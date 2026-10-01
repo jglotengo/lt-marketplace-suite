@@ -230,7 +230,22 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * HEADER — 3 zonas: logo · buscador + chips · acciones de cuenta
+     * SALTAR AL CONTENIDO — accesibilidad: primer elemento enfocable,
+     * visible al recibir foco (HOME-REDESIGN-002).
+     * =====================================================================
+     */
+    ?>
+    <a class="pv-home-skip" href="#pv-main"><?php esc_html_e( 'Saltar al contenido', 'ltms' ); ?></a>
+
+    <?php
+    /* =====================================================================
+     * HEADER — 3 zonas: logo · buscador (sugerencias live + filtro categoría) ·
+     * acciones de cuenta. HOME-REDESIGN-002 (patrón Amazon simplificado):
+     * fondo azul marino, texto blanco, buscador protagonista con sugerencias
+     * (máx 6 — JS en el scope HOME de ltms-plaza-viva.js) y filtro opcional
+     * de categoría dentro del campo (select product_cat — apply_shop_filters()
+     * ya lo soporta en /tienda/). Móvil 2 filas, tablet 1 fila, escritorio
+     * buscador min 480px. CSP-compliant: sin <script> inline.
      * =====================================================================
      */
     ?>
@@ -256,18 +271,38 @@ do_action( 'ltms_before_home_plazaviva' );
                     <span class="pv-home-header__search-icon" aria-hidden="true">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     </span>
+                    <?php if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) : ?>
+                        <?php /* HOME-REDESIGN-002: filtro de categoría dentro del campo
+                             (patrón Amazon, opcional). Viaja como product_cat junto a la
+                             búsqueda — apply_shop_filters() en /tienda/ ya lo aplica. */ ?>
+                        <label class="pv-visually-hidden" for="pv-home-search-cat"><?php esc_html_e( 'Todas las categorías', 'ltms' ); ?></label>
+                        <select id="pv-home-search-cat" class="pv-home-header__search-cat" name="product_cat">
+                            <option value=""><?php esc_html_e( 'Todas las categorías', 'ltms' ); ?></option>
+                            <?php foreach ( $pv_cat_terms as $pv_cat_term_opt ) : ?>
+                                <option value="<?php echo esc_attr( $pv_cat_term_opt->slug ); ?>"><?php echo esc_html( $pv_cat_term_opt->name ); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php endif; ?>
                     <input type="search"
                            id="pv-home-search"
                            class="pv-home-header__search-input"
                            name="s"
                            placeholder="<?php esc_attr_e( 'Buscar productos, marcas, vendedores...', 'ltms' ); ?>"
                            value="<?php echo esc_attr( get_search_query() ); ?>"
-                           autocomplete="off" />
+                           autocomplete="off"
+                           role="combobox"
+                           aria-autocomplete="list"
+                           aria-expanded="false"
+                           aria-controls="pv-home-suggestions" />
                     <input type="hidden" name="post_type" value="product" />
                     <button type="submit" class="pv-btn pv-btn--sm pv-home-header__search-btn">
                         <?php esc_html_e( 'Buscar', 'ltms' ); ?>
                     </button>
                 </form>
+                <?php /* HOME-REDESIGN-002: panel de sugerencias live (máx 6) —
+                     el JS del scope HOME lo llena contra ltms_live_search
+                     (productos visibles, rate limit 30/min server-side). */ ?>
+                <div id="pv-home-suggestions" class="pv-home-header__suggestions" role="listbox" aria-label="<?php esc_attr_e( 'Sugerencias de búsqueda', 'ltms' ); ?>" hidden></div>
                 <?php if ( ! empty( $pv_popular_chips ) ) : ?>
                     <ul class="pv-home-header__chips" aria-label="<?php esc_attr_e( 'Búsquedas populares', 'ltms' ); ?>">
                         <?php foreach ( $pv_popular_chips as $pv_chip ) : ?>
@@ -309,6 +344,8 @@ do_action( 'ltms_before_home_plazaviva' );
 
         </div>
     </header><!-- /.pv-home-header -->
+
+    <main id="pv-main">
 
     <?php
     /* =====================================================================
@@ -608,6 +645,8 @@ do_action( 'ltms_before_home_plazaviva' );
         </section>
     <?php endif; ?>
 
+    </main><!-- /#pv-main -->
+
     <?php
     /* =====================================================================
      * FOOTER — enlaces legales · métodos de pago · redes sociales
@@ -716,73 +755,197 @@ do_action( 'ltms_after_home_plazaviva' );
 <style>
 .pv-scope.pv-home{display:block;background:var(--bg);}
 
-/* ── HEADER ──────────────────────────────────────────────────────────────── */
+/* ── HEADER (HOME-REDESIGN-002, patrón Amazon) ───────────────────────────
+   Fondo azul marino #1A1A4E, texto blanco, buscador protagonista.
+   Mobile-first según brief:
+   - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
+   - ≥480: filtro de categoría dentro del campo.
+   - ≥768 (tablet): 1 fila con buscador flexible.
+   - ≥1024: buscador central min 480px.
+   Contraste AA: #fff sobre #1A1A4E ≈ 15.9:1; etiquetas rgba .72 ≈ 9:1;
+   botón #1E40AF + #fff ≈ 10.4:1; badge dorado #E0A526 + #1A1A4E ≈ 7:1. */
 .pv-scope.pv-home .pv-home-header{
     position:sticky;top:0;z-index:50;
-    background:rgba(255,255,255,.94);backdrop-filter:blur(10px);
-    border-bottom:1px solid var(--border);
+    background:#1A1A4E;
+    border-bottom:1px solid rgba(255,255,255,.08);
+    padding-top:calc(env(safe-area-inset-top, 0px) + 8px);
 }
 .pv-scope.pv-home .pv-home-header__inner{
-    display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:24px;
-    padding-top:14px;padding-bottom:14px;
+    display:grid;
+    grid-template-columns:auto 1fr;
+    grid-template-areas:
+        "logo actions"
+        "search search";
+    align-items:center;
+    gap:12px;
+    padding-top:10px;
+    padding-bottom:12px;
 }
 .pv-scope.pv-home .pv-home-header__logo{
-    display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);
+    grid-area:logo;
+    display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;
 }
 .pv-scope.pv-home .pv-home-header__logo-mark{
-    width:42px;height:42px;flex-shrink:0;
+    width:40px;height:42px;flex-shrink:0;
     display:flex;align-items:center;justify-content:center;font-size:20px;
-    background:var(--primary-50);border-radius:var(--r-md);
+    background:rgba(255,255,255,.14);border-radius:var(--r-md);color:#fff;
 }
 .pv-scope.pv-home .pv-home-header__logo-text{display:flex;flex-direction:column;line-height:1.1;}
-.pv-scope.pv-home .pv-home-header__logo-name{font-family:var(--display);font-weight:800;font-size:19px;color:var(--text);}
-.pv-scope.pv-home .pv-home-header__logo-tag{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;}
+.pv-scope.pv-home .pv-home-header__logo-name{font-family:var(--display);font-weight:800;font-size:19px;color:#fff;}
+.pv-scope.pv-home .pv-home-header__logo-tag{font-size:11px;font-weight:600;color:rgba(255,255,255,.72);text-transform:uppercase;letter-spacing:.06em;}
 
-.pv-scope.pv-home .pv-home-header__search{display:flex;flex-direction:column;gap:8px;min-width:0;}
-.pv-scope.pv-home .pv-home-header__search-form{
-    display:flex;align-items:center;gap:0;
-    background:var(--surface);border:2px solid var(--border);
-    border-radius:var(--r-pill);padding:4px 4px 4px 16px;
-    transition:border-color var(--t),box-shadow var(--t);
-}
-.pv-scope.pv-home .pv-home-header__search-form:focus-within{
-    border-color:var(--primary);box-shadow:0 0 0 4px rgba(37,99,235,.14);
-}
-.pv-scope.pv-home .pv-home-header__search-icon{color:var(--text-3);flex-shrink:0;display:flex;}
-.pv-scope.pv-home .pv-home-header__search-input{
-    flex:1;height:40px;border:0;background:transparent;font-size:14.5px;
-    padding:0 12px;min-width:0;
-}
-.pv-scope.pv-home .pv-home-header__search-input:focus{outline:none;}
-.pv-scope.pv-home .pv-home-header__search-btn{border-radius:var(--r-pill);height:40px;}
-.pv-scope.pv-home .pv-home-header__chips{display:flex;gap:6px;flex-wrap:wrap;}
-.pv-scope.pv-home .pv-home-header__chip{
-    padding:3px 11px;border-radius:var(--r-pill);
-    background:var(--bg-2);color:var(--text-2);
-    font-size:12px;font-weight:600;border:1px solid transparent;
-    cursor:pointer;transition:background var(--t),color var(--t),border-color var(--t);
-}
-.pv-scope.pv-home .pv-home-header__chip:hover{background:var(--primary-50);color:var(--primary-700);border-color:var(--primary-100);}
-
-.pv-scope.pv-home .pv-home-header__actions{display:flex;align-items:center;gap:6px;}
-.pv-scope.pv-home .pv-home-header__action{
-    display:flex;flex-direction:column;align-items:center;gap:3px;
-    padding:6px 12px;border-radius:var(--r-md);color:var(--text-2);
-    text-decoration:none;transition:background var(--t),color var(--t);
+.pv-scope.pv-home .pv-home-header__search{
+    grid-area:search;
+    display:flex;flex-direction:column;gap:8px;min-width:0;
     position:relative;
 }
-.pv-scope.pv-home .pv-home-header__action:hover{background:var(--bg-2);color:var(--primary);}
+.pv-scope.pv-home .pv-home-header__search-form{
+    display:flex;align-items:center;gap:0;
+    background:#fff;border:2px solid #fff;
+    border-radius:var(--r-pill);padding:4px 4px 4px 14px;
+    transition:box-shadow var(--t);
+}
+/* Foco del buscador: anillo dorado (único acento dorado del header; sobre
+   fondo azul marino ~7:1, muy visible). */
+.pv-scope.pv-home .pv-home-header__search-form:focus-within{
+    box-shadow:0 0 0 3px #E0A526;
+}
+.pv-scope.pv-home .pv-home-header__search-icon{color:var(--text-3);flex-shrink:0;display:flex;}
+/* Filtro de categoría dentro del campo (patrón Amazon). En base móvil se
+   oculta (la barra de categorías está 20px debajo — mismo camino); visible
+   desde 480px. font-size 16px: evita el zoom automático de iOS en campos. */
+.pv-scope.pv-home .pv-home-header__search-cat{
+    display:none;
+    height:44px;min-width:0;flex-shrink:1;
+    margin:0 6px;padding:0 8px;
+    border:0;border-right:1px solid var(--border);
+    border-radius:0;background:transparent;
+    font-size:16px;color:var(--text);
+    cursor:pointer;outline:none;
+    max-width:150px;
+}
+.pv-scope.pv-home .pv-home-header__search-input{
+    flex:1;height:44px;border:0;background:transparent;font-size:16px;
+    padding:0 12px;min-width:0;color:var(--text);
+}
+.pv-scope.pv-home .pv-home-header__search-input:focus{outline:none;}
+.pv-scope.pv-home .pv-home-header__search-btn{
+    border-radius:var(--r-pill);height:44px;min-width:44px;
+    background:#1E40AF;padding:0 18px;flex-shrink:0;
+}
+.pv-scope.pv-home .pv-home-header__search-btn:hover{background:#16309B;}
+
+/* Panel de sugerencias live (máx 6) — combobox ARIA accesible. */
+.pv-scope.pv-home .pv-home-header__suggestions{
+    position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:60;
+    background:#fff;border-radius:var(--r-md);
+    box-shadow:var(--sh-3);
+    max-height:340px;overflow-y:auto;
+    border:1px solid var(--border);
+}
+.pv-scope.pv-home .pv-home-header__suggestion{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:12px 16px;text-decoration:none;
+    border-bottom:1px solid var(--border);
+    cursor:pointer;min-height:44px;
+}
+.pv-scope.pv-home .pv-home-header__suggestion:last-child{border-bottom:none;}
+.pv-scope.pv-home .pv-home-header__suggestion:hover,
+.pv-scope.pv-home .pv-home-header__suggestion.is-active{background:var(--primary-50);}
+.pv-scope.pv-home .pv-home-header__suggestion-label{
+    font-size:14px;font-weight:600;color:var(--text);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+}
+.pv-scope.pv-home .pv-home-header__suggestion-price{
+    font-size:13px;font-weight:700;color:#1E40AF;flex-shrink:0;white-space:nowrap;
+}
+
+.pv-scope.pv-home .pv-home-header__chips{display:flex;gap:6px;flex-wrap:wrap;}
+.pv-scope.pv-home .pv-home-header__chip{
+    padding:5px 12px;border-radius:var(--r-pill);
+    background:rgba(255,255,255,.12);color:#fff;
+    font-size:12px;font-weight:600;border:1px solid transparent;
+    cursor:pointer;transition:background var(--t),color var(--t),border-color var(--t);
+    min-height:32px;
+}
+.pv-scope.pv-home .pv-home-header__chip:hover{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.4);}
+
+.pv-scope.pv-home .pv-home-header__actions{grid-area:actions;justify-self:end;display:flex;align-items:center;gap:4px;}
+.pv-scope.pv-home .pv-home-header__action{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:6px 12px;border-radius:var(--r-md);color:rgba(255,255,255,.8);
+    text-decoration:none;transition:background var(--t),color var(--t);
+    position:relative;min-height:44px;justify-content:center;
+}
+.pv-scope.pv-home .pv-home-header__action:hover{background:rgba(255,255,255,.14);color:#fff;}
 .pv-scope.pv-home .pv-home-header__action-label{font-size:11px;font-weight:600;}
 .pv-scope.pv-home .pv-home-header__action-icon{position:relative;display:flex;}
 .pv-scope.pv-home .pv-home-header__badge{
     position:absolute;top:-4px;right:-6px;
     min-width:18px;height:18px;padding:0 5px;
     display:flex;align-items:center;justify-content:center;
-    background:var(--primary);color:#fff;
+    background:#E0A526;color:#1A1A4E;
     border-radius:var(--r-pill);font-size:10.5px;font-weight:700;
-    border:2px solid var(--surface);
+    border:2px solid #1A1A4E;
 }
-.pv-scope.pv-home .pv-home-header__badge--accent{background:var(--accent);}
+.pv-scope.pv-home .pv-home-header__badge--accent{background:#E0A526;}
+
+/* Enlace "Saltar al contenido" — oculto hasta recibir foco. */
+.pv-scope.pv-home .pv-home-skip{
+    position:absolute;left:16px;top:-60px;z-index:100;
+    background:#fff;color:#1E40AF;font-weight:700;font-size:14px;
+    padding:12px 20px;border-radius:0 0 var(--r-sm) var(--r-sm);
+    text-decoration:none;box-shadow:var(--sh-2);
+    transition:top var(--t);
+}
+.pv-scope.pv-home .pv-home-skip:focus{top:0;color:#1E40AF;outline:3px solid #E0A526;}
+
+/* ── DEFENSIVA (HOME-REDESIGN-002): home nativa — ocultar el header del tema
+   (Hello Elementor / WoodMart / Theme Builder) y el floating access que
+   ltms-header-nav.js appenda cuando no hay .site-header. La home nativa
+   tiene su propio header con acciones de cuenta. Selectores precisos: NUNCA
+   un bare `header` (matchearía .pv-home-header). Mismo patrón probado de la
+   vitrina (class-ltms-vendor-storefront.php HEADER OVERLAP FIX). */
+body.pv-home-native #site-header,
+body.pv-home-native .site-header,
+body.pv-home-native #masthead,
+body.pv-home-native .elementor-location-header,
+body.pv-home-native .whb-header,
+body.pv-home-native .whb-sticky-header,
+body.pv-home-native .woodmart-header,
+body.pv-home-native #ltms-floating-access,
+body.pv-home-native #ltms-hello-access,
+body.pv-home-native #ltms-header-access,
+body.pv-home-native .ltms-header-access{display:none!important}
+
+@media (min-width:480px){
+    .pv-scope.pv-home .pv-home-header__search-cat{display:block;}
+}
+@media (min-width:768px){
+    .pv-scope.pv-home .pv-home-header__inner{
+        grid-template-columns:auto 1fr auto;
+        grid-template-areas:"logo search actions";
+        gap:16px;
+    }
+    .pv-scope.pv-home .pv-home-header__actions{justify-self:end;}
+    .pv-scope.pv-home .pv-home-header__action-label{display:none;}
+    .pv-scope.pv-home .pv-home-header__logo{grid-area:logo;}
+    .pv-scope.pv-home .pv-home-header__search{grid-area:search;}
+}
+@media (min-width:1024px){
+    .pv-scope.pv-home .pv-home-header__search{
+        max-width:none;min-width:480px;
+    }
+    .pv-scope.pv-home .pv-home-header__inner{
+        gap:24px;
+        padding-top:14px;
+        padding-bottom:14px;
+    }
+}
+@media (min-width:1280px){
+    .pv-scope.pv-home .pv-home-header__action-label{display:inline;}
+    .pv-scope.pv-home .pv-home-header__action{flex-direction:row;gap:6px;}
+}
 
 /* ── HERO ────────────────────────────────────────────────────────────────── */
 .pv-scope.pv-home .pv-home__hero-wrap{padding-top:28px;padding-bottom:8px;}

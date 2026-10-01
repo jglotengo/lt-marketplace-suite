@@ -509,6 +509,13 @@ class LTMS_Native_Templates {
     public static function body_class( array $classes ): array {
         $classes[] = 'pv-scope';
         $classes[] = 'ltms-native-template';
+        // HOME-REDESIGN-002 (2026-10-01): clase de la home nativa — permite el
+        // CSS defensivo body-scoped del template home.php (ocultar el header
+        // del tema y el floating access de ltms-header-nav.js, excluidos por
+        // el brief: la home nativa tiene su propio header con acciones).
+        if ( is_front_page() && is_page() ) {
+            $classes[] = 'pv-home-native';
+        }
         return $classes;
     }
 

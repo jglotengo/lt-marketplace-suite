@@ -1935,13 +1935,120 @@
    *      cuando exista CSS que la consuma (no antes).
    * ========================================================================= */
   (function homeScope() {
+    /* HOME-REDESIGN-002 (2026-10-01): live search del header de la home —
+       sugerencias al escribir (máx 6) contra el endpoint ltms_live_search
+       (productos visibles, rate limit 30/min server-side, nonce global
+       ltms_plaza_viva vía PV.ajax — el handler acepta búsqueda read-only
+       products/vendors para anónimos). Combobox ARIA accesible:
+       aria-expanded, ArrowUp/Down, Enter navega a la sugerencia activa,
+       Escape cierra. Debounce 250ms; respuesta stale descartada. */
+    function initLiveSearch(scope) {
+      var input = scope.querySelector('.pv-home-header__search-input');
+      var form  = scope.querySelector('.pv-home-header__search-form');
+      var panel = scope.querySelector('.pv-home-header__suggestions');
+      if (!input || !form || !panel || !window.PV || typeof PV.ajax !== 'function') return;
+
+      var timer  = null;
+      var items  = [];
+      var active = -1;
+
+      function close() {
+        panel.hidden = true;
+        panel.innerHTML = '';
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        items = [];
+        active = -1;
+      }
+
+      function setActive(idx) {
+        active = idx;
+        qsa('[role="option"]', panel).forEach(function (opt, i) {
+          opt.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+          opt.classList.toggle('is-active', i === idx);
+        });
+        if (idx >= 0 && items[idx]) {
+          input.setAttribute('aria-activedescendant', 'pv-home-suggestions-opt-' + idx);
+        } else {
+          input.removeAttribute('aria-activedescendant');
+        }
+      }
+
+      function render(results) {
+        panel.innerHTML = '';
+        items = (results || []).slice(0, 6);
+        if (!items.length) { close(); return; }
+        items.forEach(function (r, i) {
+          var opt = document.createElement('a');
+          opt.className = 'pv-home-header__suggestion';
+          opt.setAttribute('role', 'option');
+          opt.id = 'pv-home-suggestions-opt-' + i;
+          opt.setAttribute('aria-selected', 'false');
+          opt.href = r.url || '#';
+          var label = document.createElement('span');
+          label.className = 'pv-home-header__suggestion-label';
+          label.textContent = r.label || '';
+          opt.appendChild(label);
+          if (r.price) {
+            var price = document.createElement('span');
+            price.className = 'pv-home-header__suggestion-price';
+            // r.price viene server-side via wc_price() (HTML seguro de WC).
+            price.innerHTML = r.price;
+            opt.appendChild(price);
+          }
+          panel.appendChild(opt);
+        });
+        panel.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+        setActive(-1);
+      }
+
+      function search(q) {
+        PV.ajax('ltms_live_search', { q: q, type: 'products', limit: 6 })
+          .then(function (res) {
+            if (input.value.trim() !== q) return; // respuesta stale del debounce
+            render(res && res.data && res.data.results ? res.data.results : []);
+          })
+          .catch(function () { close(); });
+      }
+
+      on(input, 'input', function () {
+        var q = input.value.trim();
+        if (timer) clearTimeout(timer);
+        if (q.length < 2) { close(); return; }
+        timer = setTimeout(function () { search(q); }, 250);
+      });
+
+      on(input, 'keydown', function (e) {
+        if (panel.hidden) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setActive(Math.min(active + 1, items.length - 1));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setActive(Math.max(active - 1, -1));
+        } else if (e.key === 'Enter' && active >= 0 && items[active]) {
+          e.preventDefault();
+          window.location.href = items[active].url || '#';
+        } else if (e.key === 'Escape') {
+          close();
+        }
+      });
+
+      // Cerrar al click fuera del buscador.
+      on(document, 'click', function (e) {
+        if (panel.hidden) return;
+        if (!form.contains(e.target) && !panel.contains(e.target)) close();
+      });
+    }
+
     function initHome() {
       var scope = document.querySelector('.pv-scope.pv-home');
       if (!scope) return;
-      // No hay behaviours a (re)inicializar en este momento — el handler
-      // global AUDIT-FE-HOME-003 cubre los chips, y la clase is-scrolled
-      // no tiene CSS. Mantenemos el IIFE como válvula de extensión para
-      // futuros behaviours específicos de la home (ver comentario arriba).
+      initLiveSearch(scope);
+      // El handler global AUDIT-FE-HOME-003 cubre los chips, y la clase
+      // is-scrolled no tiene CSS. El IIFE sigue siendo la válvula de
+      // extensión para futuros behaviours específicos de la home.
     }
 
     if (document.readyState === 'loading') {
