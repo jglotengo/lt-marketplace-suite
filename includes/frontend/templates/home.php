@@ -65,16 +65,24 @@ $pv_popular_chips = apply_filters( 'ltms_home_popular_chips', array(
 ) );
 
 /* ---------------------------------------------------------------------------
- * 2. Categorías para el Bento Grid (get_terms → product_cat)
- *    Top 6 por número de productos, orden descendente.
+ * 2. Categorías para la barra de accesos (HOME-REDESIGN-003)
+ *    Fuente: LTMS_Utils::get_normalized_product_categories() — dedup por
+ *    fingerprint (case/acento/singular-plural) + nombre en MAYUSCULAS +
+ *    orden por # de productos (proxy de conversión). Top 8.
+ *    Fallback: get_terms crudo (top 8 por count) si el helper no está cargado.
  * ------------------------------------------------------------------------- */
-$pv_cat_terms = get_terms( array(
-    'taxonomy'   => 'product_cat',
-    'hide_empty' => true,
-    'number'     => 6,
-    'orderby'    => 'count',
-    'order'      => 'DESC',
-) );
+$pv_cat_terms = array();
+if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'get_normalized_product_categories' ) ) {
+    $pv_cat_terms = array_slice( LTMS_Utils::get_normalized_product_categories( true ), 0, 8 );
+} else {
+    $pv_cat_terms = get_terms( array(
+        'taxonomy'   => 'product_cat',
+        'hide_empty' => true,
+        'number'     => 8,
+        'orderby'    => 'count',
+        'order'      => 'DESC',
+    ) );
+}
 
 /**
  * Mapa slug → emoji para los iconos de categoría.
@@ -349,6 +357,58 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
+     * CATEGORÍAS — barra de 8 accesos (Shein/Alibaba, HOME-REDESIGN-003)
+     * Un único elemento de navegación de categorías, justo debajo del header
+     * (antes del hero — orden de compra: 1 buscar, 2 elegir categoría,
+     * 3 oferta principal, 4 productos). Reemplaza al bento grid de 6 tiles
+     * (el brief: no repetir las categorías en otra grilla más abajo).
+     * Móvil = fila deslizable con la última asomando; tablet = deslizable
+     * más ancha; escritorio = barra fija + "Ver todas".
+     * =====================================================================
+     */
+    if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) :
+    ?>
+        <nav class="pv-cat-bar" aria-label="<?php esc_attr_e( 'Explora por categorías', 'ltms' ); ?>">
+            <div class="pv-cat-bar__scroll">
+                <ul class="pv-cat-bar__list" role="list">
+                    <?php foreach ( $pv_cat_terms as $pv_term ) :
+                        $pv_icon = isset( $pv_cat_icons[ $pv_term->slug ] ) ? $pv_cat_icons[ $pv_term->slug ] : '🛍️';
+                        $pv_term_id = (int) ( $pv_term->term_id ?? 0 );
+                        $pv_cat_url = $pv_term_id ? get_term_link( $pv_term_id ) : get_term_link( $pv_term );
+                        if ( is_wp_error( $pv_cat_url ) ) {
+                            $pv_cat_url = $pv_shop_url;
+                        }
+                        $pv_count = (int) $pv_term->count;
+                    ?>
+                        <li role="listitem">
+                            <a class="pv-cat-bar__item"
+                               href="<?php echo esc_url( $pv_cat_url ); ?>"
+                               aria-label="<?php echo esc_attr( sprintf( __( '%1$s — %2$s', 'ltms' ), $pv_term->name, sprintf( _n( '%d producto', '%d productos', $pv_count, 'ltms' ), $pv_count ) ) ); ?>">
+                                <span class="pv-cat-bar__icon" aria-hidden="true"><?php echo esc_html( $pv_icon ); ?></span>
+                                <span class="pv-cat-bar__name"><?php echo esc_html( $pv_term->name ); ?></span>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <a class="pv-cat-bar__more" href="<?php echo esc_url( $pv_shop_url ); ?>">
+                <?php esc_html_e( 'Ver todas', 'ltms' ); ?>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </a>
+        </nav>
+    <?php else : ?>
+        <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
+        <section class="pv-section pv-home__cats">
+            <div class="pv-card pv-card--flat pv-home__empty-note">
+                <h3><?php esc_html_e( 'Próximamente más categorías', 'ltms' ); ?></h3>
+                <p><?php esc_html_e( 'Estamos organizando el catálogo. Mientras tanto, explora todos los productos disponibles.', 'ltms' ); ?></p>
+                <a class="pv-btn pv-btn--sm" href="<?php echo esc_url( $pv_shop_url ); ?>"><?php esc_html_e( 'Ver todos los productos', 'ltms' ); ?></a>
+            </div>
+        </section>
+    <?php endif; ?>
+
+    <?php
+    /* =====================================================================
      * HERO BANNER — gradiente azul #2563EB
      * =====================================================================
      */
@@ -427,68 +487,6 @@ do_action( 'ltms_before_home_plazaviva' );
             </div>
         </div>
     </section>
-
-    <?php
-    /* =====================================================================
-     * BENTO GRID — 6 categorías asimétricas
-     * =====================================================================
-     */
-    if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) :
-        $pv_bento_classes = array( 'a', 'b', 'c', 'd', 'e', 'f' ); // placement
-    ?>
-        <section class="pv-section pv-home__cats" aria-labelledby="pv-home-cats-title">
-            <header class="pv-section__head">
-                <div>
-                    <h2 id="pv-home-cats-title" class="pv-section__title"><?php esc_html_e( 'Explora por categorías', 'ltms' ); ?></h2>
-                    <p class="pv-section__sub"><?php esc_html_e( 'Encuentra lo que buscas en nuestros principales departamentos', 'ltms' ); ?></p>
-                </div>
-                <a class="pv-section__more" href="<?php echo esc_url( $pv_shop_url ); ?>">
-                    <?php esc_html_e( 'Ver todas', 'ltms' ); ?>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                </a>
-            </header>
-
-            <div class="pv-bento-grid" role="list">
-                <?php foreach ( $pv_cat_terms as $pv_idx => $pv_term ) :
-                    $pv_placement = isset( $pv_bento_classes[ $pv_idx ] ) ? $pv_bento_classes[ $pv_idx ] : 'f';
-                    $pv_icon = isset( $pv_cat_icons[ $pv_term->slug ] ) ? $pv_cat_icons[ $pv_term->slug ] : '🛍️';
-                    $pv_cat_url = get_term_link( $pv_term );
-                    if ( is_wp_error( $pv_cat_url ) ) {
-                        $pv_cat_url = $pv_shop_url;
-                    }
-                    $pv_count = (int) $pv_term->count;
-                ?>
-                    <a class="pv-bento-tile pv-bento-tile--<?php echo esc_attr( $pv_placement ); ?> <?php echo $pv_placement === 'a' ? 'pv-bento-tile--feature' : ''; ?>"
-                       href="<?php echo esc_url( $pv_cat_url ); ?>"
-                       role="listitem"
-                       aria-label="<?php echo esc_attr( sprintf( __( '%s — %d productos', 'ltms' ), $pv_term->name, $pv_count ) ); ?>">
-                        <span class="pv-bento-tile__icon" aria-hidden="true"><?php echo esc_html( $pv_icon ); ?></span>
-                        <span class="pv-bento-tile__body">
-                            <span class="pv-bento-tile__name"><?php echo esc_html( $pv_term->name ); ?></span>
-                            <span class="pv-bento-tile__count">
-                                <?php
-                                /* translators: %d: número de productos. */
-                                echo esc_html( sprintf( _n( '%d producto', '%d productos', $pv_count, 'ltms' ), $pv_count ) );
-                                ?>
-                            </span>
-                        </span>
-                        <span class="pv-bento-tile__arrow" aria-hidden="true">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                        </span>
-                    </a>
-                <?php endforeach; ?>
-            </div>
-        </section>
-    <?php else : ?>
-        <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
-        <section class="pv-section pv-home__cats">
-            <div class="pv-card pv-card--flat pv-home__empty-note">
-                <h3><?php esc_html_e( 'Próximamente más categorías', 'ltms' ); ?></h3>
-                <p><?php esc_html_e( 'Estamos organizando el catálogo. Mientras tanto, explora todos los productos disponibles.', 'ltms' ); ?></p>
-                <a class="pv-btn pv-btn--sm" href="<?php echo esc_url( $pv_shop_url ); ?>"><?php esc_html_e( 'Ver todos los productos', 'ltms' ); ?></a>
-            </div>
-        </section>
-    <?php endif; ?>
 
     <?php
     /* =====================================================================
@@ -954,58 +952,54 @@ body.pv-home-native .ltms-header-access{display:none!important}
 /* ── TRUST ───────────────────────────────────────────────────────────────── */
 .pv-scope.pv-home .pv-home__trust{padding-top:24px;padding-bottom:8px;}
 
-/* ── BENTO GRID ──────────────────────────────────────────────────────────── */
-.pv-scope.pv-home .pv-home__cats{padding-top:40px;padding-bottom:8px;}
-.pv-scope.pv-home .pv-bento-grid{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    grid-auto-rows:minmax(130px,auto);
-    grid-template-areas:
-        "a a b b"
-        "a a c d"
-        "e e f f";
-    gap:16px;
+/* ── CATEGORÍAS — barra de accesos (HOME-REDESIGN-003, Shein/Alibaba) ──────
+   Móvil: fila deslizable con la última asomando (partial item = indicio de
+   que hay más). Escritorio ≥1024: barra fija sin deslizar. Íconos del mapa
+   emoji existente (filterable). Touch targets 72px de alto. */
+.pv-scope.pv-home .pv-cat-bar{
+    display:flex;align-items:center;gap:8px;
+    padding-top:12px;padding-bottom:4px;
 }
-.pv-scope.pv-home .pv-bento-tile--a{grid-area:a;}
-.pv-scope.pv-home .pv-bento-tile--b{grid-area:b;}
-.pv-scope.pv-home .pv-bento-tile--c{grid-area:c;}
-.pv-scope.pv-home .pv-bento-tile--d{grid-area:d;}
-.pv-scope.pv-home .pv-bento-tile--e{grid-area:e;}
-.pv-scope.pv-home .pv-bento-tile--f{grid-area:f;}
-
-.pv-scope.pv-home .pv-bento-tile{
-    position:relative;display:flex;flex-direction:column;justify-content:flex-end;
-    padding:22px;border-radius:var(--r-card);overflow:hidden;
-    background:var(--surface);border:1px solid var(--border);box-shadow:var(--sh-1);
+.pv-scope.pv-home .pv-cat-bar__scroll{
+    flex:1;min-width:0;
+    overflow-x:auto;
+    scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding-bottom:2px;
+}
+.pv-scope.pv-home .pv-cat-bar__scroll::-webkit-scrollbar{display:none;}
+.pv-scope.pv-home .pv-cat-bar__list{
+    display:flex;gap:4px;width:max-content;
+}
+.pv-scope.pv-home .pv-cat-bar__item{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;min-width:76px;min-height:72px;
+    padding:10px 8px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
     text-decoration:none;color:var(--text);
-    transition:transform var(--t-slow),box-shadow var(--t-slow),border-color var(--t-slow);
+    scroll-snap-align:start;
+    transition:transform var(--t),box-shadow var(--t),border-color var(--t);
 }
-.pv-scope.pv-home .pv-bento-tile:hover{
-    transform:translateY(-4px);box-shadow:var(--sh-hover);border-color:var(--primary-100);
+.pv-scope.pv-home .pv-cat-bar__item:hover{
+    transform:translateY(-2px);box-shadow:var(--sh-hover);border-color:var(--primary-100);
 }
-.pv-scope.pv-home .pv-bento-tile__icon{
-    position:absolute;top:18px;left:22px;font-size:34px;line-height:1;
-    filter:drop-shadow(0 2px 4px rgba(15,17,17,.08));
+.pv-scope.pv-home .pv-cat-bar__icon{font-size:26px;line-height:1;}
+.pv-scope.pv-home .pv-cat-bar__name{
+    font-size:11.5px;font-weight:600;color:var(--text);
+    max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.pv-scope.pv-home .pv-bento-tile__body{display:flex;flex-direction:column;gap:2px;position:relative;z-index:1;}
-.pv-scope.pv-home .pv-bento-tile__name{font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);}
-.pv-scope.pv-home .pv-bento-tile__count{font-size:12.5px;color:var(--text-3);font-weight:500;}
-.pv-scope.pv-home .pv-bento-tile__arrow{
-    position:absolute;bottom:22px;right:22px;
-    width:36px;height:36px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    background:var(--bg);color:var(--text-2);
-    transition:background var(--t),color var(--t),transform var(--t);
+.pv-scope.pv-home .pv-cat-bar__more{
+    display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
+    font-size:13px;font-weight:700;color:#1E40AF;text-decoration:none;
+    min-height:44px;padding:0 8px;
 }
-.pv-scope.pv-home .pv-bento-tile:hover .pv-bento-tile__arrow{background:var(--primary);color:#fff;transform:translateX(2px);}
-
-/* Tile destacado (a) — fondo con gradiente sutil */
-.pv-scope.pv-home .pv-bento-tile--feature{
-    background:linear-gradient(135deg,var(--primary-50) 0%,var(--surface) 60%);
-    border-color:var(--primary-100);
+.pv-scope.pv-home .pv-cat-bar__more:hover{color:#16309B;}
+@media (min-width:1024px){
+    /* Escritorio: barra fija sin deslizar (los 8-10 accesos caben). */
+    .pv-scope.pv-home .pv-cat-bar__scroll{overflow:visible;}
+    .pv-scope.pv-home .pv-cat-bar__list{width:100%;justify-content:space-between;}
 }
-.pv-scope.pv-home .pv-bento-tile--feature .pv-bento-tile__icon{font-size:54px;}
-.pv-scope.pv-home .pv-bento-tile--feature .pv-bento-tile__name{font-size:22px;font-weight:800;}
 
 /* ── TRENDING ────────────────────────────────────────────────────────────── */
 .pv-scope.pv-home .pv-home__trending{padding-top:40px;padding-bottom:8px;}
@@ -1120,23 +1114,18 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-home-footer__built{font-weight:600;}
 
-/* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
+/* ── RESPONSIVE ────────────────────────────────────────────────────────────
+   HOME-REDESIGN-002/003: el header y la barra de categorías usan el sistema
+   móvil-primero (min-width 480/768/1024/1280) definido arriba. Los bloques
+   max-width de abajo cubren solo las secciones pendientes de su propio
+   commit (trending, vendors, footer). Las reglas viejas del header
+   (max-width:980/560) y del bento grid fueron ELIMINADAS — pisaban al
+   sistema nuevo en la cascada y rompían el header en ≤980px. */
 @media (max-width:1100px){
     .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(3,1fr);}
     .pv-scope.pv-home .pv-home__vendor-grid{grid-template-columns:repeat(2,1fr);}
     .pv-scope.pv-home .pv-home-footer__inner{grid-template-columns:1fr 1fr;gap:32px;}
     .pv-scope.pv-home .pv-home-footer__col--brand{grid-column:1 / -1;}
-}
-@media (max-width:980px){
-    .pv-scope.pv-home .pv-home-header__inner{grid-template-columns:auto 1fr;gap:16px;}
-    .pv-scope.pv-home .pv-home-header__search{grid-column:1 / -1;order:3;}
-    .pv-scope.pv-home .pv-home-header__actions{justify-self:end;}
-    .pv-scope.pv-home .pv-home-header__action-label{display:none;}
-    .pv-scope.pv-home .pv-home-hero{padding:38px 30px;min-height:280px;}
-    .pv-scope.pv-home .pv-bento-grid{
-        grid-template-columns:repeat(2,1fr);
-        grid-template-areas:"a a" "b b" "c d" "e f";
-    }
 }
 @media (max-width:760px){
     .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(2,1fr);}
@@ -1144,14 +1133,6 @@ body.pv-home-native .ltms-header-access{display:none!important}
     .pv-scope.pv-home .pv-home-footer__inner{grid-template-columns:1fr;gap:28px;}
 }
 @media (max-width:560px){
-    .pv-scope.pv-home .pv-home-header__logo-tag{display:none;}
-    .pv-scope.pv-home .pv-home-hero{padding:30px 20px;border-radius:var(--r-md);}
-    .pv-scope.pv-home .pv-bento-grid{
-        grid-template-columns:1fr;
-        grid-template-areas:"a" "b" "c" "d" "e" "f";
-    }
-    .pv-scope.pv-home .pv-bento-tile--feature .pv-bento-tile__icon{font-size:40px;}
-    .pv-scope.pv-home .pv-bento-tile--feature .pv-bento-tile__name{font-size:18px;}
     .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:1fr;gap:14px;}
     .pv-scope.pv-home .pv-home-footer__bottom-inner{flex-direction:column;align-items:flex-start;}
 }
