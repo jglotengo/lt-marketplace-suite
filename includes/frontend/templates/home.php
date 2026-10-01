@@ -727,6 +727,28 @@ do_action( 'ltms_before_home_plazaviva' );
         </section>
     <?php endif; ?>
 
+    <?php
+    /* =====================================================================
+     * VENDE CON NOSOTROS (HOME-REDESIGN-005, patrón AliExpress): franja con
+     * un único botón de registro de vendedor. Fondo azul marino con detalle
+     * dorado. Sin cifras inventadas (brief). Desktop: texto a la izquierda +
+     * botón a la derecha en una sola fila; móvil: apilado, botón a todo el
+     * ancho.
+     * =====================================================================
+     */
+    ?>
+    <section class="pv-section pv-home__sell" aria-labelledby="pv-home-sell-title">
+        <div class="pv-home-sell">
+            <div class="pv-home-sell__body">
+                <h2 id="pv-home-sell-title" class="pv-home-sell__title"><?php esc_html_e( 'Vende con nosotros', 'ltms' ); ?></h2>
+                <p class="pv-home-sell__sub"><?php esc_html_e( 'Publica tus productos en el marketplace y llega a compradores de toda Colombia y México.', 'ltms' ); ?></p>
+            </div>
+            <a class="pv-home-sell__cta" href="<?php echo esc_url( apply_filters( 'ltms_become_seller_url', home_url( '/vendedor/registro' ) ) ); ?>">
+                <?php esc_html_e( 'Registrarme como vendedor', 'ltms' ); ?>
+            </a>
+        </div>
+    </section>
+
     </main><!-- /#pv-main -->
 
     <?php
@@ -836,6 +858,15 @@ do_action( 'ltms_after_home_plazaviva' );
 ?>
 <style>
 .pv-scope.pv-home{display:block;background:var(--bg);}
+
+/* ── RADIOS UNIFORMES (HOME-REDESIGN-005) ──────────────────────────────────
+   Brief: radio uniforme (8px tarjetas, 8-12px botones). Scoped a la home —
+   NO toca los tokens globales compartidos con shop/cart/checkout. Los radios
+   de las TARJETAS van al final del <style> (deben ganar sobre las reglas
+   específicas de cada sección que usan --r-md). El botón del buscador
+   conserva el pill (matchea la forma del campo, patrón Amazon; su regla
+   específica viene después en la cascada y gana por orden). */
+.pv-scope.pv-home .pv-btn{border-radius:12px;}
 
 /* ── HEADER (HOME-REDESIGN-002, patrón Amazon) ───────────────────────────
    Fondo azul marino #1A1A4E, texto blanco, buscador protagonista.
@@ -1112,6 +1143,27 @@ body.pv-home-native .ltms-header-access{display:none!important}
 
 /* ── TRUST ───────────────────────────────────────────────────────────────── */
 .pv-scope.pv-home .pv-home__trust{padding-top:24px;padding-bottom:8px;}
+/* HOME-REDESIGN-005 (Temu/AliExpress): franja compacta, sin animación.
+   Móvil 2×2; tablet/escritorio una sola línea con los 4 elementos. Íconos
+   unificados a azul (la variante danger del 4º item leía como error — el
+   brief reserva rojo para estados de error/éxito; el dorado queda escaso
+   para el badge del header). */
+.pv-scope.pv-home .pv-trust-bar{
+    grid-template-columns:repeat(4,1fr);
+    gap:16px;
+    padding:16px 20px;
+    box-shadow:none;
+}
+.pv-scope.pv-home .pv-trust-item:nth-child(n) .pv-trust-item__icon{
+    background:var(--primary-50);color:var(--primary);
+}
+@media (max-width:767px){
+    .pv-scope.pv-home .pv-trust-bar{
+        grid-template-columns:repeat(2,1fr);
+        gap:10px;
+        padding:14px;
+    }
+}
 
 /* ── CATEGORÍAS — barra de accesos (HOME-REDESIGN-003, Shein/Alibaba) ──────
    Móvil: fila deslizable con la última asomando (partial item = indicio de
@@ -1163,11 +1215,23 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 
 /* ── TRENDING ────────────────────────────────────────────────────────────── */
+/* HOME-REDESIGN-005: grid 2 col móvil / 3 tablet / 4 escritorio / 5 solo en
+   pantallas ≥1440px (el contenedor de 1400px lo permite). Tarjetas de igual
+   altura (grid stretch). Radio 8px (regla de radios uniformes arriba). */
 .pv-scope.pv-home .pv-home__trending{padding-top:40px;padding-bottom:8px;}
 .pv-scope.pv-home .pv-home__product-grid{
-    display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
 }
-.pv-scope.pv-home .pv-home__product-grid .pv-product-card{margin:0;}
+.pv-scope.pv-home .pv-home__product-grid .pv-product-card{margin:0;border-radius:8px;}
+@media (min-width:768px){
+    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(3,1fr);gap:16px;}
+}
+@media (min-width:1024px){
+    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(4,1fr);gap:18px;}
+}
+@media (min-width:1440px){
+    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(5,1fr);}
+}
 
 /* ── VENDORS ─────────────────────────────────────────────────────────────── */
 .pv-scope.pv-home .pv-home__vendors{padding-top:40px;padding-bottom:8px;}
@@ -1205,10 +1269,53 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-vendor-card__sales{font-size:12.5px;color:var(--text-3);}
 .pv-scope.pv-home .pv-vendor-card__products{font-size:12.5px;color:var(--text-3);font-weight:600;}
 
+/* ── VENDE CON NOSOTROS (HOME-REDESIGN-005, AliExpress) ────────────────────
+   Fondo azul marino con detalle dorado (línea superior de 3px). Desktop:
+   texto izq + botón der en una sola fila. Móvil: apilado, botón full-width.
+   Contraste: #fff sobre #1A1A4E ≈ 15.9:1; sub rgba .8 ≈ 9.9:1; CTA dorado
+   #E0A526 + #1A1A4E ≈ 7:1 (el dorado NUNCA como texto sobre blanco). */
+.pv-scope.pv-home .pv-home__sell{padding-top:40px;padding-bottom:8px;}
+.pv-scope.pv-home .pv-home-sell{
+    display:flex;flex-direction:column;align-items:flex-start;gap:18px;
+    background:#1A1A4E;
+    border-top:3px solid #E0A526;
+    border-radius:var(--r-md);
+    padding:32px 24px;
+}
+.pv-scope.pv-home .pv-home-sell__body{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.pv-scope.pv-home .pv-home-sell__title{
+    font-family:var(--display);font-weight:800;font-size:clamp(20px,2.4vw,28px);
+    color:#fff;line-height:1.15;margin:0;
+}
+.pv-scope.pv-home .pv-home-sell__sub{
+    font-size:14.5px;color:rgba(255,255,255,.8);line-height:1.5;margin:0;
+    max-width:560px;
+}
+.pv-scope.pv-home .pv-home-sell__cta{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-height:48px;padding:0 28px;flex-shrink:0;
+    background:#E0A526;color:#1A1A4E;
+    font-family:var(--display);font-size:14.5px;font-weight:700;
+    border-radius:12px;text-decoration:none;
+    transition:background var(--t),transform var(--t);
+    white-space:nowrap;
+}
+.pv-scope.pv-home .pv-home-sell__cta:hover{background:#EBB44A;color:#1A1A4E;transform:translateY(-1px);}
+.pv-scope.pv-home .pv-home-sell__cta:focus-visible{outline:3px solid #fff;outline-offset:2px;}
+@media (min-width:1024px){
+    .pv-scope.pv-home .pv-home-sell{
+        flex-direction:row;align-items:center;justify-content:space-between;
+        padding:36px 40px;
+    }
+}
+@media (max-width:560px){
+    .pv-scope.pv-home .pv-home-sell__cta{width:100%;padding:0 16px;}
+}
+
 /* ── EMPTY STATES (secciones dinámicas) ───────────────────────────────────
-   AUDIT-FE-PV-DS-008 FIX (P1-6): bento cats / trending / star vendors eran
-   secciones silenciosas (if !empty sin else). Ahora muestran una nota vacía
-   con CTA en vez de desaparecer sin explicación. */
+   AUDIT-FE-PV-DS-008 FIX (P1-6): trending / star vendors eran secciones
+   silenciosas (if !empty sin else). Ahora muestran una nota vacía con CTA
+   en vez de desaparecer sin explicación. */
 .pv-scope.pv-home .pv-home__empty-note{
     padding:32px 24px;text-align:center;
 }
@@ -1275,26 +1382,34 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-home-footer__built{font-weight:600;}
 
+/* ── RADIOS DE TARJETAS (HOME-REDESIGN-005) — al final del <style> para
+   ganar sobre las reglas específicas de cada sección (cat-bar items, hero
+   banners/cards y cards de producto usaban --r-md 14px o 20px; el brief
+   exige radio uniforme de 8px en tarjetas). Especificidad igual o mayor
+   + orden posterior = ganan. */
+.pv-scope.pv-home .pv-product-card,
+.pv-scope.pv-home .pv-vendor-card,
+.pv-scope.pv-home .pv-cat-bar__item,
+.pv-scope.pv-home .pv-home-hero__banner,
+.pv-scope.pv-home .pv-home-hero__card{border-radius:8px;}
+
 /* ── RESPONSIVE ────────────────────────────────────────────────────────────
-   HOME-REDESIGN-002/003: el header y la barra de categorías usan el sistema
-   móvil-primero (min-width 480/768/1024/1280) definido arriba. Los bloques
-   max-width de abajo cubren solo las secciones pendientes de su propio
-   commit (trending, vendors, footer). Las reglas viejas del header
-   (max-width:980/560) y del bento grid fueron ELIMINADAS — pisaban al
-   sistema nuevo en la cascada y rompían el header en ≤980px. */
+   HOME-REDESIGN-002/003/005: header, barra de categorías, hero y grid de
+   productos usan el sistema móvil-primero (min-width 480/768/1024/1280/1440)
+   definido arriba. Los bloques max-width de abajo cubren solo las secciones
+   pendientes de su propio commit (vendors, footer). Las reglas viejas del
+   header (max-width:980/560), del bento grid y del grid de productos fueron
+   ELIMINADAS — pisaban al sistema nuevo en la cascada. */
 @media (max-width:1100px){
-    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(3,1fr);}
     .pv-scope.pv-home .pv-home__vendor-grid{grid-template-columns:repeat(2,1fr);}
     .pv-scope.pv-home .pv-home-footer__inner{grid-template-columns:1fr 1fr;gap:32px;}
     .pv-scope.pv-home .pv-home-footer__col--brand{grid-column:1 / -1;}
 }
 @media (max-width:760px){
-    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(2,1fr);}
     .pv-scope.pv-home .pv-home__vendor-grid{grid-template-columns:1fr;}
     .pv-scope.pv-home .pv-home-footer__inner{grid-template-columns:1fr;gap:28px;}
 }
 @media (max-width:560px){
-    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:1fr;gap:14px;}
     .pv-scope.pv-home .pv-home-footer__bottom-inner{flex-direction:column;align-items:flex-start;}
 }
 </style>

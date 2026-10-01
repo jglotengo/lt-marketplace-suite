@@ -122,6 +122,12 @@
        ══════════════════════════════════════════════════════════════ */
     function injectTrustBar() {
         if (document.querySelector('.ltms-trust-bar')) return; // Ya existe
+        // HOME-REDESIGN-005 (2026-10-01): la home nativa (Plaza Viva) tiene su
+        // propia franja de confianza (.pv-home__trust) con las garantías reales
+        // de LTMS — no inyectar la barra genérica (prometía "Devoluciones
+        // garantizadas", excluida por el brief). Sin esto habría doble franja
+        // en la home nativa (el body tiene la clase home/front-page).
+        if (document.querySelector('.pv-scope.pv-home')) return;
 
         var bar = document.createElement('div');
         bar.className = 'ltms-trust-bar';
