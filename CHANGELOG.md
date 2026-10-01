@@ -4,6 +4,147 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-01
+
+### Added — `HOME-WIRING-001` + `HOME-REDESIGN-002..006` (home nativa Plaza Viva conectada y rediseñada: header Amazon, barra de categorías, hero con banners, trust, productos, vende con nosotros, footer)
+
+> **Reporte del operador:** rediseñar la home aplicando patrones de Amazon,
+> Alibaba, AliExpress, Shein y Temu adaptados a la identidad de Lo Tengo, con
+> diseño plenamente responsivo (móvil, tablet y escritorio). Solo entran los
+> patrones que acortan el camino a la compra; lo que genera fricción o
+> saturación queda excluido. Decisiones de negocio confirmadas: Opción A
+> (template nativo), categorías por conversión, 4 garantías (Compra Protegida,
+> Pago Seguro, Vendedores Verificados, Envío a todo el país), banners desde el
+> admin, fuentes Albert Sans + Inter.
+>
+> **Estado previo:** el home vivo era la página de Elementor (ID 30) con fixes
+> CSS/JS injectados (HF-01..HF-08) + Home Slider LTMS. El template nativo
+> `home.php` (Plaza Viva, @since 3.0.0, 1023 líneas, CSP-compliant, con tests)
+> estaba completo pero **NO conectado**: `maybe_override()` no tenía rama para
+> `is_front_page()` (el docblock mencionaba `ltms_home_template_enabled` pero
+> la rama no existía).
+>
+> - **`HOME-WIRING-001` (feat, C1)** (`class-ltms-native-templates.php`,
+>   `class-ltms-frontend-home-slider.php`):
+>   - Rama `is_front_page() && is_page()` en `maybe_override()` ANTES del check
+>     de Elementor (condicionales básicos de WP — sin riesgo del fatal
+>     histórico de is_product/is_shop; con Elementor activo el home caía al
+>     final de la rama Elementor sin override). Opción
+>     `ltms_home_template_enabled` default `'yes'` (reversible: `'no'` devuelve
+>     el control a Elementor sin tocar código). Guard `is_page()` evita
+>     reemplazar el índice del blog con show_on_front='posts'.
+>   - `render_shortcode()` marca `$this->rendered = true` — un render por
+>     do_shortcode() directo (el hero nativo) dejaba el flag false y el
+>     fallback wp_footer imprimía el banner una SEGUNDA vez.
+>   - Cache-busting: `ltms-plaza-viva.css` encolado con `$ver` (antes
+>     `$ver . '-b' . time()` — la URL cambiaba en CADA request e invalidaba el
+>     cache de SG Optimizer en cada visita).
+> - **`HOME-REDESIGN-002` (feat, C2 — header, patrón Amazon)**:
+>   - Fondo azul marino #1A1A4E, texto blanco, sticky + safe-area-inset-top.
+>     Móvil 2 filas (logo+acciones arriba, buscador full-width debajo); tablet
+>     1 fila; escritorio buscador min 480px.
+>   - Buscador protagonista: **sugerencias live** (máx 6) contra el endpoint
+>     existente `ltms_live_search` (productos visibles, rate limit 30/min
+>     server-side) + **filtro de categoría dentro del campo** (select
+>     `product_cat` — `apply_shop_filters()` ya lo soporta en /tienda/; oculto
+>     en base móvil, la barra está 20px debajo).
+>   - JS en el scope HOME de `ltms-plaza-viva.js` (válvula de extensión
+>     existente): combobox ARIA (aria-expanded, listbox, ArrowUp/Down, Enter,
+>     Escape), debounce 250ms, respuesta stale descartada. home.php sigue 100%
+>     CSP-compliant (cero `<script>` inline).
+>   - Enlace "Saltar al contenido" + wrapper semántico `<main id="pv-main">`.
+>   - CSS defensivo `body.pv-home-native`: oculta el header del tema
+>     (`.site-header`, `.elementor-location-header`, `.whb-*`) y el floating
+>     access (`#ltms-floating-access`, `#ltms-hello-access` — botones fijos
+>     VENDER/MI CUENTA de ltms-header-nav.js, excluidos por el brief como
+>     "elementos fijos extra"). Mismo patrón probado de la vitrina
+>     (HEADER OVERLAP FIX v2.9.268).
+>   - Touch targets 44px (buscar, sugerencias) y font-size 16px en
+>     input/select (evita el zoom automático de iOS). Foco del buscador con
+>     anillo dorado #E0A526 (único acento dorado del header, ~7:1 sobre navy).
+> - **`HOME-REDESIGN-003` (feat, C3 — categorías, Shein/Alibaba)**:
+>   - El bento grid de 6 tiles (HTML+CSS) ELIMINADO — el brief: no repetir las
+>     categorías en otra grilla más abajo.
+>   - Barra de 8 accesos (ícono + nombre) + "Ver todas", justo debajo del
+>     header y ANTES del hero (orden de compra: 1 buscar, 2 elegir categoría,
+>     3 oferta principal, 4 productos).
+>   - Fuente: `LTMS_Utils::get_normalized_product_categories()` top 8 (dedup
+>     por fingerprint + nombre MAYÚSCULAS + orden por # de productos = proxy
+>     de conversión, evita duplicados CAT-NORM), fallback get_terms crudo top 8.
+>   - Móvil: fila deslizable scroll-snap con la última asomando (partial item
+>     = indicio de que hay más); escritorio ≥1024: barra fija sin deslizar.
+>   - Reglas responsive viejas del header/bento (max-width 980/560) ELIMINADAS
+>     — pisaban al sistema nuevo en la cascada y rompían el header en ≤980px.
+> - **`HOME-REDESIGN-004` (feat, C4 — hero, Amazon)**:
+>   - 1 banner principal (slide 1 del Home Slider del admin) + 2 tarjetas
+>     secundarias (slides 2-3), cada una con título corto y un único botón.
+>     Contenido del admin, sin datos inventados.
+>   - Sin autoplay y sin carrusel en el hero (brief) — el hero renderiza los
+>     slides directamente con markup propio (no ltms-hs).
+>   - Desktop: banner ≈66% izq + tarjetas apiladas ≈33% der, una sola altura
+>     (grid stretch). Móvil/tablet: banner full-width + tarjetas en fila 2 col.
+>   - `<picture>` con recorte distinto móvil (imagen 1:1 del admin) /
+>     escritorio (panorámica); `fetchpriority="high"` sin carga diferida; el
+>     texto del banner en HTML con overlay scrim (nunca dentro de la imagen).
+>   - Fallback sin banners: hero gradiente del design system con un solo CTA.
+>   - Guards del slider: fallback wp_footer skip en la home nativa
+>     (`did_action('ltms_before_home_plazaviva')` — el fallback pondría el
+>     banner DEBAJO del footer) + enqueue del CSS/JS del slider skip (peso
+>     muerto). Test HomeSliderTest actualizado al nuevo orden del fallback
+>     (lección #119, intento preservado).
+> - **`HOME-REDESIGN-005` (feat, C5 — trust + productos + vende)**:
+>   - Franja de confianza (Temu/AliExpress): compacta, sin animación; móvil
+>     2×2; tablet/escritorio una línea con los 4 elementos. Íconos unificados
+>     a azul (la variante danger del 4º item leía como error — el brief
+>     reserva rojo para estados de error/éxito).
+>   - La trust bar genérica HF-02 (que prometía "Devoluciones garantizadas",
+>     excluida por el brief) NO se inyecta en la home nativa: `injectTrustBar()`
+>     skip si existe `.pv-scope.pv-home` (sin esto habría doble franja).
+>   - Grid de productos: 2 col móvil / 3 tablet / 4 escritorio / 5 solo
+>     ≥1440px (móvil-primero, reglas viejas max-width eliminadas). Radio 8px.
+>   - Radios uniformes (brief): 8px tarjetas (product/vendor/cat/hero,
+>     agrupado al final del `<style>` para ganar la cascada), 12px botones
+>     (scoped a la home, sin tocar tokens globales compartidos con
+>     shop/cart/checkout; el botón del buscador conserva el pill por orden).
+>   - Franja "Vende con nosotros" (AliExpress): fondo azul marino #1A1A4E +
+>     detalle dorado (border-top 3px #E0A526), CTA dorado con texto navy
+>     (~7:1 — el dorado NUNCA como texto sobre blanco), desktop texto izq +
+>     botón der, móvil apilado con botón full-width, sin cifras inventadas.
+> - **`HOME-REDESIGN-006` (feat, C6 — footer, Amazon)**:
+>   - 4 columnas: Conócenos (marca + tagline + redes), Vende con nosotros,
+>     Ayuda y Legal.
+>   - Móvil: acordeones colapsables por columna (`<details>` nativo, cero JS
+>     — CSP-compliant, chevron giratorio, renderizados abiertos); tablet 2
+>     columnas; escritorio 4 columnas con headers estáticos
+>     (pointer-events:none).
+>   - Enlaces solo a páginas reales (/ayuda, /seguimiento, registro de
+>     vendedor, vendedores) — sin enlaces rotos (P1).
+>   - Fila de pagos bajo las columnas (badges PSE/Nequi/Daviplata/Visa/MC/Amex
+>     + nota Escrow).
+>   - Selector de moneda solo si ya existe soporte multi-moneda
+>     (`LTMS_Currency_Manager::render_currency_selector()` con guard
+>     class_exists/method_exists, bail defensivo interno). Selector de país
+>     descartado: no existe soporte (brief: solo si ya existe).
+> - **Tests:** +26 (`HomeTemplateWiringTest` 5/17, `HomeHeaderRedesignTest`
+>   6/29, `HomeCategoriesBarTest` 5/14, `HomeHeroTest` 6/31, `HomeTrustSellTest`
+>   5/21, `HomeFooterTest` 4/18) — puramente estructurales (file_get_contents +
+>   asserts sobre source PHP/JS/CSS): deterministas en LTMS_UNIT_ONLY=true y CI
+>   Ubuntu (mismo patrón que HomeProductScopeAuditTest). Cobertura: wiring
+>   (rama + posición antes de Elementor + flag anti-duplicado + enqueue sin
+>   time()), header navy + buscador (filtro categoría + combobox + live search
+>   en scope HOME + .min sincronizado + defensiva floating oculto + touch
+>   targets 44px + font-size 16px iOS), barra categorías (bento eliminado +
+>   top 8 + antes del hero + deslizable/fija), hero (slides del admin +
+>   picture + fetchpriority + overlay HTML + h1 único + sin carrusel +
+>   fallback), trust (2×2/1 línea + sin sombra + iconos azul + HF-02 skip),
+>   productos (2/3/4/5 col + radio 8px), radios uniformes (8px/12px), franja
+>   vende (navy + dorado + responsive), footer (4 columnas + acordeones +
+>   enlaces reales + moneda con guard).
+> - **`chore`**: `LTMS_VERSION` 2.9.404 → 2.9.405 (cache-busting CSS/JS de la
+>   home). `php -l` sin errores en todos los archivos tocados.
+>   `npm run build:js` 49/49 minified OK, `lint:js` 49 OK. Suite completa
+>   PHPUnit en la validación final del ciclo.
+
 ## [Unreleased] — 2026-09-28/29/30
 
 ### Fixed — `CAT-NORM-002` + `SHOP-CATS-MULTI` + `PROD-GALLERY-EDIT` + `PROD-IMG-FIT` (categorías duplicadas/variantes, multi-select en storefronts, galería en modal Editar, previews sin recorte)

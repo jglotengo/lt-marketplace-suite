@@ -52,7 +52,11 @@ define( 'LTMS_LOADED', true );
 // POSGOLD-RULES-PARITY (2026-09-26): bump a 2.9.396 — reglas PosGold idénticas
 // a VTEX (transporte/publicidad monto fijo COP/MXN, comisión Lo Tengo 12) +
 // cache-busting del JS del panel.
-define( 'LTMS_VERSION', '2.9.404' );
+// HOME-WIRING/REDESIGN (2026-10-01): bump a 2.9.405 — home nativa Plaza Viva
+// (wiring + rediseño por secciones: header Amazon, barra categorías, hero
+// banners, trust, productos, vende con nosotros, footer) + cache-busting
+// CSS/JS de la home (plaza-viva, homepage-fixes, live search).
+define( 'LTMS_VERSION', '2.9.405' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
