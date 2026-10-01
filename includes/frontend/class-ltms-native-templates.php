@@ -213,6 +213,27 @@ class LTMS_Native_Templates {
      * @return string Template override o el original.
      */
     public static function maybe_override( string $template ): string {
+        // HOME-WIRING-001 (2026-10-01): home nativa Plaza Viva (home.php) en la
+        // página frontal, activada por la opción ltms_home_template_enabled
+        // (default 'yes'). La rama corre ANTES del check de Elementor porque
+        // is_front_page()+is_page() son condicionales básicos de WP que NO
+        // disparan query setup de WC (el fatal histórico de las ramas
+        // is_product()/is_shop() no aplica aquí) y porque el home con Elementor
+        // activo cae al final de la rama Elementor sin override — sin esta rama
+        // adelantada el template nativo nunca se serviría con Elementor activo.
+        // El guard is_page() evita reemplazar el índice del blog cuando
+        // show_on_front='posts' (is_front_page() también es true ahí, pero la
+        // home del marketplace es una página estática con page_on_front).
+        // Reversible: opción ltms_home_template_enabled='no' devuelve el control
+        // a la página de Elementor (ID 30) sin tocar código.
+        if ( get_option( 'ltms_home_template_enabled', 'yes' ) === 'yes'
+            && is_front_page() && is_page() ) {
+            $native = self::$template_dir . 'home.php';
+            if ( file_exists( $native ) ) {
+                return $native;
+            }
+        }
+
         // CRITICAL: If Elementor Pro Theme Builder is handling this page,
         // do NOT override. Elementor registers its own template_include
         // callback. Our priority 99 runs AFTER Elementor, but calling
@@ -383,7 +404,11 @@ class LTMS_Native_Templates {
         );
 
         // Design system CSS.
-        wp_enqueue_style( 'ltms-plaza-viva', $url . 'css/ltms-plaza-viva.css', [ 'ltms-pv-fonts' ], $ver . '-b' . time() );
+        // HOME-WIRING-001 (2026-10-01): la versión solo depende de LTMS_VERSION
+        // (cache-busting controlado por bump de versión). Antes usaba
+        // $ver . '-b' . time() — la URL cambiaba en CADA request, invalidando
+        // el cache del CSS en SiteGround Optimizer en cada visita.
+        wp_enqueue_style( 'ltms-plaza-viva', $url . 'css/ltms-plaza-viva.css', [ 'ltms-pv-fonts' ], $ver );
 
         // AUDIT-FE-UIUX-BACKLOG-D32 FIX: los estilos scoped del carrito viven
         // en hoja dedicada (extraidos del template). Encolado condicional con

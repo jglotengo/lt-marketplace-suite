@@ -189,11 +189,24 @@ final class LTMS_Frontend_Home_Slider {
     /**
      * Renderiza el shortcode [ltms_home_slider].
      *
+     * HOME-WIRING-001 (2026-10-01): el render vía shortcode marca $rendered
+     * para que el fallback wp_footer (inject_home_slider) y el filtro
+     * the_content (prepend_slider_to_content) NO dupliquen el slider cuando el
+     * hero del home nativo (home.php) lo renderiza explícitamente. Antes el
+     * flag solo se seteaba en prepend/inject: un render por do_shortcode()
+     * directo dejaba $rendered=false y el fallback de wp_footer imprimía el
+     * banner una segunda vez (doble slider). Si el slider quedó vacío (sin
+     * slides activos) no se marca — el fallback sigue siendo válido.
+     *
      * @param array $atts Atributos.
      * @return string HTML del slider.
      */
     public function render_shortcode( array $atts = [] ): string {
-        return $this->render_slider();
+        $html = $this->render_slider();
+        if ( '' !== $html ) {
+            $this->rendered = true;
+        }
+        return $html;
     }
 
     /**
