@@ -59,7 +59,10 @@ define( 'LTMS_LOADED', true );
 // HOME-REDESIGN-007 (2026-10-01): bump a 2.9.406 — popups excluidos de la
 // home nativa (newsletter del módulo ux-enhancements + prompt push del
 // Sales Booster, confirmado por el operador) + cache-busting del JS.
-define( 'LTMS_VERSION', '2.9.406' );
+// HOME-REDESIGN-007b (2026-10-02): bump a 2.9.407 — guard del newsletter en
+// ltms-ux-storefront.js (la copia del módulo que SÍ corre en la home) y bar
+// del traffic-booster excluido; cache-busting del JS.
+define( 'LTMS_VERSION', '2.9.407' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

@@ -238,6 +238,31 @@ final class HomeTrustSellTest extends LTMS_Unit_Test_Case {
 			'HOME-REDESIGN-007: el .min.js de ux-enhancements debe contener el guard (regenerado).'
 		);
 
+		// (a-2) Newsletter — la copia que SÍ corre en la home: ltms-ux-storefront.js
+		// (módulo 117 duplicado; ux-enhancements no se encola en la home nativa —
+		// verificado en producción: el overlay provenía de ux-storefront).
+		$storefront_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-ux-storefront.js' );
+		$this->assertMatchesRegularExpression(
+			"/function initNewsletterSignup\(\)\s*\{[\s\S]*?pv-scope\.pv-home[\s\S]*?setTimeout/",
+			$storefront_src,
+			'HOME-REDESIGN-007: la copia de initNewsletterSignup en ltms-ux-storefront.js debe hacer return si existe .pv-scope.pv-home (es la que corre en la home).'
+		);
+		// Sincronización .min.js (SG Optimizer carga el min en producción).
+		$storefront_min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-ux-storefront.min.js' );
+		$this->assertStringContainsString(
+			'pv-scope.pv-home',
+			$storefront_min,
+			'HOME-REDESIGN-007: el .min.js de ux-storefront debe contener el guard (regenerado).'
+		);
+		// El guard no debe romper el delay del setTimeout (la constante delay
+		// sigue declarada antes del setTimeout — verificado: su ausencia habría
+		// sido ReferenceError en runtime que node --check no detecta).
+		$this->assertMatchesRegularExpression(
+			"/pv-scope\.pv-home'\)\) return;[\s\S]{0,200}const delay[\s\S]{0,120}setTimeout/",
+			$storefront_src,
+			'HOME-REDESIGN-007: la declaración const delay debe seguir presente entre el guard y el setTimeout.'
+		);
+
 		// (b) Sales Booster: guard en render_push_subscription_prompt.
 		$booster_src = (string) preg_replace( '/\/\*.*?\*\//s', '', (string) file_get_contents( dirname( __DIR__, 2 ) . '/includes/business/class-ltms-sales-booster.php' ) );
 		$this->assertMatchesRegularExpression(

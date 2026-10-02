@@ -5335,6 +5335,13 @@
         if (document.body.classList.contains('wp-admin')) return;
         if (document.body.classList.contains('woocommerce-checkout')) return;
 
+        // HOME-REDESIGN-007 (2026-10-01): la home nativa (Plaza Viva) no
+        // muestra el popup de newsletter — el brief del rediseño excluye
+        // ventanas emergentes y el operador lo confirmó. Este módulo es una
+        // copia del módulo 117 de ltms-ux-enhancements.js (que lleva el
+        // mismo guard). Sigue activo en las demás páginas.
+        if (document.querySelector('.pv-scope.pv-home')) return;
+
         // Solo a usuarios no logueados o después de 60s
         const delay = document.body.classList.contains('logged-in') ? 120000 : 45000;
 
