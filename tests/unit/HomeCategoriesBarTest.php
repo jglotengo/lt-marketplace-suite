@@ -118,14 +118,31 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 	/**
 	 * HOME-REDESIGN-003-D: fuente de datos — helper normalizado (dedup +
 	 * orden por conversión) top 8, con fallback get_terms crudo top 8.
+	 *
+	 * HOME-MATRIX-FIX (2026-10-01): el query cambió de array_slice directo
+	 * sobre el helper a array_filter (exclusión de la categoría artefacto
+	 * 'no-aplica' de los syncs) + array_slice(array_values(...), 0, 8).
+	 * El intento del test se preserva: helper normalizado + top 8, y se
+	 * añade la aserción de la exclusión (lección #119 — test actualizado
+	 * en el mismo commit que el cambio de enfoque).
 	 */
 	public function test_004_fuente_datos_top_8_normalizada(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
 		$this->assertMatchesRegularExpression(
-			"/array_slice\(\s*LTMS_Utils::get_normalized_product_categories\(\s*true\s*\),\s*0,\s*8\s*\)/",
+			"/array_filter\(\s*LTMS_Utils::get_normalized_product_categories\(\s*true\s*\),\s*static function/",
 			$src,
-			'HOME-REDESIGN-003-D: debe usar el helper normalizado top 8 (dedup + orden por # de productos).'
+			'HOME-REDESIGN-003-D: debe usar el helper normalizado (dedup + orden por # de productos).'
+		);
+		$this->assertMatchesRegularExpression(
+			"/array_slice\(\s*array_values\(\s*\\\$pv_all_cats\s*\),\s*0,\s*8\s*\)/",
+			$src,
+			'HOME-REDESIGN-003-D: debe tomar el top 8 tras la exclusión (brief: 8-10 accesos).'
+		);
+		$this->assertMatchesRegularExpression(
+			"/'no-aplica'\s*!==\s*\\\$c->slug/",
+			$src,
+			'HOME-MATRIX-FIX: la categoría artefacto de syncs "NO APLICA" debe excluirse de la barra.'
 		);
 		$this->assertMatchesRegularExpression(
 			"/'number'\s*=>\s*8,/",
