@@ -594,6 +594,20 @@
   /* =========================================================================
    * Global delegation: add-to-cart, quick-view, wishlist, swatches auto-init
    * ========================================================================= */
+  /* HOME-UX3-001 (2026-10-02): listener del evento pv:wishlist-toggle — antes
+     el evento se disparaba "que nadie escuchaba" (ver el comentario del
+     handler de abajo) y el badge de favoritos del header home nunca se
+     movía. El handler envía el count autoritativo del backend; este listener
+     actualiza TODOS los [data-pv-wishlist-count] en vivo (vacío = oculto
+     por CSS :empty en el header). */
+  on(window, 'pv:wishlist-toggle', function (e) {
+    var n = (e.detail && typeof e.detail.count === 'number') ? e.detail.count : null;
+    if (n === null) return;
+    qsa('[data-pv-wishlist-count]').forEach(function (el) {
+      el.textContent = n > 0 ? String(n) : '';
+    });
+  });
+
   on(document, 'click', function (e) {
     // AUDIT-FE-HOME-003 FIX: popular search chip — rellena el input del
     // header search form y lo envía a /tienda/. Antes los chips de búsquedas
@@ -632,11 +646,11 @@
     // AUDIT-FE-AP-001 FIX (Fase 1.5): wishlist toggle del card — persiste via
     // PV.ajax('ltms_pv_toggle_wishlist', ...). Antes este handler hacia solo
     // toggle visual (classList + aria-pressed) + dispatch del evento custom
-    // `wishlist-toggle` que nadie escucha (verificado: ningun listener en
-    // todo el design system para ese evento). El botón fav parecia funcionar
-    // al usuario (corazon se llenaba) pero el favorito NUNCA se guardaba en
-    // backend para guests (cookie ltms_wishlist) ni logged-in (tabla
-    // bkr_lt_wishlists). Mismo patron que el bug AUDIT-FE-SF-006 de
+    // `wishlist-toggle` sin listeners (HOY lo escucha el actualizador de
+    // badges [data-pv-wishlist-count] — HOME-UX3-001). El botón fav parecia
+    // funcionar al usuario (corazon se llenaba) pero el favorito NUNCA se
+    // guardaba en backend para guests (cookie ltms_wishlist) ni logged-in
+    // (tabla bkr_lt_wishlists). Mismo patron que el bug AUDIT-FE-SF-006 de
     // follow-vendor (commit 43a2da5b) — ver LECCIONES_APRENDIDAS.md #137.
     //
     // Fix: invoca PV.ajax que manda PV.config.nonce (wp_create_nonce de
@@ -667,7 +681,15 @@
             }
             var msg = (res.data && res.data.message) || (added ? PV.i18n.added_to_wishlist : PV.i18n.removed_from_wishlist);
             if (added && fav.dataset.pvFav !== 'silent') PV.toast(msg, { type: 'success', duration: 1800 });
-            dispatch('wishlist-toggle', { el: fav, active: added, productId: productId });
+            // HOME-UX3-001: el count del backend viaja en el evento — el
+            // listener global (registro al inicio de esta sección) actualiza
+            // todos los badges [data-pv-wishlist-count] (header home).
+            dispatch('wishlist-toggle', {
+              el: fav,
+              active: added,
+              productId: productId,
+              count: (res.data && typeof res.data.count === 'number') ? res.data.count : undefined
+            });
           } else {
             // Backend dijo no: revertir toggle optimista.
             if (wasFavActive) { fav.classList.add('is-active'); } else { fav.classList.remove('is-active'); }

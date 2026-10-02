@@ -345,9 +345,9 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 		$this->assertFileExists( $this->plugin_path );
 		$plugin = file_get_contents( $this->plugin_path );
 		$this->assertMatchesRegularExpression(
-			"/define\( 'LTMS_VERSION', '2\.9\.409' \);/",
+			"/define\( 'LTMS_VERSION', '2\.9\.4(0[89]|[1-9][0-9])' \);/",
 			$plugin,
-			'HOME-UX2: LTMS_VERSION debe estar en 2.9.409 (cache-busting del JS con el fix estructural del scope HOME).'
+			'HOME-UX2: LTMS_VERSION debe ser >= 2.9.408 (cache-busting del JS del ciclo UX2; 410 tras UX3).'
 		);
 
 		$min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.min.js' );

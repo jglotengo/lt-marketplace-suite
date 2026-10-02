@@ -398,9 +398,11 @@ do_action( 'ltms_before_home_plazaviva' );
                 <a class="pv-home-header__action" href="<?php echo esc_url( $pv_wishlist_url ); ?>" aria-label="<?php esc_attr_e( 'Favoritos', 'ltms' ); ?>">
                     <span class="pv-home-header__action-icon">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                        <?php if ( $pv_wishlist_count > 0 ) : ?>
-                            <span class="pv-home-header__badge"><?php echo esc_html( number_format_i18n( $pv_wishlist_count ) ); ?></span>
-                        <?php endif; ?>
+                        <?php /* HOME-UX3-001: badge SIEMPRE renderizado con data-pv-wishlist-count
+                             * — el JS (listener del evento pv:wishlist-toggle) lo actualiza en vivo
+                             * tras cada toggle; vacío se oculta por CSS (:empty). El count inicial
+                             * viene del filtro ltms_wishlist_count (LTMS_Wishlist::filter_wishlist_count). */ ?>
+                        <span class="pv-home-header__badge" data-pv-wishlist-count><?php echo esc_html( $pv_wishlist_count > 0 ? number_format_i18n( $pv_wishlist_count ) : '' ); ?></span>
                     </span>
                     <span class="pv-home-header__action-label"><?php esc_html_e( 'Favoritos', 'ltms' ); ?></span>
                 </a>
@@ -920,16 +922,26 @@ do_action( 'ltms_before_home_plazaviva' );
             </ul>
         </div>
 
-        <?php /* --- Pagos + selector de moneda (solo si multi-moneda activa) --- */ ?>
+        <?php /* --- Pagos, donaciones y afiliaciones (HOME-UX3-002: las IMÁGENES
+             * reales que el footer del tema mostraba y se perdieron al ocultarlo
+             * — logos de métodos de pago incl. OpenPay, Fundación Cardioinfantil
+             * LaCardio, Cámara de Comercio de Cali y Cámara Colombiana de
+             * Comercio Electrónico. Mismos assets del footer Elementor) +
+             * selector de moneda (solo si multi-moneda activa). --- */ ?>
         <div class="pv-section pv-home-footer__payrow">
-            <ul class="pv-home-footer__payments" aria-label="<?php esc_attr_e( 'Métodos de pago', 'ltms' ); ?>">
+            <ul class="pv-home-footer__brands" aria-label="<?php esc_attr_e( 'Pagos seguros, donaciones y afiliaciones', 'ltms' ); ?>">
                 <?php
-                $pv_payments = apply_filters( 'ltms_home_footer_payments', array(
-                    'PSE', 'Nequi', 'Daviplata', 'Visa', 'Mastercard', 'Amex',
+                $pv_footer_brands = apply_filters( 'ltms_home_footer_brands', array(
+                    array( 'src' => '/wp-content/uploads/2025/10/logos-footer-4-300x169.png', 'alt' => __( 'Pagos seguros: PSE, Nequi, Daviplata, Visa, Mastercard, Amex, OpenPay', 'ltms' ) ),
+                    array( 'src' => '/wp-content/uploads/2026/09/logo-lacardio-300x111.png',  'alt' => __( 'Fundación Cardioinfantil LaCardio', 'ltms' ) ),
+                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-1-300x169.png',    'alt' => __( 'Cámara de Comercio de Cali — La CCC', 'ltms' ) ),
+                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-2-300x169.png',    'alt' => __( 'Cámara Colombiana de Comercio Electrónico', 'ltms' ) ),
                 ) );
-                foreach ( $pv_payments as $pv_pay ) :
+                foreach ( $pv_footer_brands as $pv_brand ) :
                 ?>
-                    <li class="pv-home-footer__pay-badge"><?php echo esc_html( $pv_pay ); ?></li>
+                    <li class="pv-home-footer__brand-item">
+                        <img src="<?php echo esc_url( home_url( $pv_brand['src'] ) ); ?>" alt="<?php echo esc_attr( $pv_brand['alt'] ); ?>" loading="lazy" decoding="async" />
+                    </li>
                 <?php endforeach; ?>
             </ul>
             <?php
@@ -1129,6 +1141,9 @@ body.pv-home-native{font-size:16px;}
     border:2px solid var(--surface);
 }
 .pv-scope.pv-home .pv-home-header__badge--accent{background:var(--gold);}
+/* HOME-UX3-001: badge de favoritos vacío (count 0) se oculta — el elemento
+   existe SIEMPRE para que el JS pueda actualizarlo en vivo. */
+.pv-scope.pv-home .pv-home-header__badge:empty{display:none;}
 
 /* Enlace "Saltar al contenido" — oculto hasta recibir foco. */
 .pv-scope.pv-home .pv-home-skip{
@@ -1543,17 +1558,23 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-home-footer__social-link:hover{
     background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-2px);
 }
-.pv-scope.pv-home .pv-home-footer__payments{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0;}
-/* Fila de pagos + selector de moneda (bajo la marca). */
+/* Fila de marcas (pagos/donaciones/afiliaciones — las imágenes reales del
+   operador) + selector de moneda (bajo la marca). HOME-UX3-002. */
 .pv-scope.pv-home .pv-home-footer__payrow{
     display:flex;flex-direction:column;gap:10px;
     padding-top:24px;padding-bottom:32px;
     border-top:1px solid var(--border);
 }
-.pv-scope.pv-home .pv-home-footer__pay-badge{
-    padding:5px 10px;border-radius:var(--r-sm);
-    background:var(--bg);border:1px solid var(--border);
-    font-size:11.5px;font-weight:700;color:var(--text-2);letter-spacing:.02em;
+.pv-scope.pv-home .pv-home-footer__brands{
+    display:flex;align-items:center;justify-content:center;
+    gap:18px;flex-wrap:wrap;list-style:none;margin:0;padding:0;
+}
+.pv-scope.pv-home .pv-home-footer__brand-item img{
+    height:56px;width:auto;max-width:190px;object-fit:contain;display:block;
+}
+@media (max-width:560px){
+    .pv-scope.pv-home .pv-home-footer__brands{gap:12px;}
+    .pv-scope.pv-home .pv-home-footer__brand-item img{height:44px;max-width:150px;}
 }
 .pv-scope.pv-home .pv-home-footer__bottom{border-top:1px solid var(--border);}
 .pv-scope.pv-home .pv-home-footer__bottom-inner{

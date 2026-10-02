@@ -62,14 +62,21 @@ define( 'LTMS_LOADED', true );
 // HOME-REDESIGN-007b (2026-10-02): bump a 2.9.407 — guard del newsletter en
 // ltms-ux-storefront.js (la copia del módulo que SÍ corre en la home) y bar
 // del traffic-booster excluido; cache-busting del JS.
-// HOME-UX2-008a (2026-10-02): bump a 2.9.409 — FIX ESTRUCTURAL del scope HOME
-// de ltms-plaza-viva.js: el homeScope corre FUERA del IIFE principal del design
-// system, donde los helpers qs/qsa/on NO existen — el live search de
-// HOME-REDESIGN-002 moría en silencio con "ReferenceError: on is not defined"
-// (las sugerencias del buscador nunca funcionaron en runtime; verificado con
-// window.onerror en producción) y el fade de categorías heredó el mismo
-// defecto. Helpers locales declarados al inicio del scope HOME.
-define( 'LTMS_VERSION', '2.9.409' );
+// HOME-UX3 (2026-10-02): bump a 2.9.410 — ronda de hallazgos post-UX2 del
+// operador: (a) wishlist end-to-end reparado (el corazón persistía pero NO
+// restauraba estado inicial al recargar — el legacy que se suprimió era el
+// único que consultaba is_in_wishlist; el badge del header nunca se movía —
+// el filtro ltms_wishlist_count no tenía implementación y el evento
+// wishlist-toggle se disparaba "que nadie escucha"; y la página /favoritos
+// enlazada era un 404 — creada ahora con el shortcode [ltms_wishlist]);
+// (b) imágenes del footer restauradas (pagos incl. OpenPay, Fundación
+// Cardioinfantil LaCardio, CCC y CCCE — los assets reales del footer del
+// tema) en reemplazo de los badges de texto inventados; (c) título
+// DUPLICADO en la card (el h2 core de WC se colaba: el template suprimía
+// rating/price/ATC pero olvidaba woocommerce_template_loop_product_title)
+// + especificidad del h3 del título bumpada contra el kit de Elementor que
+// lo pisaba a 20px/700 (design: 14.5px/600). Cache-busting JS+CSS.
+define( 'LTMS_VERSION', '2.9.410' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

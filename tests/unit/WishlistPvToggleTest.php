@@ -219,10 +219,20 @@ final class WishlistPvToggleTest extends LTMS_Unit_Test_Case {
             $this->assertFileExists( $path, "$label debe existir" );
             $src = file_get_contents( $path );
 
-            $this->assertStringContainsString(
-                'class="pv-product-card__fav"',
+            // HOME-UX3-001 (2026-10-02): content-product.php ahora emite la
+            // clase fav con un condicional de estado inicial (is-active cuando
+            // el producto ya está en la wishlist) — el PREFIJO del atributo
+            // class sigue siendo el hook del handler delegado. El literal
+            // exacto sigue válido en vendor-store.php. Assert por el PREFIJO.
+            $this->assertMatchesRegularExpression(
+                '/class="pv-product-card__fav/',
                 $src,
                 "AUDIT-FE-AP-001: $label DEBE conservar el botón fav (.pv-product-card__fav) para que el handler delegado funcione"
+            );
+            $this->assertStringContainsString(
+                'data-pv-wishlist-toggle',
+                $src,
+                "AUDIT-FE-AP-001: $label DEBE conservar data-pv-wishlist-toggle (el hook del handler delegado)"
             );
         }
     }

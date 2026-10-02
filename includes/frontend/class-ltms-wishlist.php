@@ -48,12 +48,31 @@ class LTMS_Wishlist {
         add_action( 'wp_ajax_ltms_wishlist_count', [ __CLASS__, 'ajax_count' ] );
         add_action( 'wp_ajax_nopriv_ltms_wishlist_count', [ __CLASS__, 'ajax_count' ] );
 
+        // HOME-UX3-001 (2026-10-02): el header de la home nativa consume
+        // apply_filters('ltms_wishlist_count', 0) — el filtro NO tenía
+        // implementación: el badge de favoritos nunca se movía (el evento JS
+        // 'wishlist-toggle' se disparaba "que nadie escucha" y el render
+        // inicial siempre era 0). Fuente canónica: get_wishlist_ids() (cookie
+        // 30d para guests / DB bkr_lt_wishlists para logueados).
+        add_filter( 'ltms_wishlist_count', [ __CLASS__, 'filter_wishlist_count' ] );
+
         // Shortcode para página de wishlist.
         add_shortcode( 'ltms_wishlist', [ __CLASS__, 'render_wishlist_page' ] );
 
         // Crear tabla en activación.
         add_action( 'ltms_plugin_activated', [ __CLASS__, 'create_table' ] );
         self::create_table();
+    }
+
+    /**
+     * HOME-UX3-001 (2026-10-02): implementación del filtro ltms_wishlist_count
+     * que el header de la home nativa consume — count real de favoritos
+     * (guest: cookie ltms_wishlist 30d; logueado: DB bkr_lt_wishlists).
+     *
+     * @return int Número de productos en la wishlist del usuario actual.
+     */
+    public static function filter_wishlist_count(): int {
+        return count( self::get_wishlist_ids() );
     }
 
     /**

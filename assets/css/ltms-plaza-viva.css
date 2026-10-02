@@ -552,7 +552,12 @@
 .pv-product-card__quickview:hover{background:var(--primary-50);color:var(--primary);border-color:var(--primary-100);}
 .pv-product-card__body{padding:14px 14px 16px;display:flex;flex-direction:column;gap:6px;flex:1;}
 .pv-product-card__brand{font-size:11.5px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
-.pv-product-card__title{
+/* HOME-UX3-003 (2026-10-02): especificidad .pv-product-card .pv-product-card__title
+   (0-2-0) — el kit global de Elementor define h3 con .elementor-kit-* h3 (0-1-1)
+   que GANABA al h3 del card con la clase sola (0-1-0): el título computaba a
+   20px/700 en producción en vez del design 14.5px/600 (verificado con
+   getComputedStyle — "las letras con tamaños incoherentes" del operador). */
+.pv-product-card .pv-product-card__title{
   font-family:var(--display);font-weight:600;font-size:14.5px;line-height:1.35;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   min-height:38px;
@@ -846,7 +851,8 @@
 @media (max-width:400px){
   .pv-scope .grid-2,.pv-scope .grid-3,.pv-scope .grid-4{grid-template-columns:1fr;}
   .pv-scope .grid-auto{grid-template-columns:1fr;}
-  .pv-product-card__title{font-size:13.5px;-webkit-line-clamp:1;min-height:auto;}
+  /* HOME-UX3-003: mismo bump de especificidad que la regla base del título. */
+  .pv-product-card .pv-product-card__title{font-size:13.5px;-webkit-line-clamp:1;min-height:auto;}
   .pv-countdown__item{min-width:46px;padding:6px 8px;}
   .pv-countdown__num{font-size:16px;}
   .pv-btn{padding:0 16px;font-size:13.5px;}

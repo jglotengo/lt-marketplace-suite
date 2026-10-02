@@ -140,6 +140,16 @@ if ( $pv_type === 'variable' && method_exists( $product, 'get_available_variatio
  * 4. URLs de acción
  * ------------------------------------------------------------------------- */
 $pv_wishlist_url = add_query_arg( 'add_to_wishlist', $pv_pid, $pv_permalink );
+/* HOME-UX3-001 (2026-10-02): estado inicial del fav desde la wishlist real
+ * (cookie 30d para guests / DB bkr_lt_wishlists para logueados). Antes el
+ * fav renderizaba aria-pressed="false" hardcodeado: el toggle persistía
+ * (AJAX + cookie) pero al recargar el corazón volvía vacío y el badge del
+ * header nunca se movía — el usuario percibía "la lista de deseos no
+ * funciona". Lección #188: al suprimir el corazón legacy (HOME-UX2-007)
+ * había que heredar ESTA responsabilidad suya. */
+$pv_in_wishlist = class_exists( 'LTMS_Wishlist' ) && method_exists( 'LTMS_Wishlist', 'is_in_wishlist' )
+    ? (bool) LTMS_Wishlist::is_in_wishlist( $pv_pid )
+    : false;
 // AUDIT-FE-AP-002 FIX (Fase 1.5): estandarizar en `data-pv-quickview` (sin guion
 // interno). El JS ltms-plaza-viva.js:603 solo escucha `[data-pv-quickview]` y lee
 // `qv.getAttribute('data-pv-quickview') || qv.getAttribute('data-product_id')`.
@@ -203,12 +213,12 @@ $pv_atc_attrs = $pv_purchasable && $pv_in_stock
         <?php endif; ?>
 
         <?php /* Fav button (wishlist) — enlace a ?add_to_wishlist=ID + data attribute para AJAX */ ?>
-        <a class="pv-product-card__fav"
+        <a class="pv-product-card__fav<?php echo $pv_in_wishlist ? ' is-active' : ''; ?>"
            href="<?php echo esc_url( $pv_wishlist_url ); ?>"
            data-pv-wishlist-toggle="<?php echo esc_attr( $pv_pid ); ?>"
            data-product-id="<?php echo esc_attr( $pv_pid ); ?>"
            aria-label="<?php echo esc_attr( sprintf( __( 'Añadir %s a favoritos', 'ltms' ), $pv_title ) ); ?>"
-           aria-pressed="false"
+           aria-pressed="<?php echo $pv_in_wishlist ? 'true' : 'false'; ?>"
            rel="nofollow">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </a>
@@ -257,9 +267,22 @@ $pv_atc_attrs = $pv_purchasable && $pv_in_stock
         <?php
         /**
          * Hook: woocommerce_shop_loop_item_title
-         * (Sin output por defecto.)
+         * WC core hookea woocommerce_template_loop_product_title (p10) que
+         * imprime <h2 class="woocommerce-loop-product__title"> — nuestro h3
+         * .pv-product-card__title ya es el título del card. Sin esta
+         * supresión el título se renderizaba DOS VECES por card (HOME-UX3-003:
+         * la "redundancia en las letras" del operador; verificado en DOM:
+         * h2.woocommerce-loop-product__title + h3.pv-product-card__title).
+         * remove+re-add scoped: loops de terceros sin el card PV lo conservan.
          */
+        $pv_suppress_core_title = has_action( 'woocommerce_shop_loop_item_title', 'woocommerce_template_loop_product_title' );
+        if ( $pv_suppress_core_title ) {
+            remove_action( 'woocommerce_shop_loop_item_title', 'woocommerce_template_loop_product_title', 10 );
+        }
         do_action( 'woocommerce_shop_loop_item_title' );
+        if ( $pv_suppress_core_title ) {
+            add_action( 'woocommerce_shop_loop_item_title', 'woocommerce_template_loop_product_title', 10 );
+        }
         ?>
 
         <h3 class="pv-product-card__title">
