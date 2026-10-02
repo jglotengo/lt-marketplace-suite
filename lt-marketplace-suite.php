@@ -56,7 +56,10 @@ define( 'LTMS_LOADED', true );
 // (wiring + rediseño por secciones: header Amazon, barra categorías, hero
 // banners, trust, productos, vende con nosotros, footer) + cache-busting
 // CSS/JS de la home (plaza-viva, homepage-fixes, live search).
-define( 'LTMS_VERSION', '2.9.405' );
+// HOME-REDESIGN-007 (2026-10-01): bump a 2.9.406 — popups excluidos de la
+// home nativa (newsletter del módulo ux-enhancements + prompt push del
+// Sales Booster, confirmado por el operador) + cache-busting del JS.
+define( 'LTMS_VERSION', '2.9.406' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

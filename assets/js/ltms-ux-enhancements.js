@@ -12417,6 +12417,12 @@
         if (document.body.classList.contains('wp-admin')) return;
         if (document.body.classList.contains('woocommerce-checkout')) return;
 
+        // HOME-REDESIGN-007 (2026-10-01): la home nativa (Plaza Viva) no
+        // muestra el popup de newsletter — el brief del rediseño excluye
+        // ventanas emergentes y el operador lo confirmó. El popup sigue
+        // activo en las demás páginas (shop, producto, etc.).
+        if (document.querySelector('.pv-scope.pv-home')) return;
+
         // Solo a usuarios no logueados o después de 60s
         const delay = document.body.classList.contains('logged-in') ? 120000 : 45000;
 

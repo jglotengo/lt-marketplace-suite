@@ -494,10 +494,17 @@ class LTMS_Sales_Booster {
 
     /**
      * Renderiza prompt de suscripción a push notifications.
+     *
+     * HOME-REDESIGN-007 (2026-10-01): la home nativa (Plaza Viva) NO muestra
+     * el prompt — el brief del rediseño de la home excluye ventanas
+     * emergentes y avisos flotantes, y el operador lo confirmó. El prompt
+     * sigue activo en las demás páginas (producto, shop, checkout...).
+     * Misma condición de la rama del home en maybe_override().
      */
     public static function render_push_subscription_prompt(): void {
         if ( ! is_ssl() ) return; // Push requiere HTTPS.
         if ( is_admin() ) return;
+        if ( is_front_page() && is_page() ) return;
         ?>
         <div id="ltms-push-prompt" style="display:none;position:fixed;bottom:20px;right:20px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,0.1);z-index:99998;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">

@@ -211,4 +211,39 @@ final class HomeTrustSellTest extends LTMS_Unit_Test_Case {
 			'HOME-REDESIGN-005-E: en móvil el botón debe ir a todo el ancho.'
 		);
 	}
+
+	/**
+	 * HOME-REDESIGN-007: popups excluidos de la home nativa (decisión del
+	 * operador 2026-10-01; el brief excluye ventanas emergentes y avisos
+	 * flotantes). (a) El popup de newsletter del módulo ux-enhancements
+	 * (módulo 117, 45s) hace skip si existe .pv-scope.pv-home. (b) El prompt
+	 * de push del Sales Booster hace skip en is_front_page()+is_page().
+	 * Ambos siguen activos en las demás páginas.
+	 */
+	public function test_006_popups_excluidos_de_la_home(): void {
+		$this->assertFileExists( dirname( __DIR__, 2 ) . '/assets/js/ltms-ux-enhancements.js' );
+		$ux_src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-ux-enhancements.js' );
+
+		// (a) Newsletter: guard dentro de initNewsletterSignup, antes del setTimeout.
+		$this->assertMatchesRegularExpression(
+			"/function initNewsletterSignup\(\)\s*\{[\s\S]*?pv-scope\.pv-home[\s\S]*?setTimeout/",
+			$ux_src,
+			'HOME-REDESIGN-007: initNewsletterSignup debe hacer return si existe .pv-scope.pv-home (antes del setTimeout del popup).'
+		);
+		// Sincronización .min.js (SG Optimizer carga el min en producción).
+		$ux_min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-ux-enhancements.min.js' );
+		$this->assertStringContainsString(
+			'pv-scope.pv-home',
+			$ux_min,
+			'HOME-REDESIGN-007: el .min.js de ux-enhancements debe contener el guard (regenerado).'
+		);
+
+		// (b) Sales Booster: guard en render_push_subscription_prompt.
+		$booster_src = (string) preg_replace( '/\/\*.*?\*\//s', '', (string) file_get_contents( dirname( __DIR__, 2 ) . '/includes/business/class-ltms-sales-booster.php' ) );
+		$this->assertMatchesRegularExpression(
+			"/function render_push_subscription_prompt\(\): void\s*\{[\s\S]*?is_front_page\(\)\s*&&\s*is_page\(\)\s*\)\s*return;/",
+			$booster_src,
+			'HOME-REDESIGN-007: render_push_subscription_prompt debe hacer return en la home nativa (is_front_page + is_page).'
+		);
+	}
 }
