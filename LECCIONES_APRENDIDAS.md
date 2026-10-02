@@ -4087,3 +4087,48 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (verificado live, error_log sin rastro) - el multi-select de categorías usa CSV propio
    (?ltms_cats=slug1,slug2 en /tienda/ con filtro pre_get_posts; ?cat=CSV en /vendedor/{slug}/)
    con sanitize_title() POR ITEM (sobre el CSV crudo quita las comas y produce slug basura).
+
+
+### Lección #186: filtro registrado con nombre que NO EXISTE en WC core — el override de content-product NUNCA corrió y 2 auditorías lo dieron por bueno (HOME-MATRIX-FIX, 2026-10-01)
+
+1. **Caso real (wiring muerto, P0):** el rediseño de la home nativa (v2.9.405, commit `a07c270a`)
+   expuso que `LTMS_Native_Templates::init()` registraba el override del card de producto en el
+   filtro `'woocommerce_get_template_part'` — que NO EXISTE como filtro en WooCommerce core:
+   solo existe como FUNCIÓN deprecated en wc-deprecated-functions.php (verificado en server,
+   WC 11.1.2). El filtro REAL que aplica `wc_get_template_part()` es `'wc_get_template_part'`
+   (wc-core-functions.php:248-290). Neto: el template `wc-parts/content-product.php` (el card
+   canónico del design system, con KYC badge, swatches, wishlist persistente, quick view) era
+   CÓDIGO MUERTO desde su creación — los cards del home (trending) y de todo el sitio renderizaban
+   el markup RAW de WooCommerce (`li.product` con ATC `display:inline` sin estilo de botón).
+   Detectado solo al verificar la matriz de responsividad en producción con checks DOM del
+   navegador: 7 cards raw, 0 `.pv-product-card`.
+
+2. **La meta-lección (por qué 2 ciclos de auditoría no lo vieron):** los ciclos AUDIT-FE (julio
+   2026) validaron el "fix" DRY de la home con tests SOURCE-BASED (assert de que home.php delega
+   via `wc_get_template_part('content','product')` — ver `HomeProductScopeAuditTest`,
+   `WishlistPvToggleTest`, `PlazaVivaDesignSystemAuditTest`) y dieron por buena la delegación.
+   Los tests pasaban porque el source SÍ delega — pero NADIE verificó el RUNTIME: qué template
+   resolvía realmente esa llamada. Los tests source-based validan forma, no comportamiento.
+   Cuando un fix depende de un HOOK de un tercero (WC), el test que importa es el que verifica
+   que el hook EXISTE y DISPARA (ej. assert del `add_filter` con el nombre exacto del
+   `apply_filters` del tercero, o render real). Es la reincidencia del patrón de la lección
+   #508 (JS llamando `ltms_*` sin `add_action`) + #161 (wiring declarado, sin consumer runtime):
+   registrar en un hook inexistente es indistinguible de no registrar nada — y WP NO lanza
+   error, solo silencia.
+
+3. **Regla preventiva:** antes de registrar `add_filter/add_action` sobre un hook de un tercero
+   (WC/Elementor/tema), VERIFICAR el nombre contra el `apply_filters/do_action` REAL del código
+   del tercero EN PRODUCCIÓN (grep en el plugin/tema del server, no contra la documentación ni
+   la memoria — WC 11.x movió wc_get_template_part de wc-template-functions.php a
+   wc-core-functions.php y AGENTS.md seguía diciendo WC 8.x). Y: cuando el fix introduce una
+   delegación runtime (wc_get_template_part, do_shortcode, locate_template), la verificación de
+   "Revisar" (AGENTS.md) exige UNA comprobación del resultado renderizado — el DOM check de
+   producción (`querySelectorAll('.pv-product-card').length > 0`) vale más que cualquier test
+   source-based de la delegación.
+
+4. **Fix aplicado (commit `a07c270a`):** `add_filter('wc_get_template_part', ...)` + guard
+   `is_front_page() && is_page()` en el callback — solo la home nativa sirve el card PV; el
+   shop/related/cross-sells conservan su markup exacto (alcance del rediseño: solo la home).
+   Verificado en producción post-deploy: pvCards=7, liRaw=0, ATC flex 44px. Test:
+   `HomeTemplateWiringTest::test_006_override_content_product_filtro_real_y_guard_home`
+   (assert del filtro REAL + assert negativo del filtro muerto + guard home).

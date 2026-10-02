@@ -144,6 +144,50 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   home). `php -l` sin errores en todos los archivos tocados.
 >   `npm run build:js` 49/49 minified OK, `lint:js` 49 OK. Suite completa
 >   PHPUnit en la validación final del ciclo.
+>
+> **Revisión en producción (matriz de responsividad, commits `a07c270a` +
+> `41dce543`):** verificación browser-based del sitio real en 360×640,
+> 390×844, 768×1024, 1024×768, 1280×800 y 1440×900 (checks DOM por
+> breakpoint + screenshots) expuso y corrigió:
+>
+> - **P0 `HOME-MATRIX-FIX`-1 — filtro muerto:** el override de
+>   content-product registraba `'woocommerce_get_template_part'` que NO
+>   existe como filtro en WC core (solo función deprecated; server WC
+>   11.1.2) — el filtro REAL es `'wc_get_template_part'`
+>   (wc-core-functions.php:288). El card PV nunca se sirvió: los cards del
+>   home renderizaban markup RAW de WC (7 raw, 0 pv-product-card, ATC
+>   display:inline). Fix: filtro real + guard `is_front_page() && is_page()`
+>   (solo la home sirve el card PV; shop/related intactos). Verificado
+>   post-deploy: pvCards=7, liRaw=0, ATC flex 44px. **Lección #186.**
+> - **P0 `HOME-MATRIX-FIX`-2 — sub del hero invisible:** `.pv-hero__sub` era
+>   `rgba(255,255,255,.86)` (diseñado para el hero gradiente viejo) — sobre
+>   el fondo claro de la home quedaba inaccesible. Override scoped a la rama
+>   con banners: sub `--text-2` (~6.9:1), eyebrow pill azul (~8.6:1); el
+>   fallback gradiente conserva el blanco.
+> - **Menores:** chips 32→44px (touch target), body 16px en la home nativa
+>   (brief; plaza-viva mantiene 15px en las demás páginas), categoría "NO
+>   APLICA" (artefacto de syncs, count=223) excluida del top 8, mapa de
+>   íconos con match por PREFIJO (slugs reales llevan sufijos de dedup WP:
+>   belleza-y-salud-342) + entradas del catálogo real, logo-mark 44px.
+> - **2ª pasada de la matriz (post-fix):** 6/6 tamaños OK — sin scroll
+>   horizontal real en ninguno (el +1px de scrollWidth en móvil es phantom
+>   del cart drawer fixed, `scrollX` queda 0), touch targets ≥44px,
+>   estructuras por breakpoint correctas (buscador full-width móvil, header
+>   1 fila tablet, hero 66/33 desktop, tarjetas apiladas, trust 1 línea,
+>   footer 4 cols estático, grid 5 col ≥1440).
+> - **Test huérfano actualizado (lección #119, commit `41dce543`):**
+>   `HomeCategoriesBarTest` asertaba el patrón de query pre-matrix-fix; la
+>   corrida filtrada post-fix no lo incluyó y el fallo solo apareció en la
+>   suite completa. Actualizado con la aserción de la exclusión de NO APLICA.
+> - **Suite completa final: 5,205 tests, 11,131 assertions, 0 fallas
+>   (3 skips preexistentes).**
+> - **Hallazgos reportados fuera de alcance:** popups preexistentes en la
+>   home (newsletter del módulo ux-enhancements a los 45s + prompt del Sales
+>   Booster — el brief los excluye; decisión de negocio pendiente del
+>   operador), 3 banners del admin sin título/CTA/URL y con texto incrustado
+>   en la imagen (el hero no muestra botones hasta que el admin llene los
+>   campos en LT Marketplace → Home Slider), header "Version:" del plugin
+>   stale en 2.9.339 (preexistente).
 
 ## [Unreleased] — 2026-09-28/29/30
 
