@@ -4132,3 +4132,54 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    Verificado en producción post-deploy: pvCards=7, liRaw=0, ATC flex 44px. Test:
    `HomeTemplateWiringTest::test_006_override_content_product_filtro_real_y_guard_home`
    (assert del filtro REAL + assert negativo del filtro muerto + guard home).
+
+### Lección #187: un IIFE de scope que corre FUERA del closure de los helpers que usa = feature muerta en runtime que `node --check` y los tests source-based pasan igual (HOME-UX2-008a, 2026-10-02)
+
+1. **Caso real (feature muerta 2 ciclos, P1):** `ltms-plaza-viva.js` cierra su IIFE principal
+   (`})(window, document);`, ~línea 1075) DONDE viven los helpers internos `qs`/`qsa`/`on`.
+   Los scopes de página (homeScope, productScope, líneas 1937/2094+) viven FUERA de ese closure,
+   a nivel de módulo. El `homeScope` (migrado del `<script>` inline de home.php en
+   HOME-REDESIGN-002, v2.9.405) llama `on(input,'input',...)`, `qsa('[role="option"]',...)`
+   como identificadores LIBRES → `ReferenceError: on is not defined` dentro del handler de
+   DOMContentLoaded → **el live search del buscador de la home JAMÁS funcionó en runtime**
+   (2 ciclos de auditoría + matriz de responsividad pasaron al lado: nadie TIPEÓ en el campo;
+   los checks DOM validaban presencia del markup, no interacción). El defecto era invisible:
+   PHP no interviene, `node --check` pasa (sintaxis válida — un ReferenceError es de EJECUCIÓN),
+   y terser deja el nombre `on` sin manglear (lo trata como variable global asumida). El fade
+   de categorías nuevo (HOME-UX2-002) heredó el mismo defecto y lo EXPUSO porque su
+   verificación sí exigía un efecto observable (`data-pv-scrollable` en el DOM).
+
+2. **Cómo se detectó (la técnica, replicar):** el atributo esperado no aparecía en producción
+   pese a que el min.js SERVIDO (fetch no-store) contenía el código. Diagnóstico en 2 pasos:
+   (a) disparar el evento manualmente (`dispatchEvent(new Event('scroll'))`) → nada (listener
+   nunca bindeado = código no ejecutó); (b) re-inyectar el script en la página viva con
+   `window.onerror` capturado ANTES (`document.head.appendChild(script)` con query nuevo) →
+   el error real aparece con línea/columna del min: `Uncaught ReferenceError: on is not defined
+   (col 40890)`. Esto último es la herramienta que faltaba en ciclos anteriores: **capturar
+   window.onerror + re-inyección en la página viva revela errores de ejecución que ninguna
+   verificación estática ve.**
+
+3. **Meta-lección (#186 recayendo, ahora del lado del JS):** la verificación de una feature JS
+   interactiva exige EJERCER la interacción en producción (tipiar en el buscador, no solo mirar
+   el markup; despachar el evento, no solo leer el atributo). Un test source-based que valida
+   "el archivo contiene el handler" dice forma, no runtime — igual que el hook muerto de
+   #186. Y ojo con el check de sintaxis como verificación: `node --check` solo detecta
+   errores PARSEABLES; los ReferenceError de scope cruzado (IIFE que cierra antes de donde
+   se consume) son runtime-only.
+
+4. **Regla preventiva:** al añadir un scope IIFE de página a un design system con helpers
+   internos, verificar DÓNDE CIERRA el closure principal respecto al scope nuevo (grep del
+   `})()` de cierre vs. la posición del scope). Si el scope queda fuera, o se declaran
+   helpers locales al inicio del scope (lo aplicado: `function on(el,ev,fn,opt){...}` dentro
+   de homeScope, idénticos a los del sistema, sin acoplarse a `PV.utils`), o se usan los
+   helpers expuestos (`PV.utils.on`). Y en la verificación post-deploy de features JS:
+   simular la interacción (input events, clicks) y capturar `window.onerror` — no asumir que
+   "el script cargó" = "el script corrió".
+
+5. **Fix aplicado (commit `c4165316`, v2.9.409):** helpers locales `on`/`qs`/`qsa` al inicio del
+   `homeScope` — repara el live search latente Y el fade nuevo. Verificado en producción:
+   6 sugerencias reales al escribir "shampoo" (aria-expanded=true, opciones con contenido),
+   fade activo (`data-pv-scrollable="1"` + mask) y auto-apagado al final del scroll
+   (`data-pv-at-end="1"`, mask removido). Test:
+   `HomeUxV2Test::test_010_scope_home_declara_helpers_locales` (cierre del IIFE principal
+   ANTES del scope HOME + declaraciones locales preceden al primer uso bare).

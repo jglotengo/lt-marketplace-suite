@@ -1,8 +1,140 @@
 ﻿# Changelog — LT Marketplace Suite
 
 All notable changes to this project are documented in this file.
-Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased] — 2026-10-02
+
+### Fixed/Changed — `HOME-UX2-001..008` + `HOME-UX2-008a` (ciclo de consistencia UI/UX de la home: 8 hallazgos del operador + 1 hallazgo estructural latente)
+
+> **Reporte del operador:** jerarquía de colores de la home inconsistente con
+> las demás páginas, categorías ocultas sin percibirse, chips del buscador que
+> no existen en el catálogo, decidir minicart vs página de carrito, footer con
+> redundancia de redes/políticas, cards con texto redundante, corazón de
+> wishlist duplicado, y reorden del móvil (ocultar banners/destacados,
+> categorías y tarjetas primero). Decisiones de negocio confirmadas vía
+> question flow: (1) header blanco como las demás páginas, (2) footer puramente
+> visual + nueva sección "Ayuda y políticas" + footer Elementor oculto solo en
+> la home, (3) móvil: hero y vendedores destacados ocultos con orden
+> categorías → tarjetas → garantías → vende → políticas.
+>
+> - **`HOME-UX2-001` (colores re-anclados a tokens)** (`home.php`): el header,
+>   la franja Vende y los fondos del hero hardcodeaban navy `#1A1A4E` + dorado
+>   `#E0A526` — colores que NO existen en ningún token del design system
+>   Plaza Viva (shop/producto usan `--primary #2563EB`, superficies claras,
+>   `--gold #D4A857`): la home leía como otro site. Fix: header
+>   `var(--surface)` con texto `var(--text)` (igual que el resto del sitio),
+>   botón Buscar `var(--primary)`/hover `var(--primary-600)` (idéntico a
+>   `.pv-btn`), anillo de foco `var(--primary)`, chips `var(--bg-2)`/texto
+>   `var(--text-2)`, badge de contador `var(--gold)` + `var(--text)`, franja
+>   Vende con el gradiente del design system (radial `#3b82f6` →
+>   `var(--primary)` → `var(--primary-700)`, mismo del hero fallback) con
+>   detalle dorado token, CTA `var(--gold)`/`var(--text)` (AA ~8:1), skip-link
+>   y "Ver todas" a tokens. Bonus: al usar tokens, la home hereda el dark mode
+>   del design system gratis.
+> - **`HOME-UX2-002` (todas las categorías activas)** (`home.php` +
+>   `ltms-plaza-viva.js`): la barra capaba a 8 (`array_slice(...,0,8)`) y el
+>   operador no percibía que había más (verificado por SSH: **20 categorías
+>   activas** hoy, top: Belleza y Salud 1383, Cuidado Capilar 792, Cuidado
+>   Corporal 411, Shampoo y Acondicionador 395, Juego de Mesa 230). Fix: todas
+>   las activas (excluida la artefacto NO APLICA), scroll horizontal en TODOS
+>   los tamaños (antes escritorio era `overflow:visible` — con 20 accesos ya no
+>   caben) + fade del borde derecho toggleado por JS (`data-pv-scrollable` /
+>   `data-pv-at-end`, nuevo `initCatBarFade()` en el scope HOME) que desaparece
+>   al llegar al final — el indicio de "hay más" sin ocultar nada.
+> - **`HOME-UX2-003` (chips = categorías reales)** (`home.php`): los chips eran
+>   4 términos hardcodeados con 0-2 resultados reales verificados en producción
+>   ('Tecnología'=113 matches de descripción pero 0 categorías, 'Regalos'=0,
+>   'Hogar'=2, 'Juegos de mesa'=230). Fix: chips = top 4 categorías activas
+>   derivadas del mismo query de la barra, renderizadas como ENLACES directos a
+>   la página de la categoría (sin `data-pv-search-chip`: el handler JS
+>   rellenaría el input y lanzaría una búsqueda de texto que puede llegar
+>   vacía). Siempre en sincronía con el catálogo; filtro
+>   `ltms_home_popular_chips` conservado (ahora con name+url).
+> - **`HOME-UX2-004` (carrito → minicart)** (`home.php`): la acción de carrito
+>   del header navegaba a /carrito/. Decisión técnica: el mini-cart lateral ya
+>   existe (`.ltms-minicart`, CART-UX-NEXT, con barra de envío gratis y
+>   upsells) y es el patrón del topbar del storefront — el carrito del header
+>   ahora abre el drawer con `data-ltms-open-cart` (preventDefault del JS del
+>   drawer; href de fallback a /carrito/ para no-JS; "Ver carrito" completo
+>   dentro del drawer). Verificado en producción: el drawer abre sin navegar.
+> - **`HOME-UX2-005` (footer visual + sección de políticas)** (`home.php`): la
+>   home apilaba DOS footers (el PV de 4 columnas de texto + el footer
+>   Elementor 13743 con Términos/Privacidad/Devoluciones/Contactos/redes/pagos
+>   duplicados — la "redundancia de redes y políticas" del operador). Fix: (a)
+>   footer PV puramente visual (logo, redes REALES del operador —
+>   instagram.com/lotengooficial, tiktok.com/@lotengocolombia,
+>   youtube.com/@lotengocolombia, extraídas del footer Elementor; antes eran
+>   placeholders a instagram.com/facebook.com —, badges de pago, ©; sin
+>   tagline ni "powered by"); (b) nueva sección "Ayuda y políticas" en el body
+>   con TODO el texto reubicado (Vende con nosotros · Ayuda · Legal ·
+>   Contacto — con los emails/dirección/teléfono del footer del tema); (c)
+>   footer del tema oculto SOLO en la home (selectores precisos
+>   `.elementor-location-footer`, `#colophon`, `.site-footer` — nunca un bare
+>   `footer` que matchearía `.pv-home-footer`); filtro
+>   `ltms_home_footer_legal_links` conservado en la sección políticas.
+> - **`HOME-UX2-006` (card PV sin texto redundante)** (`content-product.php`):
+>   (a) el badge "✅ Verificado" de `LTMS_Trust_Badges::render_loop_vendor_badge`
+>   (hook `woocommerce_after_shop_loop_item_title` p5) se inyectaba DENTRO del
+>   slot del rating y duplicaba el escudo KYC que la línea de vendor ya muestra
+>   — suprimido dentro del card PV (remove+re-add scoped al template; loops de
+>   terceros sin card PV lo conservan); (b) la fila de rating renderaba "(0)"
+>   en cada card sin reseñas — ahora solo se renderiza con reseñas; (c) el
+>   claim genérico "Envío a todo el país" (metatexto idéntico en TODAS las
+>   cards, duplicando la franja de garantías de la home) eliminado — las
+>   señales REALES por producto se conservan (badge envío gratis free_absorbed
+>   sobre la imagen, urgencia de stock bajo). Aplica a todos los loops con card
+>   PV (home/shop/related) — un solo componente, coherente por definición.
+> - **`HOME-UX2-007` (corazón duplicado)** (`content-product.php`): el botón
+>   wishlist legacy `.ltms-wishlist-btn` (glyph ♡, `LTMS_Wishlist::render_wishlist_button`
+>   hook `woocommerce_after_shop_loop_item` p20) se montaba ENCIMA de
+>   `.pv-product-card__fav` (ambos top:5-9/right:9 — dos corazones superpuestos
+>   por card, visibles siempre en touch por `@media(hover:none){opacity:1}`).
+>   Fix: suprimido dentro del card PV (remove+re-add scoped); el fav del design
+>   system con su AJAX propio (`data-pv-wishlist-toggle` →
+>   `ltms_pv_toggle_wishlist`) queda como único corazón. Verificado en
+>   producción desktop+mobile.
+> - **`HOME-UX2-008` (móvil: funnel de compra)** (`home.php`): en <768px el hero
+>   de banners y los vendedores destacados se ocultan (decisión del operador) y
+>   el orden queda header → categorías → tarjetas de productos → garantías →
+>   vende → políticas → footer (`#pv-main` flex-column + `order` 1-4; la barra
+>   de categorías ya vive fuera de main, justo bajo el header). Escritorio
+>   (≥768) conserva el orden original completo. Verificado por posiciones
+>   visuales (getBoundingClientRect) a 390px.
+> - **`HOME-UX2-008a` (FIX ESTRUCTURAL: scope HOME fuera del IIFE — live search
+>   latente)** (`ltms-plaza-viva.js`): hallazgo nuevo de la verificación
+>   runtime. El `homeScope` corre FUERA del IIFE principal del design system
+>   (que cierra en ~línea 1075), donde los helpers `qs`/`qsa`/`on` NO existen
+>   como identificadores — el live search migrado en HOME-REDESIGN-002 moría en
+>   silencio con `ReferenceError: on is not defined` dentro del handler de
+>   DOMContentLoaded: **las sugerencias del buscador NUNCA funcionaron en
+>   runtime** (la verificación del ciclo anterior validó la forma del source,
+>   no el runtime — lección #186 recayendo) y el fade nuevo de UX2-002 heredó
+>   el mismo defecto. Detectado inyectando el min.js servido en la página viva
+>   con `window.onerror` capturado. Fix: helpers locales `on`/`qs`/`qsa`
+>   declarados al inicio del scope HOME (idénticos a los del design system,
+>   sin acoplamiento a PV.utils). Verificado en producción: 6 sugerencias
+>   reales al escribir "shampoo" (aria-expanded, opciones, contenido), fade
+>   activo y apagándose al llegar al final del scroll.
+> - **Versiones**: `LTMS_VERSION` 2.9.407 → 2.9.408 (cache-busting del JS con
+>   initCatBarFade) → 2.9.409 (fix estructural del scope HOME).
+> - **Tests**: +11 (HomeUxV2Test 001-010 + rework HomeFooterTest al footer
+>   visual) y actualizados EN EL MISMO COMMIT (lección #119) los que asertaban
+>   el patrón viejo: HomeCategoriesBarTest 004/005 (top-8 → todas; overflow
+>   fijo → scroll+fade), HomeHeaderRedesignTest 002 (navy → var(--surface)),
+>   HomeTrustSellTest 005 (navy/dorado off-system → gradiente/tokens),
+>   PlazaVivaDesignSystemAuditTest 018 (grid del footer → flex visual). Suite
+>   completa final: **5,218 tests, 11,226 assertions, 0 fallas, 3 skips
+>   preexistentes**. Verificación en producción vía DOM checks: 20 categorías,
+>   chips reales, un solo corazón, sin badge verificado, sin "(0)", sin envío
+>   genérico, minicart abre sin navegar, footer visual único + políticas con 4
+>   grupos, footer Elementor display:none, orden móvil por posiciones reales,
+>   live search 6 sugerencias, fade con data-pv-scrollable/at-end.
+> - **Pendientes del OPERADOR (no del agente):** BANNERS-ADMIN (llenar
+>   título/CTA/URL de los 3 slides en LT Marketplace → Home Slider — el hero
+>   desktop sigue con solo imagen) y ZOOM-200 (revisión en teléfono real +
+>   zoom 200%).
 
 ## [Unreleased] — 2026-10-01
 
