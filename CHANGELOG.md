@@ -188,6 +188,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   en la imagen (el hero no muestra botones hasta que el admin llene los
 >   campos en LT Marketplace → Home Slider), header "Version:" del plugin
 >   stale en 2.9.339 (preexistente).
+>
+> **Decisión del operador ejecutada — `HOME-REDESIGN-007` (2026-10-02, v2.9.406→2.9.407,
+> commits `45f5ffe2`+`d656fa99`+`7a463cae`): popups retirados de la home**
+> (confirmación del operador; el brief excluye ventanas emergentes y avisos
+> flotantes). 3 elementos guardados con la misma condición de la rama home
+> (`is_front_page() && is_page()` / `.pv-scope.pv-home`), activos en el
+> resto del sitio:
+>
+> - Newsletter modal — la copia que SÍ corre en la home es
+>   `ltms-ux-storefront.js` (módulo 117 duplicado; `ux-enhancements.js` ni
+>   siquiera se encola en la home nativa — primera pasada guardó el archivo
+>   equivocado, detectado verificando el DOM servido). +1 test cubre guard
+>   en .js/.min y la preservación de `const delay` (su ausencia habría sido
+>   ReferenceError en runtime que `node --check` no detecta).
+> - Newsletter bar del Traffic Booster (`render_newsletter_signup`, quedaba
+>   colgando después del footer propio de la home).
+> - Push prompt del Sales Booster (`render_push_subscription_prompt`).
+> - **Gotcha de cache documentado (lección #162 aplicada):** tras el primer
+>   deploy el guard JS no se reflejaba — SG Optimizer cachea assets por
+>   filename y `wp cache flush` NO purga su cache de assets; resuelto con
+>   `wp sg purge` (assets+file+dynamic). `remove_query_strings=0` (fix
+>   v2.9.366 intacto — el `?ver=` funciona como cache-bust).
+> - Verificación en producción (flags de localStorage limpios para que los
+>   popups PUDIERAN dispararse): min servido con guard, bar ausente, push
+>   ausente, overlay ausente tras 78s (dispararía a los 45s), 0 overlays.
+> - Suite completa final: 5,206 tests, 11,139 assertions, 0 fallas
+>   (3 skips preexistentes).
 
 ## [Unreleased] — 2026-09-28/29/30
 
