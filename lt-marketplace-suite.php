@@ -62,16 +62,14 @@ define( 'LTMS_LOADED', true );
 // HOME-REDESIGN-007b (2026-10-02): bump a 2.9.407 — guard del newsletter en
 // ltms-ux-storefront.js (la copia del módulo que SÍ corre en la home) y bar
 // del traffic-booster excluido; cache-busting del JS.
-// HOME-UX2 (2026-10-02): bump a 2.9.408 — ciclo de consistencia UI/UX de la
-// home: header re-anclado a tokens (blanco como el resto del sitio), chips =
-// categorías reales como enlaces, TODAS las categorías activas en la barra
-// (con fade de scroll toggleado por JS), carrito abre mini-cart, footer
-// visual + sección "Ayuda y políticas" (+ footer Elementor oculto en home),
-// card PV sin texto redundante (rating (0), badge Verificado duplicado,
-// envío genérico) y sin corazón de wishlist duplicado; móvil: hero y
-// vendedores ocultos con orden cats→cards→garantías. Cache-busting del JS
-// (initCatBarFade en ltms-plaza-viva.js).
-define( 'LTMS_VERSION', '2.9.408' );
+// HOME-UX2-008a (2026-10-02): bump a 2.9.409 — FIX ESTRUCTURAL del scope HOME
+// de ltms-plaza-viva.js: el homeScope corre FUERA del IIFE principal del design
+// system, donde los helpers qs/qsa/on NO existen — el live search de
+// HOME-REDESIGN-002 moría en silencio con "ReferenceError: on is not defined"
+// (las sugerencias del buscador nunca funcionaron en runtime; verificado con
+// window.onerror en producción) y el fade de categorías heredó el mismo
+// defecto. Helpers locales declarados al inicio del scope HOME.
+define( 'LTMS_VERSION', '2.9.409' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

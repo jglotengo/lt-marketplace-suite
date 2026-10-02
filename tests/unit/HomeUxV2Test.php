@@ -345,13 +345,76 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 		$this->assertFileExists( $this->plugin_path );
 		$plugin = file_get_contents( $this->plugin_path );
 		$this->assertMatchesRegularExpression(
-			"/define\( 'LTMS_VERSION', '2\.9\.408' \);/",
+			"/define\( 'LTMS_VERSION', '2\.9\.409' \);/",
 			$plugin,
-			'HOME-UX2: LTMS_VERSION debe estar en 2.9.408 (cache-busting del JS con initCatBarFade).'
+			'HOME-UX2: LTMS_VERSION debe estar en 2.9.409 (cache-busting del JS con el fix estructural del scope HOME).'
 		);
 
 		$min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.min.js' );
 		$this->assertStringContainsString( 'data-pv-scrollable', $min, 'HOME-UX2: el .min.js debe estar regenerado con el toggle del fade.' );
 		$this->assertStringContainsString( 'data-pv-at-end', $min, 'HOME-UX2: el .min.js debe contener el toggle data-pv-at-end.' );
+	}
+
+	/**
+	 * HOME-UX2-008a: FIX ESTRUCTURAL del scope HOME. El homeScope corre
+	 * FUERA del IIFE principal del design system (cierra ~línea 1075), donde
+	 * los helpers qs/qsa/on NO existen — el live search de HOME-REDESIGN-002
+	 * moría en silencio con "ReferenceError: on is not defined" (verificado
+	 * con window.onerror en producción: las sugerencias del buscador NUNCA
+	 * funcionaron en runtime; lección #186 forma-vs-runtime de nuevo). El
+	 * scope HOME debe declarar helpers locales ANTES de cualquier uso bare.
+	 */
+	public function test_010_scope_home_declara_helpers_locales(): void {
+		$js_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
+		$this->assertFileExists( $js_path );
+		$js = file_get_contents( $js_path );
+
+		// 1. El IIFE principal del design system cierra ANTES del scope HOME.
+		$pos_main_close = strpos( $js, '})(window, document);' );
+		$pos_home_scope  = strpos( $js, '(function homeScope() {' );
+		$this->assertNotFalse( $pos_main_close, 'HOME-UX2-008a: debe existir el cierre del IIFE principal.' );
+		$this->assertNotFalse( $pos_home_scope, 'HOME-UX2-008a: debe existir el scope HOME.' );
+		$this->assertLessThan(
+			$pos_home_scope,
+			$pos_main_close,
+			'HOME-UX2-008a: el scope HOME corre FUERA del IIFE principal — no puede usar sus helpers internos.'
+		);
+
+		// 2. El scope HOME declara sus propios helpers al inicio.
+		$home_scope_src = substr( $js, $pos_home_scope );
+		$this->assertMatchesRegularExpression(
+			"/\(function homeScope\(\) \{\s*\/\* HOME-UX2-008a/",
+			$home_scope_src,
+			'HOME-UX2-008a: el fix estructural debe documentarse al inicio del scope HOME.'
+		);
+		foreach ( array(
+			'function on(el, ev, fn, opt)' => 'bind de eventos (live search + fade de categorías)',
+			'function qs(sel, ctx)'        => 'querySelector del fade de categorías',
+			'function qsa(sel, ctx)'       => 'querySelectorAll del combobox de sugerencias',
+		) as $decl => $why ) {
+			$this->assertStringContainsString(
+				$decl,
+				$home_scope_src,
+				sprintf( 'HOME-UX2-008a: el scope HOME debe declarar helper local "%s" (%s).', $decl, $why )
+			);
+		}
+
+		// 3. Las declaraciones van ANTES del primer uso bare de on( dentro del scope.
+		$pos_decl_on = strpos( $home_scope_src, 'function on(el, ev, fn, opt)' );
+		$pos_first_use = strpos( $home_scope_src, "on(input, 'input', function () {" );
+		$this->assertNotFalse( $pos_first_use, 'HOME-UX2-008a: referencia de anclaje — el live search debe seguir usando on().' );
+		$this->assertLessThan(
+			$pos_first_use,
+			$pos_decl_on,
+			'HOME-UX2-008a: la declaración local de on() debe preceder a su primer uso en el scope HOME.'
+		);
+
+		// 4. El .min.js regenerado contiene las declaraciones locales (no quedó con el on bare muerto).
+		$min = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.min.js' );
+		$this->assertStringNotContainsString(
+			'window.on=',
+			$min,
+			'HOME-UX2-008a: el min no debe inventar un on global — helpers LOCALES del scope HOME.'
+		);
 	}
 }

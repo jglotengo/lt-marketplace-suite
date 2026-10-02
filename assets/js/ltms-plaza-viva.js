@@ -1935,6 +1935,22 @@
    *      cuando exista CSS que la consuma (no antes).
    * ========================================================================= */
   (function homeScope() {
+    /* HOME-UX2-008a (2026-10-02): FIX ESTRUCTURAL. Este scope corre FUERA del
+     * IIFE principal del design system (que cierra antes, ~línea 1075) — los
+     * helpers qs/qsa/on del design system NO existen aquí como identificadores.
+     * El live search migrado en HOME-REDESIGN-002 llevaba este ReferenceError
+     * latente desde su migración: moría en silencio dentro del handler de
+     * DOMContentLoaded (on(input,'input',...) línea ~2015) y las sugerencias
+     * del buscador JAMÁS funcionaron en runtime — nadie tipió en el campo
+     * durante la verificación (lección #186: forma vs runtime). Verificado en
+     * producción: window.onerror capturó "ReferenceError: on is not defined"
+     * en el min.js. Fix: helpers locales idénticos a los del design system
+     * (PV.utils los expone, pero una copia local evita el acoplamiento y
+     * funciona aunque PV no cargue). */
+    function on(el, ev, fn, opt) { if (el) el.addEventListener(ev, fn, opt || false); }
+    function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
+    function qsa(sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); }
+
     /* HOME-REDESIGN-002 (2026-10-01): live search del header de la home —
        sugerencias al escribir (máx 6) contra el endpoint ltms_live_search
        (productos visibles, rate limit 30/min server-side, nonce global
