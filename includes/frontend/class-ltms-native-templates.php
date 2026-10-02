@@ -64,7 +64,22 @@ class LTMS_Native_Templates {
         // que el filter woocommerce_locate_template interfería con TODOS
         // los templates de WC. Ahora usamos woocommerce_get_template_part
         // que es más específico y solo afecta content-product.
-        add_filter( 'woocommerce_get_template_part', [ __CLASS__, 'override_content_product' ], 10, 3 );
+        //
+        // HOME-MATRIX-FIX (2026-10-01, P0): el filtro registrado era
+        // 'woocommerce_get_template_part' — NO EXISTE como filtro en WC core
+        // (solo como FUNCIÓN deprecated en wc-deprecated-functions.php; verificado
+        // en server, WC 11.1.2). El filtro REAL que aplica wc_get_template_part()
+        // es 'wc_get_template_part' (wc-core-functions.php:288) — el override
+        // NUNCA corría: los cards del home (trending) renderizaban el markup RAW
+        // de WooCommerce (li.product + ATC inline display:inline sin estilo,
+        // verificado en producción: 7 cards raw, 0 pv-product-card). Es el mismo
+        // patrón de wiring muerto de LECCIONES #508 (action/filter sin consumidor).
+        // Fix: registrar el filtro REAL con guard de contexto home en el callback —
+        // en la home nativa sirve el card PV (content-product.php, una sola fuente
+        // de verdad del UI de card); en las demás páginas devuelve el original
+        // (shop/related/cross-sells conservan su markup exactamente como está —
+        // alcance del rediseño: solo la home).
+        add_filter( 'wc_get_template_part', [ __CLASS__, 'override_content_product' ], 10, 3 );
 
         // v2.9.211: Remove WC's default related products output to prevent
         // duplicate "Productos relacionados" sections. Our single-product.php
@@ -183,11 +198,18 @@ class LTMS_Native_Templates {
      * otros templates de WC (emails, admin, etc.).
      */
     public static function override_content_product( $template, $slug, $name ) {
-        // Solo interceptar content-product
+        // Solo interceptar content-product.
         if ( $slug === 'content' && $name === 'product' ) {
-            $native = self::$template_dir . 'wc-parts/content-product.php';
-            if ( file_exists( $native ) ) {
-                return $native;
+            // HOME-MATRIX-FIX (2026-10-01): solo la home nativa sirve el card
+            // PV — el shop, related y cross-sells conservan el markup original
+            // (alcance del rediseño: solo la home; el filtro real
+            // wc_get_template_part dispara en todas las páginas, aquí se
+            // acota al front page).
+            if ( is_front_page() && is_page() ) {
+                $native = self::$template_dir . 'wc-parts/content-product.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
             }
         }
         return $template;

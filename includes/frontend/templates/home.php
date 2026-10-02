@@ -73,7 +73,12 @@ $pv_popular_chips = apply_filters( 'ltms_home_popular_chips', array(
  * ------------------------------------------------------------------------- */
 $pv_cat_terms = array();
 if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'get_normalized_product_categories' ) ) {
-    $pv_cat_terms = array_slice( LTMS_Utils::get_normalized_product_categories( true ), 0, 8 );
+    // HOME-MATRIX-FIX (2026-10-01): excluir "NO APLICA" — artefacto de los
+    // syncs (no es una categoría navegable; el top por count la incluía).
+    $pv_all_cats = array_filter( LTMS_Utils::get_normalized_product_categories( true ), static function ( $c ) {
+        return isset( $c->slug ) && 'no-aplica' !== $c->slug;
+    } );
+    $pv_cat_terms = array_slice( array_values( $pv_all_cats ), 0, 8 );
 } else {
     $pv_cat_terms = get_terms( array(
         'taxonomy'   => 'product_cat',
@@ -89,15 +94,32 @@ if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'get_normalize
  * Fallback genérico 🛍️ si el slug no coincide.
  */
 $pv_cat_icons = apply_filters( 'ltms_home_category_icons', array(
+    /* HOME-MATRIX-FIX (2026-10-01): los slugs reales llevan sufijos numéricos
+     * del dedup WP (belleza-y-salud-342) y el lookup matchea por PREFIJO —
+     * entradas añadidas para el catálogo real (belleza/capilar/corporal). */
     'tecnologia'   => '💻',
     'electronica'  => '🔌',
     'hogar'        => '🏠',
     'moda'         => '👕',
     'ropa'         => '👗',
     'belleza'      => '💄',
+    'cuidado'      => '🧴',
+    'shampoo'      => '🧴',
+    'coloracion'   => '🎨',
+    'mascarillas'  => '🧴',
+    'ceras'        => '🧴',
+    'cremas'       => '🧴',
+    'hidratantes'  => '🧴',
+    'tratamientos' => '🧴',
+    'proteccion-solar' => '☀️',
+    'exfoliantes'  => '🧼',
+    'jabones'      => '🧼',
+    'ampolletas'   => '🧴',
+    'accesorios'   => '👜',
     'deportes'     => '⚽',
     'juegos'       => '🎮',
     'juegos-de-mesa' => '🎲',
+    'juego'        => '🎲',
     'libros'       => '📚',
     'juguetes'     => '🧸',
     'muebles'      => '🛋️',
@@ -386,7 +408,21 @@ do_action( 'ltms_before_home_plazaviva' );
             <div class="pv-cat-bar__scroll">
                 <ul class="pv-cat-bar__list" role="list">
                     <?php foreach ( $pv_cat_terms as $pv_term ) :
-                        $pv_icon = isset( $pv_cat_icons[ $pv_term->slug ] ) ? $pv_cat_icons[ $pv_term->slug ] : '🛍️';
+                        /* HOME-MATRIX-FIX (2026-10-01): los slugs reales llevan
+                         * sufijos numéricos del dedup de WP (belleza-y-salud-342)
+                         * — matchear el mapa de íconos por PREFIJO; el fallback
+                         * 🛍️ solo si ningún prefijo coincide. */
+                        $pv_icon = '🛍️';
+                        if ( isset( $pv_cat_icons[ $pv_term->slug ] ) ) {
+                            $pv_icon = $pv_cat_icons[ $pv_term->slug ];
+                        } else {
+                            foreach ( $pv_cat_icons as $pv_icon_slug => $pv_icon_emoji ) {
+                                if ( '' !== $pv_icon_slug && strpos( (string) $pv_term->slug, (string) $pv_icon_slug ) === 0 ) {
+                                    $pv_icon = $pv_icon_emoji;
+                                    break;
+                                }
+                            }
+                        }
                         $pv_term_id = (int) ( $pv_term->term_id ?? 0 );
                         $pv_cat_url = $pv_term_id ? get_term_link( $pv_term_id ) : get_term_link( $pv_term );
                         if ( is_wp_error( $pv_cat_url ) ) {
@@ -898,6 +934,12 @@ do_action( 'ltms_after_home_plazaviva' );
 <style>
 .pv-scope.pv-home{display:block;background:var(--bg);}
 
+/* HOME-MATRIX-FIX: cuerpo 16px mínimo en móvil (brief; la base 15px de
+   plaza-viva se mantiene en las demás páginas — este override es solo la
+   home nativa). body.pv-home-native gana por orden de carga (inline <style>
+   en el body, después del CSS externo de wp_head). */
+body.pv-home-native{font-size:16px;}
+
 /* ── RADIOS UNIFORMES (HOME-REDESIGN-005) ──────────────────────────────────
    Brief: radio uniforme (8px tarjetas, 8-12px botones). Scoped a la home —
    NO toca los tokens globales compartidos con shop/cart/checkout. Los radios
@@ -1014,11 +1056,13 @@ do_action( 'ltms_after_home_plazaviva' );
 
 .pv-scope.pv-home .pv-home-header__chips{display:flex;gap:6px;flex-wrap:wrap;}
 .pv-scope.pv-home .pv-home-header__chip{
-    padding:5px 12px;border-radius:var(--r-pill);
+    padding:8px 14px;border-radius:var(--r-pill);
     background:rgba(255,255,255,.12);color:#fff;
     font-size:12px;font-weight:600;border:1px solid transparent;
     cursor:pointer;transition:background var(--t),color var(--t),border-color var(--t);
-    min-height:32px;
+    /* HOME-MATRIX-FIX: touch target 44px mínimo (brief: 44×44 con 8px de
+       separación; los chips estaban en 32px). */
+    min-height:44px;
 }
 .pv-scope.pv-home .pv-home-header__chip:hover{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.4);}
 
@@ -1110,6 +1154,16 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-home-hero__head{
     display:flex;flex-direction:column;gap:6px;
     padding-bottom:16px;
+}
+/* HOME-MATRIX-FIX (2026-10-01): el sub y el eyebrow del design system
+   estaban diseñados para el fondo AZUL del hero gradiente (texto blanco
+   rgba(255,255,255,.86) — invisible sobre el fondo claro de la home: P0 de
+   contraste). Sobre fondo claro: sub gris oscuro (--text-2, ~6.9:1) y
+   eyebrow con pill azul visible (~8.6:1). El FALLBACK (hero gradiente)
+   conserva el texto blanco — solo la rama con banners usa este override. */
+.pv-scope.pv-home .pv-home-hero__head .pv-hero__sub{color:var(--text-2);}
+.pv-scope.pv-home .pv-home-hero__head .pv-hero__eyebrow{
+    background:var(--primary-50);color:var(--primary-700);
 }
 .pv-scope.pv-home .pv-home-hero__grid{
     display:grid;grid-template-columns:1fr;gap:12px;

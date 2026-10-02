@@ -202,6 +202,37 @@ final class HomeTemplateWiringTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
+	// ── HOME-MATRIX-FIX: override content-product con el filtro REAL ───────
+
+	/**
+	 * El override de content-product debe registrar el filtro REAL
+	 * 'wc_get_template_part' (el que aplica wc_get_template_part() en WC core,
+	 * wc-core-functions.php:288, WC 11.1.2). El registro viejo
+	 * 'woocommerce_get_template_part' NO existe como filtro (solo como función
+	 * deprecated) — wiring muerto: el override NUNCA corría y los cards del
+	 * home renderizaban markup RAW de WooCommerce (verificado en producción:
+	 * 7 cards raw, 0 pv-product-card).
+	 */
+	public function test_006_override_content_product_filtro_real_y_guard_home(): void {
+		$src = $this->strip_php_comments( (string) file_get_contents( $this->native_templates_path ) );
+
+		$this->assertMatchesRegularExpression(
+			"/add_filter\(\s*'wc_get_template_part',\s*\[ __CLASS__, 'override_content_product' \],\s*10,\s*3\s*\)/",
+			$src,
+			'HOME-MATRIX-FIX: debe registrar el filtro REAL wc_get_template_part.'
+		);
+		$this->assertStringNotContainsString(
+			"add_filter( 'woocommerce_get_template_part',",
+			$src,
+			'HOME-MATRIX-FIX: el filtro muerto woocommerce_get_template_part no debe seguir registrado (no existe en WC core).'
+		);
+		$this->assertMatchesRegularExpression(
+			"/public static function override_content_product\([^)]*\)\s*\{[^}]*is_front_page\(\)\s*&&\s*is_page\(\)/s",
+			$src,
+			'HOME-MATRIX-FIX: el override debe acotarse a la home nativa (is_front_page + is_page) — shop/related conservan su markup.'
+		);
+	}
+
 	// ── Invariante: la plantilla home.php sigue existiendo intacta ─────────
 
 	/**
