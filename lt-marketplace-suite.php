@@ -62,7 +62,16 @@ define( 'LTMS_LOADED', true );
 // HOME-REDESIGN-007b (2026-10-02): bump a 2.9.407 — guard del newsletter en
 // ltms-ux-storefront.js (la copia del módulo que SÍ corre en la home) y bar
 // del traffic-booster excluido; cache-busting del JS.
-define( 'LTMS_VERSION', '2.9.407' );
+// HOME-UX2 (2026-10-02): bump a 2.9.408 — ciclo de consistencia UI/UX de la
+// home: header re-anclado a tokens (blanco como el resto del sitio), chips =
+// categorías reales como enlaces, TODAS las categorías activas en la barra
+// (con fade de scroll toggleado por JS), carrito abre mini-cart, footer
+// visual + sección "Ayuda y políticas" (+ footer Elementor oculto en home),
+// card PV sin texto redundante (rating (0), badge Verificado duplicado,
+// envío genérico) y sin corazón de wishlist duplicado; móvil: hero y
+// vendedores ocultos con orden cats→cards→garantías. Cache-busting del JS
+// (initCatBarFade en ltms-plaza-viva.js).
+define( 'LTMS_VERSION', '2.9.408' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

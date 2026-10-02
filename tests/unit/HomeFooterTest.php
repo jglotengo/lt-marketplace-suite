@@ -1,19 +1,14 @@
 <?php
 /**
- * HomeFooterTest — tests del footer de la home nativa (HOME-REDESIGN-006,
- * patrón Amazon).
+ * HomeFooterTest — tests del footer de la home nativa.
  *
- * Foco: C6 del rediseño de la home:
- *   - 4 columnas: Conócenos (marca + tagline + redes), Vende con nosotros,
- *     Ayuda y Legal.
- *   - Móvil = acordeones colapsables por columna (<details> nativo, cero JS
- *     — CSP-compliant); tablet = 2 columnas; escritorio = 4 columnas con
- *     headers estáticos (pointer-events:none).
- *   - Enlaces solo a páginas reales (/ayuda, /seguimiento, registro de
- *     vendedor, vendedores) — sin enlaces rotos (P1).
- *   - Fila de pagos + selector de moneda SOLO si ya existe soporte
- *     multi-moneda (LTMS_Currency_Manager::render_currency_selector() con
- *     bail defensivo).
+ * Foco: C6 del rediseño de la home (HOME-REDESIGN-006) → REWORK HOME-UX2-005
+ * (2026-10-02): el footer pasó a ser PURAMENTE VISUAL (logo, redes reales,
+ * badges de pago, ©) y TODO el texto de enlaces se organizó en la nueva
+ * sección "Ayuda y políticas" del body (Vende con nosotros · Ayuda · Legal ·
+ * Contacto). El footer del tema (Elementor) se oculta en la home para
+ * eliminar la redundancia de dos footers apilados (el operador reportó
+ * políticas/redes/pagos duplicados).
  *
  * Tests PURAMENTE estructurales (file_get_contents + asserts): deterministas
  * en LTMS_UNIT_ONLY=true (mismo patrón que HomeTemplateWiringTest).
@@ -48,69 +43,165 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-006-A: 4 columnas Conócenos / Vende con nosotros /
-	 * Ayuda / Legal (los títulos de columna son 3 summaries + la col brand).
+	 * HOME-UX2-005-A: el footer es puramente visual — logo + redes + pagos + ©.
+	 * Las columnas de texto (acordeones <details>, col brand con tagline) fueron
+	 * ELIMINADAS y su contenido vive en la sección "Ayuda y políticas".
 	 */
-	public function test_001_cuatro_columnas(): void {
+	public function test_001_footer_visual_sin_columnas_de_texto(): void {
 		$this->assertFileExists( $this->home_path );
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
+		// Presente: marca, redes, pagos, ©.
 		$this->assertStringContainsString(
-			'class="pv-home-footer__acc"',
+			'pv-home-footer__logo',
 			$src,
-			'HOME-REDESIGN-006-A: las columnas deben usar acordeones <details>.'
+			'HOME-UX2-005-A: el footer visual debe tener el logo.'
 		);
-		$this->assertMatchesRegularExpression(
-			"/<summary class=\"pv-home-footer__col-title\">[^<]*<\?php esc_html_e\(\s*'Vende con nosotros'/",
+		$this->assertStringContainsString(
+			'pv-home-footer__social',
 			$src,
-			'HOME-REDESIGN-006-A: debe existir la columna Vende con nosotros.'
+			'HOME-UX2-005-A: el footer visual debe tener las redes.'
 		);
-		$this->assertMatchesRegularExpression(
-			"/<summary class=\"pv-home-footer__col-title\">[^<]*<\?php esc_html_e\(\s*'Ayuda'/",
+		$this->assertStringContainsString(
+			'pv-home-footer__payrow',
 			$src,
-			'HOME-REDESIGN-006-A: debe existir la columna Ayuda.'
+			'HOME-UX2-005-A: el footer visual debe tener la fila de pagos.'
 		);
-		$this->assertMatchesRegularExpression(
-			"/<summary class=\"pv-home-footer__col-title\">[^<]*<\?php esc_html_e\(\s*'Legal'/",
+		$this->assertStringContainsString(
+			'pv-home-footer__bottom',
 			$src,
-			'HOME-REDESIGN-006-A: debe existir la columna Legal.'
+			'HOME-UX2-005-A: el footer visual debe tener la línea de ©.'
 		);
-		// Conócenos: la col brand conserva logo + tagline + redes.
-		$this->assertStringContainsString( 'pv-home-footer__col--brand', $src );
-		$this->assertStringContainsString( 'pv-home-footer__tagline', $src );
-		$this->assertStringContainsString( 'pv-home-footer__social', $src );
+
+		// Eliminado: columnas de texto del footer viejo.
+		$this->assertStringNotContainsString(
+			'pv-home-footer__acc',
+			$src,
+			'HOME-UX2-005-A: los acordeones de columnas fueron eliminados (el texto vive en la sección políticas).'
+		);
+		$this->assertStringNotContainsString(
+			'pv-home-footer__col',
+			$src,
+			'HOME-UX2-005-A: las columnas de enlaces del footer fueron eliminadas.'
+		);
+		$this->assertStringNotContainsString(
+			'pv-home-footer__tagline',
+			$src,
+			'HOME-UX2-005-A: el tagline fue eliminado del footer (redundante con el hero).'
+		);
+		$this->assertStringNotContainsString(
+			'pv-home-footer__built',
+			$src,
+			'HOME-UX2-005-A: la línea "powered by" fue eliminada del footer visual.'
+		);
 	}
 
 	/**
-	 * HOME-REDESIGN-006-B: acordeones <details open> nativos (3 columnas de
-	 * enlaces), colapsables en móvil, estáticos en escritorio (cero JS).
+	 * HOME-UX2-005-B: redes sociales REALES del operador (extraídas del footer
+	 * Elementor) — antes eran placeholders genéricos a instagram.com etc.
 	 */
-	public function test_002_acordeones_nativos(): void {
+	public function test_002_redes_sociales_reales(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
-		$this->assertSame(
-			3,
-			substr_count( $src, '<details class="pv-home-footer__acc" open>' ),
-			'HOME-REDESIGN-006-B: exactamente 3 acordeones (Vende/Ayuda/Legal), renderizados abiertos.'
-		);
-
-		// CSS: summary con chevron giratorio + desktop estático (pointer-events:none).
-		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer__acc\[open\] summary::after\{transform:rotate\(-135deg\);\}/",
+		$this->assertStringContainsString(
+			'https://www.instagram.com/lotengooficial/',
 			$src,
-			'HOME-REDESIGN-006-B: el chevron del acordeón debe girar al abrirse.'
+			'HOME-UX2-005-B: Instagram debe apuntar al perfil real del operador.'
 		);
-		$this->assertMatchesRegularExpression(
-			"/@media \(min-width:1024px\)\{[^@]*\.pv-scope\.pv-home \.pv-home-footer__acc summary\{cursor:default;pointer-events:none;\}/s",
+		$this->assertStringContainsString(
+			'https://www.tiktok.com/@lotengocolombia',
 			$src,
-			'HOME-REDESIGN-006-B: en escritorio los headers del footer deben ser estáticos (sin colapsar).'
+			'HOME-UX2-005-B: TikTok debe apuntar al perfil real del operador.'
+		);
+		$this->assertStringContainsString(
+			'https://www.youtube.com/@lotengocolombia',
+			$src,
+			'HOME-UX2-005-B: YouTube debe apuntar al canal real del operador.'
+		);
+		$this->assertStringNotContainsString(
+			"'url' => 'https://instagram.com'",
+			$src,
+			'HOME-UX2-005-B: el placeholder genérico de Instagram debe estar eliminado.'
+		);
+		$this->assertStringNotContainsString(
+			"'url' => 'https://facebook.com'",
+			$src,
+			'HOME-UX2-005-B: el placeholder de Facebook (el operador no tiene página) debe estar eliminado.'
 		);
 	}
 
 	/**
-	 * HOME-REDESIGN-006-C: enlaces solo a páginas reales — sin enlaces rotos.
+	 * HOME-UX2-005-C: sección "Ayuda y políticas" — organiza el texto
+	 * eliminado del footer (Vende · Ayuda · Legal · Contacto).
 	 */
-	public function test_003_enlaces_paginas_reales(): void {
+	public function test_003_seccion_ayuda_y_politicas(): void {
+		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+
+		$this->assertStringContainsString(
+			'pv-home__policies',
+			$src,
+			'HOME-UX2-005-C: debe existir la sección Ayuda y políticas.'
+		);
+		foreach ( array( 'Vende con nosotros', 'Ayuda', 'Legal', 'Contacto' ) as $title ) {
+			$this->assertStringContainsString(
+				sprintf( "esc_html_e( '%s', 'ltms' )", $title ),
+				$src,
+				sprintf( "HOME-UX2-005-C: el grupo '%s' debe existir en la sección de políticas.", $title )
+			);
+		}
+		// Contacto real del operador (antes vivía solo en el footer Elementor, hoy oculto en la home).
+		$this->assertStringContainsString(
+			'dircomercialcol@lo-tengo.com.co',
+			$src,
+			'HOME-UX2-005-C: el email comercial del operador debe existir en Contacto.'
+		);
+		$this->assertStringContainsString(
+			'sellerscolombia@lo-tengo.com.co',
+			$src,
+			'HOME-UX2-005-C: el email de sellers del operador debe existir en Contacto.'
+		);
+		// El filtro de enlaces legales se conserva (backward compat).
+		$this->assertStringContainsString(
+			'ltms_home_footer_legal_links',
+			$src,
+			'HOME-UX2-005-C: el filtro ltms_home_footer_legal_links se conserva para los enlaces legales.'
+		);
+	}
+
+	/**
+	 * HOME-UX2-005-D: el footer del tema (Elementor) se oculta SOLO en la home
+	 * — mismo patrón defensivo del header. NUNCA un bare `footer`.
+	 */
+	public function test_004_footer_del_tema_oculto(): void {
+		$src = file_get_contents( $this->home_path );
+
+		$this->assertStringContainsString(
+			'body.pv-home-native .elementor-location-footer',
+			$src,
+			'HOME-UX2-005-D: el footer Elementor debe ocultarse en la home.'
+		);
+		$this->assertStringContainsString(
+			'body.pv-home-native #colophon',
+			$src,
+			'HOME-UX2-005-D: el footer del tema clásico (#colophon) debe ocultarse en la home.'
+		);
+		$this->assertStringContainsString(
+			'body.pv-home-native .site-footer',
+			$src,
+			'HOME-UX2-005-D: el .site-footer del tema debe ocultarse en la home.'
+		);
+		// El selector NUNCA debe ser un bare footer (matchearía .pv-home-footer).
+		$this->assertStringNotContainsString(
+			'body.pv-home-native footer{',
+			$src,
+			'HOME-UX2-005-D: prohibido el selector bare `footer` — ocultaría el footer PV propio.'
+		);
+	}
+
+	/**
+	 * HOME-REDESIGN-006-C (se mantiene): enlaces solo a páginas reales.
+	 */
+	public function test_005_enlaces_paginas_reales(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
 		// Centro de ayuda (/ayuda — page slug verificado en is_help_page()).
@@ -131,16 +222,16 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-006-D: fila de pagos + selector de moneda solo si ya
-	 * existe soporte multi-moneda.
+	 * HOME-REDESIGN-006-D (se mantiene): fila de pagos + selector de moneda
+	 * solo si ya existe soporte multi-moneda.
 	 */
-	public function test_004_pagos_y_selector_moneda(): void {
+	public function test_006_pagos_y_selector_moneda(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
 		$this->assertStringContainsString(
 			'pv-home-footer__payrow',
 			$src,
-			'HOME-REDESIGN-006-D: debe existir la fila de pagos bajo las columnas.'
+			'HOME-REDESIGN-006-D: debe existir la fila de pagos bajo la marca.'
 		);
 		// Selector de moneda: el widget canónico del checkout, con guard.
 		$this->assertMatchesRegularExpression(

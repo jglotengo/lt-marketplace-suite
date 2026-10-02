@@ -85,22 +85,26 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-002-B: header azul marino con texto blanco (patrón Amazon).
+	 * HOME-REDESIGN-002-B → HOME-UX2-001 (2026-10-02): header CLARO re-anclado
+	 * a los tokens del design system (var(--surface) + var(--text)), igual que
+	 * el header del resto del sitio — el operador reportó que el navy
+	 * hardcodeado #1A1A4E (fuera de los tokens PV) hacía la home leer como
+	 * otro site. Test actualizado en el mismo commit (lección #119).
 	 */
-	public function test_002_header_azul_marino(): void {
+	public function test_002_header_claro_tokens(): void {
 		$src = file_get_contents( $this->home_path );
 
-		// Fondo azul marino del header (paleta del brief).
+		// Fondo claro del header (token del design system).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:#1A1A4E;/s",
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--surface\);/s",
 			$src,
-			'HOME-REDESIGN-002-B: el header debe tener fondo azul marino #1A1A4E.'
+			'HOME-UX2-001: el header debe tener fondo var(--surface) (claro, como las demás páginas).'
 		);
-		// Logo con texto blanco.
+		// Logo con texto del sistema (oscuro sobre claro).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__logo\{[^}]*color:#fff;/s",
+			"/\.pv-scope\.pv-home \.pv-home-header__logo\{[^}]*color:var\(--text\);/s",
 			$src,
-			'HOME-REDESIGN-002-B: el logo del header debe ser texto blanco sobre azul marino.'
+			'HOME-UX2-001: el logo del header debe usar var(--text) sobre el fondo claro.'
 		);
 		// Safe-area en el header sticky.
 		$this->assertStringContainsString(

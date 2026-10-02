@@ -2042,10 +2042,41 @@
       });
     }
 
+    /* HOME-UX2-002 (2026-10-02): fade del borde derecho de la barra de
+       categorías de la home. El CSS (home.php <style>) pinta el mask
+       SOLO con data-pv-scrollable="1" y sin data-pv-at-end="1": el
+       indicio de "hay más categorías" aparece cuando hay desborde y
+       desaparece al llegar al final del scroll. Hoy son 20 activas —
+       nada queda oculto, el fade solo señala el scroll. */
+    function initCatBarFade(scope) {
+      var scroll = qs('.pv-cat-bar__scroll', scope);
+      if (!scroll) return;
+
+      function sync() {
+        var max = scroll.scrollWidth - scroll.clientWidth;
+        if (max > 4) {
+          scroll.setAttribute('data-pv-scrollable', '1');
+          if (max - scroll.scrollLeft < 8) {
+            scroll.setAttribute('data-pv-at-end', '1');
+          } else {
+            scroll.removeAttribute('data-pv-at-end');
+          }
+        } else {
+          scroll.removeAttribute('data-pv-scrollable');
+          scroll.removeAttribute('data-pv-at-end');
+        }
+      }
+
+      on(scroll, 'scroll', sync);
+      on(window, 'resize', sync);
+      sync();
+    }
+
     function initHome() {
       var scope = document.querySelector('.pv-scope.pv-home');
       if (!scope) return;
       initLiveSearch(scope);
+      initCatBarFade(scope);
       // El handler global AUDIT-FE-HOME-003 cubre los chips, y la clase
       // is-scrolled no tiene CSS. El IIFE sigue siendo la válvula de
       // extensión para futuros behaviours específicos de la home.

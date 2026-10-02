@@ -117,7 +117,7 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * HOME-REDESIGN-003-D: fuente de datos — helper normalizado (dedup +
-	 * orden por conversión) top 8, con fallback get_terms crudo top 8.
+	 * orden por conversión), con fallback get_terms crudo.
 	 *
 	 * HOME-MATRIX-FIX (2026-10-01): el query cambió de array_slice directo
 	 * sobre el helper a array_filter (exclusión de la categoría artefacto
@@ -125,8 +125,14 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 	 * El intento del test se preserva: helper normalizado + top 8, y se
 	 * añade la aserción de la exclusión (lección #119 — test actualizado
 	 * en el mismo commit que el cambio de enfoque).
+	 *
+	 * HOME-UX2-002 (2026-10-02): el cap de 8 fue ELIMINADO — el operador
+	 * reportó que "no se percibe que hay categorías ocultas"; hoy son 20
+	 * activas y TODAS se muestran (el indicio de "hay más" lo da el fade
+	 * del borde con data-pv-scrollable). Test actualizado en el mismo
+	 * commit (lección #119): array_values SIN slice + fallback SIN number.
 	 */
-	public function test_004_fuente_datos_top_8_normalizada(): void {
+	public function test_004_fuente_datos_todas_las_categorias(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
 		$this->assertMatchesRegularExpression(
@@ -135,27 +141,37 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 			'HOME-REDESIGN-003-D: debe usar el helper normalizado (dedup + orden por # de productos).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/array_slice\(\s*array_values\(\s*\\\$pv_all_cats\s*\),\s*0,\s*8\s*\)/",
+			"/\\\$pv_cat_terms\s*=\s*array_values\(\s*\\\$pv_all_cats\s*\);/",
 			$src,
-			'HOME-REDESIGN-003-D: debe tomar el top 8 tras la exclusión (brief: 8-10 accesos).'
+			'HOME-UX2-002: TODAS las categorías activas tras la exclusión — sin array_slice de top 8.'
+		);
+		$this->assertStringNotContainsString(
+			'array_slice( array_values( $pv_all_cats ), 0, 8 )',
+			$src,
+			'HOME-UX2-002: el cap de 8 fue eliminado (el usuario debe percibir todas las categorías).'
 		);
 		$this->assertMatchesRegularExpression(
 			"/'no-aplica'\s*!==\s*\\\$c->slug/",
 			$src,
 			'HOME-MATRIX-FIX: la categoría artefacto de syncs "NO APLICA" debe excluirse de la barra.'
 		);
-		$this->assertMatchesRegularExpression(
-			"/'number'\s*=>\s*8,/",
+		$this->assertStringNotContainsString(
+			"'number'     => 8,",
 			$src,
-			'HOME-REDESIGN-003-D: el fallback get_terms debe pedir top 8 (brief: 8-10 accesos).'
+			'HOME-UX2-002: el fallback get_terms NO debe pedir top 8 — todas las categorías activas.'
 		);
 	}
 
 	/**
-	 * HOME-REDESIGN-003-E: comportamiento responsivo — móvil deslizable,
-	 * escritorio ≥1024 barra fija sin deslizar.
+	 * HOME-REDESIGN-003-E: comportamiento responsivo — móvil deslizable.
+	 *
+	 * HOME-UX2-002 (2026-10-02): escritorio ya NO es barra fija — con las 20
+	 * categorías activas no caben en el contenedor: el scroll se mantiene en
+	 * TODOS los tamaños y el fade del borde derecho (mask-image activado por
+	 * data-pv-scrollable / desactivado por data-pv-at-end, toggled por el JS
+	 * del scope HOME) es el indicio de "hay más categorías".
 	 */
-	public function test_005_responsivo_deslizable_movil_fija_escritorio(): void {
+	public function test_005_responsivo_scroll_todos_los_tamanos_con_fade(): void {
 		$src = file_get_contents( $this->home_path );
 
 		// Base: fila deslizable.
@@ -164,11 +180,29 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-REDESIGN-003-E: la barra debe ser deslizable en móvil.'
 		);
-		// Escritorio ≥1024: sin deslizar.
-		$this->assertMatchesRegularExpression(
-			"/@media \(min-width:1024px\)\{[^@]*\.pv-scope\.pv-home \.pv-cat-bar__scroll\{overflow:visible;\}/s",
+		// HOME-UX2-002: sin overflow:visible en escritorio — el scroll se mantiene.
+		$this->assertStringNotContainsString(
+			'.pv-cat-bar__scroll{overflow:visible;}',
 			$src,
-			'HOME-REDESIGN-003-E: en escritorio la barra debe ser fija (sin deslizar).'
+			'HOME-UX2-002: el scroll de la barra se mantiene en TODOS los tamaños (20 categorías activas no caben).'
+		);
+		// Fade del borde: mask solo con data-pv-scrollable y sin data-pv-at-end.
+		$this->assertMatchesRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-cat-bar__scroll\[data-pv-scrollable=\"1\"\]:not\(\[data-pv-at-end=\"1\"\]\)\{[^}]*mask-image:/s",
+			$src,
+			'HOME-UX2-002: el fade del borde derecho (mask-image) debe existir y activarse solo con desborde.'
+		);
+		// El JS del scope HOME togglea los data-attrs del fade.
+		$js = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js' );
+		$this->assertStringContainsString(
+			"data-pv-scrollable",
+			$js,
+			'HOME-UX2-002: ltms-plaza-viva.js debe togglear data-pv-scrollable en el scroll de categorías.'
+		);
+		$this->assertStringContainsString(
+			"data-pv-at-end",
+			$js,
+			'HOME-UX2-002: ltms-plaza-viva.js debe togglear data-pv-at-end al llegar al final del scroll.'
 		);
 	}
 }

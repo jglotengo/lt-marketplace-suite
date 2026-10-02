@@ -186,17 +186,19 @@ final class HomeTrustSellTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-REDESIGN-005-E: el CTA debe apuntar al registro de vendedor (URL filterable).'
 		);
-		// Fondo azul marino con detalle dorado (línea superior).
+		// Fondo: gradiente azul del design system (HOME-UX2-001 reemplazó el
+		// navy hardcodeado #1A1A4E — fuera de los tokens PV — por el mismo
+		// gradiente del hero fallback) con detalle dorado token (línea superior).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-sell\{[^}]*background:#1A1A4E;[^}]*border-top:3px solid #E0A526;/s",
+			"/\.pv-scope\.pv-home \.pv-home-sell\{[^}]*radial-gradient\(120% 100% at 0% 0%,#3b82f6 0%,var\(--primary\) 45%,var\(--primary-700\) 100%\);[^}]*border-top:3px solid var\(--gold\);/s",
 			$src,
-			'HOME-REDESIGN-005-E: la franja debe ser azul marino con detalle dorado.'
+			'HOME-UX2-001: la franja debe usar el gradiente del design system con detalle dorado var(--gold).'
 		);
-		// CTA dorado con texto azul marino (el dorado nunca como texto sobre blanco).
+		// CTA dorado token con texto del sistema (el dorado nunca como texto sobre blanco).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-sell__cta\{[^}]*background:#E0A526;color:#1A1A4E;/s",
+			"/\.pv-scope\.pv-home \.pv-home-sell__cta\{[^}]*background:var\(--gold\);color:var\(--text\);/s",
 			$src,
-			'HOME-REDESIGN-005-E: el CTA debe ser dorado con texto azul marino (AA ~7:1).'
+			'HOME-UX2-001: el CTA debe ser var(--gold) con texto var(--text) (AA ~8:1).'
 		);
 		// Desktop: texto izq + botón der en una sola fila.
 		$this->assertMatchesRegularExpression(

@@ -9,14 +9,19 @@
  * ltms_home_template_enabled = 'yes').
  *
  * Secciones:
- *  - Header 3 zonas (logo · buscador con chips · acciones de cuenta).
- *  - Hero banner (gradiente azul #2563EB) con CTA "Explorar productos".
+ *  - Header 3 zonas (logo · buscador con chips de categorías reales · acciones
+ *    de cuenta). Carrito abre el mini-cart lateral (HOME-UX2-004).
+ *  - Barra de categorías con TODAS las activas (HOME-UX2-002).
+ *  - Hero banner (slide 1 del Home Slider + tarjetas 2-3, texto en HTML).
  *  - Trust bar (4 items: Compra Protegida, Pago Seguro,
  *    Vendedores Verificados, Envío a todo el país). SIN devoluciones.
- *  - Bento grid de categorías (6 tiles asimétricos) con get_terms().
  *  - Trending productos (WC query best_sellers, 8 productos).
  *  - Vendedores destacados (Star Sellers: KYC approved + star_seller=1).
- *  - Footer (legales · métodos de pago · redes sociales).
+ *  - Vende con nosotros (CTA registro de vendedor).
+ *  - Ayuda y políticas (HOME-UX2-005: Vende · Ayuda · Legal · Contacto —
+ *    el texto que antes vivía en las columnas del footer).
+ *  - Footer puramente visual (logo · redes reales · métodos de pago · ©);
+ *    el footer del tema se oculta en la home.
  *
  * Usa WC hooks estándar y el design system "Plaza Viva"
  * (assets/css/ltms-plaza-viva.css + assets/js/ltms-plaza-viva.js).
@@ -54,22 +59,25 @@ $pv_wishlist_url = apply_filters( 'ltms_wishlist_url', home_url( '/favoritos' ) 
 $pv_wishlist_count = apply_filters( 'ltms_wishlist_count', 0 );
 
 /**
- * Popular Requests — chips de búsqueda rápidos.
- * Hardcodeados por diseño (4 chips). Filterable para personalización.
+ * Popular Requests — chips de accesos rápidos.
+ * HOME-UX2-003 (2026-10-02): antes eran 4 términos hardcodeados que no
+ * existían en el catálogo ('Tecnología', 'Regalos', 'Hogar' → 0-2 resultados
+ * reales). Ahora derivan del top 4 de categorías activas (mismo query de la
+ * barra de categorías) y enlazan DIRECTO a la página de la categoría —
+ * nunca a una búsqueda de texto que puede llegar vacía. Se computan tras la
+ * consulta de categorías (sección 2). Filterable via ltms_home_popular_chips.
  */
-$pv_popular_chips = apply_filters( 'ltms_home_popular_chips', array(
-    __( 'Juegos de mesa', 'ltms' ),
-    __( 'Regalos', 'ltms' ),
-    __( 'Hogar', 'ltms' ),
-    __( 'Tecnología', 'ltms' ),
-) );
 
 /* ---------------------------------------------------------------------------
  * 2. Categorías para la barra de accesos (HOME-REDESIGN-003)
  *    Fuente: LTMS_Utils::get_normalized_product_categories() — dedup por
  *    fingerprint (case/acento/singular-plural) + nombre en MAYUSCULAS +
- *    orden por # de productos (proxy de conversión). Top 8.
- *    Fallback: get_terms crudo (top 8 por count) si el helper no está cargado.
+ *    orden por # de productos (proxy de conversión).
+ *    HOME-UX2-002 (2026-10-02): TODAS las categorías activas — antes solo el
+ *    top 8 y el usuario no percibía que había más (20 reales hoy). El hint
+ *    visual de "hay más" lo dan el fade del borde + scroll horizontal en
+ *    todos los tamaños (ver CSS). Fallback: get_terms crudo si el helper
+ *    no está cargado.
  * ------------------------------------------------------------------------- */
 $pv_cat_terms = array();
 if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'get_normalized_product_categories' ) ) {
@@ -78,12 +86,11 @@ if ( class_exists( 'LTMS_Utils' ) && method_exists( 'LTMS_Utils', 'get_normalize
     $pv_all_cats = array_filter( LTMS_Utils::get_normalized_product_categories( true ), static function ( $c ) {
         return isset( $c->slug ) && 'no-aplica' !== $c->slug;
     } );
-    $pv_cat_terms = array_slice( array_values( $pv_all_cats ), 0, 8 );
+    $pv_cat_terms = array_values( $pv_all_cats );
 } else {
     $pv_cat_terms = get_terms( array(
         'taxonomy'   => 'product_cat',
         'hide_empty' => true,
-        'number'     => 8,
         'orderby'    => 'count',
         'order'      => 'DESC',
     ) );
@@ -134,6 +141,24 @@ $pv_cat_icons = apply_filters( 'ltms_home_category_icons', array(
     'arte'         => '🎨',
     'regalos'      => '🎁',
 ) );
+
+/* HOME-UX2-003 (2026-10-02): chips = top 4 categorías activas, como enlaces
+ * directos a su página de categoría. Siempre en sincronía con el catálogo. */
+$pv_popular_chips = array();
+if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) {
+    foreach ( array_slice( $pv_cat_terms, 0, 4 ) as $pv_chip_term ) {
+        $pv_chip_tid  = (int) ( $pv_chip_term->term_id ?? 0 );
+        $pv_chip_url  = $pv_chip_tid ? get_term_link( $pv_chip_tid ) : get_term_link( $pv_chip_term );
+        if ( is_wp_error( $pv_chip_url ) ) {
+            $pv_chip_url = $pv_shop_url;
+        }
+        $pv_popular_chips[] = array(
+            'name' => $pv_chip_term->name,
+            'url'  => $pv_chip_url,
+        );
+    }
+}
+$pv_popular_chips = apply_filters( 'ltms_home_popular_chips', $pv_popular_chips );
 
 /* ---------------------------------------------------------------------------
  * 3. Trending productos — WC()->query->get_catalog_ordering_args('popularity')
@@ -347,13 +372,17 @@ do_action( 'ltms_before_home_plazaviva' );
                      el JS del scope HOME lo llena contra ltms_live_search
                      (productos visibles, rate limit 30/min server-side). */ ?>
                 <div id="pv-home-suggestions" class="pv-home-header__suggestions" role="listbox" aria-label="<?php esc_attr_e( 'Sugerencias de búsqueda', 'ltms' ); ?>" hidden></div>
+                <?php /* HOME-UX2-003: chips = enlaces directos a las categorías top
+                     * del catálogo real (sin data-pv-search-chip: el handler JS
+                     * del design system rellenaría el input y lanzaría una
+                     * búsqueda de texto que puede llegar vacía). */ ?>
                 <?php if ( ! empty( $pv_popular_chips ) ) : ?>
-                    <ul class="pv-home-header__chips" aria-label="<?php esc_attr_e( 'Búsquedas populares', 'ltms' ); ?>">
+                    <ul class="pv-home-header__chips" aria-label="<?php esc_attr_e( 'Categorías populares', 'ltms' ); ?>">
                         <?php foreach ( $pv_popular_chips as $pv_chip ) : ?>
                             <li>
-                                <button type="button" class="pv-home-header__chip" data-pv-search-chip="<?php echo esc_attr( $pv_chip ); ?>" data-pv-search-chip-value="<?php echo esc_attr( $pv_chip ); ?>">
-                                    <?php echo esc_html( $pv_chip ); ?>
-                                </button>
+                                <a class="pv-home-header__chip" href="<?php echo esc_url( $pv_chip['url'] ); ?>">
+                                    <?php echo esc_html( $pv_chip['name'] ); ?>
+                                </a>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -375,7 +404,12 @@ do_action( 'ltms_before_home_plazaviva' );
                     </span>
                     <span class="pv-home-header__action-label"><?php esc_html_e( 'Favoritos', 'ltms' ); ?></span>
                 </a>
-                <a class="pv-home-header__action" href="<?php echo esc_url( $pv_cart_url ); ?>" aria-label="<?php esc_attr_e( 'Carrito', 'ltms' ); ?>">
+                <?php /* HOME-UX2-004 (2026-10-02): el carrito abre el mini-cart
+                     * lateral (.ltms-minicart, mismo patrón del topbar del
+                     * storefront) en vez de navegar a /carrito/. El href queda
+                     * como fallback sin JS. El drawer tiene "Ver carrito"
+                     * dentro para la página completa. */ ?>
+                <a class="pv-home-header__action" href="<?php echo esc_url( $pv_cart_url ); ?>" data-ltms-open-cart aria-label="<?php esc_attr_e( 'Carrito', 'ltms' ); ?>">
                     <span class="pv-home-header__action-icon">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                         <?php if ( $pv_cart_count > 0 ) : ?>
@@ -785,97 +819,105 @@ do_action( 'ltms_before_home_plazaviva' );
         </div>
     </section>
 
+    <?php
+    /* =====================================================================
+     * AYUDA Y POLÍTICAS (HOME-UX2-005, 2026-10-02): el footer pasa a ser
+     * puramente visual (logo, redes, pagos, ©) y TODO el texto de enlaces
+     * que vivía en las 4 columnas del footer + el contacto del footer del
+     * tema se organiza aquí como sección propia, compacta y navegable.
+     * =====================================================================
+     */
+    ?>
+    <section class="pv-section pv-home__policies" aria-labelledby="pv-home-policies-title">
+        <header class="pv-section__head">
+            <h2 id="pv-home-policies-title" class="pv-section__title"><?php esc_html_e( 'Ayuda y políticas', 'ltms' ); ?></h2>
+        </header>
+        <div class="pv-home-policies">
+            <div class="pv-home-policies__group">
+                <h3 class="pv-home-policies__title"><?php esc_html_e( 'Vende con nosotros', 'ltms' ); ?></h3>
+                <ul class="pv-home-policies__links">
+                    <li><a href="<?php echo esc_url( apply_filters( 'ltms_become_seller_url', home_url( '/vendedor/registro' ) ) ); ?>"><?php esc_html_e( 'Regístrate como vendedor', 'ltms' ); ?></a></li>
+                    <li><a href="<?php echo esc_url( apply_filters( 'ltms_sellers_page_url', home_url( '/vendedores' ) ) ); ?>"><?php esc_html_e( 'Ver vendedores', 'ltms' ); ?></a></li>
+                </ul>
+            </div>
+            <div class="pv-home-policies__group">
+                <h3 class="pv-home-policies__title"><?php esc_html_e( 'Ayuda', 'ltms' ); ?></h3>
+                <ul class="pv-home-policies__links">
+                    <li><a href="<?php echo esc_url( home_url( '/ayuda' ) ); ?>"><?php esc_html_e( 'Centro de ayuda', 'ltms' ); ?></a></li>
+                    <li><a href="<?php echo esc_url( home_url( '/seguimiento' ) ); ?>"><?php esc_html_e( 'Rastrear pedido', 'ltms' ); ?></a></li>
+                    <li><a href="<?php echo esc_url( $pv_account_url ); ?>"><?php esc_html_e( 'Mi cuenta', 'ltms' ); ?></a></li>
+                </ul>
+            </div>
+            <div class="pv-home-policies__group">
+                <h3 class="pv-home-policies__title"><?php esc_html_e( 'Legal', 'ltms' ); ?></h3>
+                <ul class="pv-home-policies__links">
+                    <?php
+                    $pv_legal_links = apply_filters( 'ltms_home_footer_legal_links', array(
+                        array( 'label' => __( 'Términos y condiciones', 'ltms' ), 'url' => home_url( '/terminos' ) ),
+                        array( 'label' => __( 'Política de privacidad', 'ltms' ), 'url' => home_url( '/privacidad' ) ),
+                        array( 'label' => __( 'Política de cookies', 'ltms' ), 'url' => home_url( '/cookies' ) ),
+                        array( 'label' => __( 'Tratamiento de datos', 'ltms' ), 'url' => home_url( '/habeas-data' ) ),
+                    ) );
+                    foreach ( $pv_legal_links as $pv_link ) :
+                    ?>
+                        <li><a href="<?php echo esc_url( $pv_link['url'] ); ?>"><?php echo esc_html( $pv_link['label'] ); ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <div class="pv-home-policies__group">
+                <h3 class="pv-home-policies__title"><?php esc_html_e( 'Contacto', 'ltms' ); ?></h3>
+                <ul class="pv-home-policies__links">
+                    <li><a href="mailto:dircomercialcol@lo-tengo.com.co">dircomercialcol@lo-tengo.com.co</a></li>
+                    <li><a href="mailto:sellerscolombia@lo-tengo.com.co">sellerscolombia@lo-tengo.com.co</a></li>
+                    <li><a href="tel:+5753014106251"><?php esc_html_e( '057 301 410 6251', 'ltms' ); ?></a></li>
+                    <li><span><?php esc_html_e( 'Cra 48 # 12B - 55 - Of 102, Cali - Colombia', 'ltms' ); ?></span></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
     </main><!-- /#pv-main -->
 
     <?php
     /* =====================================================================
-     * FOOTER (HOME-REDESIGN-006, patrón Amazon): 4 columnas Conócenos,
-     * Vende con nosotros, Ayuda y Legal. Móvil = acordeones colapsables por
-     * columna (<details> nativo, cero JS — CSP-compliant); tablet = 2
-     * columnas; escritorio = 4 columnas. Selector de moneda solo si ya
-     * existe soporte multi-moneda (LTMS_Currency_Manager — bail defensivo
-     * interno si no hay monedas habilitadas). Selector de país descartado:
-     * no existe soporte (brief: solo si ya existe).
+     * FOOTER (HOME-UX2-005, 2026-10-02): puramente VISUAL — logo, redes
+     * reales, badges de pago y ©. TODO el texto de enlaces (Vende, Ayuda,
+     * Legal, Contacto) se organizó en la sección "Ayuda y políticas" del
+     * body. El footer del tema (Elementor) se oculta en la home vía CSS
+     * (bloque defensivo de abajo) para eliminar la redundancia de dos
+     * footers apilados con las mismas políticas/redes/pagos.
      * =====================================================================
      */
     ?>
     <footer class="pv-home-footer" role="contentinfo">
         <div class="pv-section pv-home-footer__inner">
 
-            <?php /* --- Col 1: Conócenos (marca + tagline + redes) --- */ ?>
-            <div class="pv-home-footer__col pv-home-footer__col--brand">
-                <a class="pv-home-footer__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
-                    <span class="pv-home-footer__logo-mark" aria-hidden="true">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    </span>
-                    <span><?php esc_html_e( 'Lo Tengo', 'ltms' ); ?></span>
-                </a>
-                <p class="pv-home-footer__tagline">
-                    <?php esc_html_e( 'El marketplace donde compras con confianza y vendes con libertad. Protegido con Escrow, vendedores verificados y envío a todo el país.', 'ltms' ); ?>
-                </p>
-                <ul class="pv-home-footer__social" aria-label="<?php esc_attr_e( 'Redes sociales', 'ltms' ); ?>">
-                    <?php
-                    $pv_socials = apply_filters( 'ltms_home_footer_socials', array(
-                        array( 'label' => 'Instagram', 'url' => 'https://instagram.com', 'icon' => 'instagram' ),
-                        array( 'label' => 'Facebook',  'url' => 'https://facebook.com',  'icon' => 'facebook' ),
-                        array( 'label' => 'TikTok',    'url' => 'https://tiktok.com',     'icon' => 'tiktok' ),
-                        array( 'label' => 'YouTube',   'url' => 'https://youtube.com',    'icon' => 'youtube' ),
-                        array( 'label' => 'X',         'url' => 'https://x.com',          'icon' => 'x' ),
-                    ) );
-                    foreach ( $pv_socials as $pv_soc ) :
-                    ?>
-                        <li>
-                            <a class="pv-home-footer__social-link" href="<?php echo esc_url( $pv_soc['url'] ); ?>" target="_blank" rel="noopener noreferrer" aria-label="<?php echo esc_attr( $pv_soc['label'] ); ?>">
-                                <?php echo ltms_pv_social_icon( $pv_soc['icon'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-                            </a>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
+            <?php /* --- Marca --- */ ?>
+            <a class="pv-home-footer__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
+                <span class="pv-home-footer__logo-mark" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </span>
+                <span><?php esc_html_e( 'Lo Tengo', 'ltms' ); ?></span>
+            </a>
 
-            <?php /* --- Col 2: Vende con nosotros --- */ ?>
-            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Vende con nosotros', 'ltms' ); ?>">
-                <details class="pv-home-footer__acc" open>
-                    <summary class="pv-home-footer__col-title"><?php esc_html_e( 'Vende con nosotros', 'ltms' ); ?></summary>
-                    <ul class="pv-home-footer__links">
-                        <li><a href="<?php echo esc_url( apply_filters( 'ltms_become_seller_url', home_url( '/vendedor/registro' ) ) ); ?>"><?php esc_html_e( 'Regístrate como vendedor', 'ltms' ); ?></a></li>
-                        <li><a href="<?php echo esc_url( apply_filters( 'ltms_sellers_page_url', home_url( '/vendedores' ) ) ); ?>"><?php esc_html_e( 'Ver vendedores', 'ltms' ); ?></a></li>
-                    </ul>
-                </details>
-            </nav>
-
-            <?php /* --- Col 3: Ayuda --- */ ?>
-            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Ayuda', 'ltms' ); ?>">
-                <details class="pv-home-footer__acc" open>
-                    <summary class="pv-home-footer__col-title"><?php esc_html_e( 'Ayuda', 'ltms' ); ?></summary>
-                    <ul class="pv-home-footer__links">
-                        <li><a href="<?php echo esc_url( home_url( '/ayuda' ) ); ?>"><?php esc_html_e( 'Centro de ayuda', 'ltms' ); ?></a></li>
-                        <li><a href="<?php echo esc_url( home_url( '/seguimiento' ) ); ?>"><?php esc_html_e( 'Rastrear pedido', 'ltms' ); ?></a></li>
-                        <li><a href="<?php echo esc_url( $pv_account_url ); ?>"><?php esc_html_e( 'Mi cuenta', 'ltms' ); ?></a></li>
-                    </ul>
-                </details>
-            </nav>
-
-            <?php /* --- Col 4: Legal --- */ ?>
-            <nav class="pv-home-footer__col" aria-label="<?php esc_attr_e( 'Enlaces legales', 'ltms' ); ?>">
-                <details class="pv-home-footer__acc" open>
-                    <summary class="pv-home-footer__col-title"><?php esc_html_e( 'Legal', 'ltms' ); ?></summary>
-                    <ul class="pv-home-footer__links">
-                        <?php
-                        $pv_legal_links = apply_filters( 'ltms_home_footer_legal_links', array(
-                            array( 'label' => __( 'Términos y condiciones', 'ltms' ), 'url' => home_url( '/terminos' ) ),
-                            array( 'label' => __( 'Política de privacidad', 'ltms' ), 'url' => home_url( '/privacidad' ) ),
-                            array( 'label' => __( 'Política de cookies', 'ltms' ), 'url' => home_url( '/cookies' ) ),
-                            array( 'label' => __( 'Tratamiento de datos', 'ltms' ), 'url' => home_url( '/habeas-data' ) ),
-                        ) );
-                        foreach ( $pv_legal_links as $pv_link ) :
-                        ?>
-                            <li><a href="<?php echo esc_url( $pv_link['url'] ); ?>"><?php echo esc_html( $pv_link['label'] ); ?></a></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </details>
-            </nav>
-
+            <?php /* --- Redes reales del operador (HOME-UX2-005: antes eran
+                 * placeholders genéricos a instagram.com/facebook.com etc.) --- */ ?>
+            <ul class="pv-home-footer__social" aria-label="<?php esc_attr_e( 'Redes sociales', 'ltms' ); ?>">
+                <?php
+                $pv_socials = apply_filters( 'ltms_home_footer_socials', array(
+                    array( 'label' => 'Instagram', 'url' => 'https://www.instagram.com/lotengooficial/', 'icon' => 'instagram' ),
+                    array( 'label' => 'TikTok',    'url' => 'https://www.tiktok.com/@lotengocolombia', 'icon' => 'tiktok' ),
+                    array( 'label' => 'YouTube',   'url' => 'https://www.youtube.com/@lotengocolombia', 'icon' => 'youtube' ),
+                ) );
+                foreach ( $pv_socials as $pv_soc ) :
+                ?>
+                    <li>
+                        <a class="pv-home-footer__social-link" href="<?php echo esc_url( $pv_soc['url'] ); ?>" target="_blank" rel="noopener noreferrer" aria-label="<?php echo esc_attr( $pv_soc['label'] ); ?>">
+                            <?php echo ltms_pv_social_icon( $pv_soc['icon'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
         </div>
 
         <?php /* --- Pagos + selector de moneda (solo si multi-moneda activa) --- */ ?>
@@ -890,9 +932,6 @@ do_action( 'ltms_before_home_plazaviva' );
                     <li class="pv-home-footer__pay-badge"><?php echo esc_html( $pv_pay ); ?></li>
                 <?php endforeach; ?>
             </ul>
-            <p class="pv-home-footer__pay-note">
-                <?php esc_html_e( 'Pago seguro con Escrow · Billetera Lo Tengo', 'ltms' ); ?>
-            </p>
             <?php
             /* HOME-REDESIGN-006: selector de moneda solo si ya existe soporte
                multi-moneda (brief). El widget canónico del checkout reutilizado
@@ -907,7 +946,6 @@ do_action( 'ltms_before_home_plazaviva' );
         <div class="pv-home-footer__bottom">
             <div class="pv-section pv-home-footer__bottom-inner">
                 <span>&copy; <?php echo esc_html( date_i18n( 'Y' ) ); ?> <?php echo esc_html( get_bloginfo( 'name' ) ); ?>. <?php esc_html_e( 'Todos los derechos reservados.', 'ltms' ); ?></span>
-                <span class="pv-home-footer__built"><?php esc_html_e( 'Marketplace powered by LT Marketplace Suite', 'ltms' ); ?></span>
             </div>
         </div>
     </footer><!-- /.pv-home-footer -->
@@ -949,19 +987,23 @@ body.pv-home-native{font-size:16px;}
    específica viene después en la cascada y gana por orden). */
 .pv-scope.pv-home .pv-btn{border-radius:12px;}
 
-/* ── HEADER (HOME-REDESIGN-002, patrón Amazon) ───────────────────────────
-   Fondo azul marino #1A1A4E, texto blanco, buscador protagonista.
-   Mobile-first según brief:
-   - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
-   - ≥480: filtro de categoría dentro del campo.
-   - ≥768 (tablet): 1 fila con buscador flexible.
-   - ≥1024: buscador central min 480px.
-   Contraste AA: #fff sobre #1A1A4E ≈ 15.9:1; etiquetas rgba .72 ≈ 9:1;
-   botón #1E40AF + #fff ≈ 10.4:1; badge dorado #E0A526 + #1A1A4E ≈ 7:1. */
+/* ── HEADER (HOME-UX2-001, 2026-10-02) ────────────────────────────────────
+    Re-anclado a los tokens del design system Plaza Viva: fondo claro
+    (var(--surface)) + texto var(--text) + acentos var(--primary), igual que
+    el header del resto del sitio (antes navy #1A1A4E hardcodeado, un color
+    que no existe en ningún token — la home leía como otro site). El dorado
+    queda SOLO para el badge de contador. Contraste AA: --text 15.9:1,
+    --text-2 7:1, botón --primary + #fff 4.6:1 (texto bold 14px), badge
+    --gold + --text ≈ 8:1.
+    Mobile-first según brief:
+    - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
+    - ≥480: filtro de categoría dentro del campo.
+    - ≥768 (tablet): 1 fila con buscador flexible.
+    - ≥1024: buscador central min 480px. */
 .pv-scope.pv-home .pv-home-header{
     position:sticky;top:0;z-index:50;
-    background:#1A1A4E;
-    border-bottom:1px solid rgba(255,255,255,.08);
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
     padding-top:calc(env(safe-area-inset-top, 0px) + 8px);
 }
 .pv-scope.pv-home .pv-home-header__inner{
@@ -977,16 +1019,16 @@ body.pv-home-native{font-size:16px;}
 }
 .pv-scope.pv-home .pv-home-header__logo{
     grid-area:logo;
-    display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;
+    display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);
 }
 .pv-scope.pv-home .pv-home-header__logo-mark{
     width:40px;height:42px;flex-shrink:0;
     display:flex;align-items:center;justify-content:center;font-size:20px;
-    background:rgba(255,255,255,.14);border-radius:var(--r-md);color:#fff;
+    background:var(--primary-50);border-radius:var(--r-md);color:var(--primary-700);
 }
 .pv-scope.pv-home .pv-home-header__logo-text{display:flex;flex-direction:column;line-height:1.1;}
-.pv-scope.pv-home .pv-home-header__logo-name{font-family:var(--display);font-weight:800;font-size:19px;color:#fff;}
-.pv-scope.pv-home .pv-home-header__logo-tag{font-size:11px;font-weight:600;color:rgba(255,255,255,.72);text-transform:uppercase;letter-spacing:.06em;}
+.pv-scope.pv-home .pv-home-header__logo-name{font-family:var(--display);font-weight:800;font-size:19px;color:var(--text);}
+.pv-scope.pv-home .pv-home-header__logo-tag{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;}
 
 .pv-scope.pv-home .pv-home-header__search{
     grid-area:search;
@@ -995,14 +1037,14 @@ body.pv-home-native{font-size:16px;}
 }
 .pv-scope.pv-home .pv-home-header__search-form{
     display:flex;align-items:center;gap:0;
-    background:#fff;border:2px solid #fff;
-    border-radius:var(--r-pill);padding:4px 4px 4px 14px;
-    transition:box-shadow var(--t);
+    background:var(--surface);border:1px solid var(--border-2);
+    border-radius:var(--r-pill);padding:3px 3px 3px 14px;
+    transition:box-shadow var(--t),border-color var(--t);
 }
-/* Foco del buscador: anillo dorado (único acento dorado del header; sobre
-   fondo azul marino ~7:1, muy visible). */
+/* Foco del buscador: anillo azul del design system (el dorado sobre fondo
+   claro no alcanzaba contraste como indicador de foco). */
 .pv-scope.pv-home .pv-home-header__search-form:focus-within{
-    box-shadow:0 0 0 3px #E0A526;
+    box-shadow:0 0 0 3px var(--primary);
 }
 .pv-scope.pv-home .pv-home-header__search-icon{color:var(--text-3);flex-shrink:0;display:flex;}
 /* Filtro de categoría dentro del campo (patrón Amazon). En base móvil se
@@ -1025,14 +1067,14 @@ body.pv-home-native{font-size:16px;}
 .pv-scope.pv-home .pv-home-header__search-input:focus{outline:none;}
 .pv-scope.pv-home .pv-home-header__search-btn{
     border-radius:var(--r-pill);height:44px;min-width:44px;
-    background:#1E40AF;padding:0 18px;flex-shrink:0;
+    background:var(--primary);padding:0 18px;flex-shrink:0;
 }
-.pv-scope.pv-home .pv-home-header__search-btn:hover{background:#16309B;}
+.pv-scope.pv-home .pv-home-header__search-btn:hover{background:var(--primary-600);}
 
 /* Panel de sugerencias live (máx 6) — combobox ARIA accesible. */
 .pv-scope.pv-home .pv-home-header__suggestions{
     position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:60;
-    background:#fff;border-radius:var(--r-md);
+    background:var(--surface);border-radius:var(--r-md);
     box-shadow:var(--sh-3);
     max-height:340px;overflow-y:auto;
     border:1px solid var(--border);
@@ -1051,61 +1093,71 @@ body.pv-home-native{font-size:16px;}
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
 }
 .pv-scope.pv-home .pv-home-header__suggestion-price{
-    font-size:13px;font-weight:700;color:#1E40AF;flex-shrink:0;white-space:nowrap;
+    font-size:13px;font-weight:700;color:var(--primary-700);flex-shrink:0;white-space:nowrap;
 }
 
 .pv-scope.pv-home .pv-home-header__chips{display:flex;gap:6px;flex-wrap:wrap;}
 .pv-scope.pv-home .pv-home-header__chip{
+    display:inline-flex;align-items:center;
     padding:8px 14px;border-radius:var(--r-pill);
-    background:rgba(255,255,255,.12);color:#fff;
+    background:var(--bg-2);color:var(--text-2);
     font-size:12px;font-weight:600;border:1px solid transparent;
-    cursor:pointer;transition:background var(--t),color var(--t),border-color var(--t);
+    text-decoration:none;cursor:pointer;
+    transition:background var(--t),color var(--t),border-color var(--t);
     /* HOME-MATRIX-FIX: touch target 44px mínimo (brief: 44×44 con 8px de
        separación; los chips estaban en 32px). */
     min-height:44px;
 }
-.pv-scope.pv-home .pv-home-header__chip:hover{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.4);}
+.pv-scope.pv-home .pv-home-header__chip:hover{background:var(--primary-50);color:var(--primary-700);border-color:var(--primary-100);}
 
 .pv-scope.pv-home .pv-home-header__actions{grid-area:actions;justify-self:end;display:flex;align-items:center;gap:4px;}
 .pv-scope.pv-home .pv-home-header__action{
     display:flex;flex-direction:column;align-items:center;gap:3px;
-    padding:6px 12px;border-radius:var(--r-md);color:rgba(255,255,255,.8);
+    padding:6px 12px;border-radius:var(--r-md);color:var(--text-2);
     text-decoration:none;transition:background var(--t),color var(--t);
     position:relative;min-height:44px;justify-content:center;
 }
-.pv-scope.pv-home .pv-home-header__action:hover{background:rgba(255,255,255,.14);color:#fff;}
+.pv-scope.pv-home .pv-home-header__action:hover{background:var(--bg-2);color:var(--primary);}
 .pv-scope.pv-home .pv-home-header__action-label{font-size:11px;font-weight:600;}
 .pv-scope.pv-home .pv-home-header__action-icon{position:relative;display:flex;}
 .pv-scope.pv-home .pv-home-header__badge{
     position:absolute;top:-4px;right:-6px;
     min-width:18px;height:18px;padding:0 5px;
     display:flex;align-items:center;justify-content:center;
-    background:#E0A526;color:#1A1A4E;
+    background:var(--gold);color:var(--text);
     border-radius:var(--r-pill);font-size:10.5px;font-weight:700;
-    border:2px solid #1A1A4E;
+    border:2px solid var(--surface);
 }
-.pv-scope.pv-home .pv-home-header__badge--accent{background:#E0A526;}
+.pv-scope.pv-home .pv-home-header__badge--accent{background:var(--gold);}
 
 /* Enlace "Saltar al contenido" — oculto hasta recibir foco. */
 .pv-scope.pv-home .pv-home-skip{
     position:absolute;left:16px;top:-60px;z-index:100;
-    background:#fff;color:#1E40AF;font-weight:700;font-size:14px;
+    background:var(--surface);color:var(--primary);font-weight:700;font-size:14px;
     padding:12px 20px;border-radius:0 0 var(--r-sm) var(--r-sm);
     text-decoration:none;box-shadow:var(--sh-2);
     transition:top var(--t);
 }
-.pv-scope.pv-home .pv-home-skip:focus{top:0;color:#1E40AF;outline:3px solid #E0A526;}
+.pv-scope.pv-home .pv-home-skip:focus{top:0;color:var(--primary);outline:3px solid var(--primary);}
 
 /* ── DEFENSIVA (HOME-REDESIGN-002): home nativa — ocultar el header del tema
    (Hello Elementor / WoodMart / Theme Builder) y el floating access que
    ltms-header-nav.js appenda cuando no hay .site-header. La home nativa
    tiene su propio header con acciones de cuenta. Selectores precisos: NUNCA
    un bare `header` (matchearía .pv-home-header). Mismo patrón probado de la
-   vitrina (class-ltms-vendor-storefront.php HEADER OVERLAP FIX). */
+   vitrina (class-ltms-vendor-storefront.php HEADER OVERLAP FIX).
+   HOME-UX2-005 (2026-10-02): también el FOOTER del tema (Elementor
+   location-footer) — la home ya tiene su propio footer visual; el del tema
+   apilaba políticas/redes/pagos duplicados. NUNCA un bare `footer`
+   (matchearía .pv-home-footer). */
 body.pv-home-native #site-header,
 body.pv-home-native .site-header,
 body.pv-home-native #masthead,
 body.pv-home-native .elementor-location-header,
+body.pv-home-native .elementor-location-footer,
+body.pv-home-native footer[data-elementor-type="footer"],
+body.pv-home-native #colophon,
+body.pv-home-native .site-footer,
 body.pv-home-native .whb-header,
 body.pv-home-native .whb-sticky-header,
 body.pv-home-native .woodmart-header,
@@ -1174,14 +1226,14 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-home-hero__banner{
     position:relative;display:block;overflow:hidden;
     border-radius:var(--r-md);text-decoration:none;
-    background:#1A1A4E;
+    background:var(--primary-700);
     min-height:120px;
 }
 .pv-scope.pv-home .pv-home-hero__banner img{display:block;width:100%;height:auto;}
 .pv-scope.pv-home .pv-home-hero__card{
     position:relative;display:block;overflow:hidden;
     border-radius:var(--r-md);text-decoration:none;
-    background:#1A1A4E;
+    background:var(--primary-700);
     min-height:120px;
 }
 .pv-scope.pv-home .pv-home-hero__card img{
@@ -1203,7 +1255,7 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-home-hero__card-cta{
     display:inline-flex;align-items:center;justify-content:center;
     min-height:40px;padding:0 16px;
-    background:#fff;color:#1E40AF;
+    background:var(--surface);color:var(--primary-700);
     font-size:13px;font-weight:700;
     border-radius:var(--r-pill);text-decoration:none;
     white-space:nowrap;
@@ -1297,14 +1349,24 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-cat-bar__more{
     display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
-    font-size:13px;font-weight:700;color:#1E40AF;text-decoration:none;
+    font-size:13px;font-weight:700;color:var(--primary);text-decoration:none;
     min-height:44px;padding:0 8px;
 }
-.pv-scope.pv-home .pv-cat-bar__more:hover{color:#16309B;}
+.pv-scope.pv-home .pv-cat-bar__more:hover{color:var(--primary-600);}
+/* HOME-UX2-002 (2026-10-02): fade del borde derecho del scroll de categorías
+   — se activa solo cuando hay desborde (data-pv-scrollable lo togglea el JS
+   del scope HOME en ltms-plaza-viva.js) y desaparece al llegar al final
+   (data-pv-at-end). Así SI se percibe que hay más categorías sin ocultar
+   nada: hoy son 20 activas y ninguna queda fuera. */
+.pv-scope.pv-home .pv-cat-bar__scroll[data-pv-scrollable="1"]:not([data-pv-at-end="1"]){
+    -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
+    mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
+}
 @media (min-width:1024px){
-    /* Escritorio: barra fija sin deslizar (los 8-10 accesos caben). */
-    .pv-scope.pv-home .pv-cat-bar__scroll{overflow:visible;}
-    .pv-scope.pv-home .pv-cat-bar__list{width:100%;justify-content:space-between;}
+    /* HOME-UX2-002: antes esta regula hacía la barra fija (overflow:visible)
+       porque solo había 8 accesos — con las 20 categorías activas ya no caben
+       en el contenedor de 1400px: el scroll se mantiene en TODOS los tamaños. */
+    .pv-scope.pv-home .pv-cat-bar__list{width:max-content;}
 }
 
 /* ── TRENDING ────────────────────────────────────────────────────────────── */
@@ -1362,16 +1424,18 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-vendor-card__sales{font-size:12.5px;color:var(--text-3);}
 .pv-scope.pv-home .pv-vendor-card__products{font-size:12.5px;color:var(--text-3);font-weight:600;}
 
-/* ── VENDE CON NOSOTROS (HOME-REDESIGN-005, AliExpress) ────────────────────
-   Fondo azul marino con detalle dorado (línea superior de 3px). Desktop:
-   texto izq + botón der en una sola fila. Móvil: apilado, botón full-width.
-   Contraste: #fff sobre #1A1A4E ≈ 15.9:1; sub rgba .8 ≈ 9.9:1; CTA dorado
-   #E0A526 + #1A1A4E ≈ 7:1 (el dorado NUNCA como texto sobre blanco). */
+/* ── VENDE CON NOSOTROS (HOME-UX2-001) ────────────────────────────────────
+   Slab de marca del design system: el mismo gradiente azul del hero
+   fallback (.pv-hero — radial #3b82f6 → var(--primary) → var(--primary-700))
+   con detalle dorado en la línea superior de 3px. Desktop: texto izq +
+   botón der en una sola fila. Móvil: apilado, botón full-width.
+   Contraste: #fff sobre --primary-700 ≈ 10.4:1; sub rgba .8 ≈ 8:1; CTA
+   dorado --gold + --text ≈ 8:1 (el dorado NUNCA como texto sobre blanco). */
 .pv-scope.pv-home .pv-home__sell{padding-top:40px;padding-bottom:8px;}
 .pv-scope.pv-home .pv-home-sell{
     display:flex;flex-direction:column;align-items:flex-start;gap:18px;
-    background:#1A1A4E;
-    border-top:3px solid #E0A526;
+    background:radial-gradient(120% 100% at 0% 0%,#3b82f6 0%,var(--primary) 45%,var(--primary-700) 100%);
+    border-top:3px solid var(--gold);
     border-radius:var(--r-md);
     padding:32px 24px;
 }
@@ -1387,13 +1451,13 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-home-sell__cta{
     display:inline-flex;align-items:center;justify-content:center;
     min-height:48px;padding:0 28px;flex-shrink:0;
-    background:#E0A526;color:#1A1A4E;
+    background:var(--gold);color:var(--text);
     font-family:var(--display);font-size:14.5px;font-weight:700;
     border-radius:12px;text-decoration:none;
-    transition:background var(--t),transform var(--t);
+    transition:filter var(--t),transform var(--t);
     white-space:nowrap;
 }
-.pv-scope.pv-home .pv-home-sell__cta:hover{background:#EBB44A;color:#1A1A4E;transform:translateY(-1px);}
+.pv-scope.pv-home .pv-home-sell__cta:hover{filter:brightness(.92);transform:translateY(-1px);}
 .pv-scope.pv-home .pv-home-sell__cta:focus-visible{outline:3px solid #fff;outline-offset:2px;}
 @media (min-width:1024px){
     .pv-scope.pv-home .pv-home-sell{
@@ -1421,21 +1485,47 @@ body.pv-home-native .ltms-header-access{display:none!important}
     margin-bottom:14px;
 }
 
-/* ── FOOTER ──────────────────────────────────────────────────────────────── */
+/* ── AYUDA Y POLÍTICAS (HOME-UX2-005) ────────────────────────────────────
+   Sección compacta que organiza TODO el texto de enlaces que antes vivía
+   en las columnas del footer (+ el contacto del footer del tema, hoy
+   oculto en la home). El footer queda puramente visual. */
+.pv-scope.pv-home .pv-home__policies{padding-top:40px;padding-bottom:8px;}
+.pv-scope.pv-home .pv-home-policies{
+    display:grid;grid-template-columns:1fr 1fr;gap:24px 16px;
+    padding:24px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--r-md);
+}
+.pv-scope.pv-home .pv-home-policies__title{
+    font-size:12.5px;font-weight:700;color:var(--text);
+    text-transform:uppercase;letter-spacing:.05em;
+    margin-bottom:10px;
+}
+.pv-scope.pv-home .pv-home-policies__links{
+    display:flex;flex-direction:column;gap:8px;list-style:none;margin:0;padding:0;
+}
+.pv-scope.pv-home .pv-home-policies__links a,
+.pv-scope.pv-home .pv-home-policies__links span{
+    font-size:13px;color:var(--text-2);text-decoration:none;line-height:1.4;
+}
+.pv-scope.pv-home .pv-home-policies__links a:hover{color:var(--primary);}
+@media (min-width:1024px){
+    .pv-scope.pv-home .pv-home-policies{grid-template-columns:repeat(4,1fr);}
+}
+
+/* ── FOOTER (HOME-UX2-005: puramente visual) ───────────────────────────── */
 .pv-scope.pv-home .pv-home-footer{
     margin-top:56px;background:var(--surface);border-top:1px solid var(--border);
 }
 .pv-scope.pv-home .pv-home-footer__inner{
-    /* AUDIT-FE-PV-DS-016 FIX (P2-4): 2fr apretaba las 3 columnas de enlaces
-       en 1100-1400px — 1.6fr da breathing room a los links sin vaciar la
-       columna de marca. */
-    display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px;
-    padding-top:48px;padding-bottom:40px;
+    display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+    padding-top:32px;padding-bottom:28px;
 }
 .pv-scope.pv-home .pv-home-footer__logo{
     display:inline-flex;align-items:center;gap:8px;
     font-family:var(--display);font-weight:800;font-size:20px;color:var(--text);
-    text-decoration:none;margin-bottom:12px;
+    text-decoration:none;
 }
 /* AUDIT-FE-UIUX2-D17 FIX: el mark del footer ahora es SVG (antes emoji 📍). */
 .pv-scope.pv-home .pv-home-footer__logo-mark{
@@ -1443,27 +1533,6 @@ body.pv-home-native .ltms-header-access{display:none!important}
     width:30px;height:30px;border-radius:var(--r-sm);
     background:var(--primary-50);color:var(--primary);
 }
-.pv-scope.pv-home .pv-home-footer__tagline{font-size:13.5px;color:var(--text-3);line-height:1.6;max-width:340px;}
-.pv-scope.pv-home .pv-home-footer__col-title{
-    font-size:13px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em;
-    margin-bottom:14px;
-}
-.pv-scope.pv-home .pv-home-footer__links{display:flex;flex-direction:column;gap:9px;}
-.pv-scope.pv-home .pv-home-footer__links a{font-size:13.5px;color:var(--text-2);text-decoration:none;transition:color var(--t);}
-.pv-scope.pv-home .pv-home-footer__links a:hover{color:var(--primary);}
-.pv-scope.pv-home .pv-home-footer__payments{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0;}
-/* HOME-REDESIGN-006: fila de pagos + selector de moneda (bajo las columnas). */
-.pv-scope.pv-home .pv-home-footer__payrow{
-    display:flex;flex-direction:column;gap:10px;
-    padding-top:24px;padding-bottom:32px;
-    border-top:1px solid var(--border);
-}
-.pv-scope.pv-home .pv-home-footer__pay-badge{
-    padding:5px 10px;border-radius:var(--r-sm);
-    background:var(--bg);border:1px solid var(--border);
-    font-size:11.5px;font-weight:700;color:var(--text-2);letter-spacing:.02em;
-}
-.pv-scope.pv-home .pv-home-footer__pay-note{font-size:12px;color:var(--text-3);line-height:1.5;}
 .pv-scope.pv-home .pv-home-footer__social{display:flex;gap:8px;}
 .pv-scope.pv-home .pv-home-footer__social-link{
     width:40px;height:40px;border-radius:var(--r-md);
@@ -1474,35 +1543,23 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-home-footer__social-link:hover{
     background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-2px);
 }
+.pv-scope.pv-home .pv-home-footer__payments{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0;}
+/* Fila de pagos + selector de moneda (bajo la marca). */
+.pv-scope.pv-home .pv-home-footer__payrow{
+    display:flex;flex-direction:column;gap:10px;
+    padding-top:24px;padding-bottom:32px;
+    border-top:1px solid var(--border);
+}
+.pv-scope.pv-home .pv-home-footer__pay-badge{
+    padding:5px 10px;border-radius:var(--r-sm);
+    background:var(--bg);border:1px solid var(--border);
+    font-size:11.5px;font-weight:700;color:var(--text-2);letter-spacing:.02em;
+}
 .pv-scope.pv-home .pv-home-footer__bottom{border-top:1px solid var(--border);}
-/* HOME-REDESIGN-006: acordeones colapsables por columna en móvil
-   (<details> nativo, cero JS — CSP-compliant). Desktop ≥1024: headers
-   estáticos siempre abiertos (pointer-events:none — sin JS). */
-.pv-scope.pv-home .pv-home-footer__acc summary{
-    list-style:none;cursor:pointer;
-    display:flex;align-items:center;justify-content:space-between;gap:8px;
-    padding:14px 0;margin-bottom:0;
-}
-.pv-scope.pv-home .pv-home-footer__acc summary::-webkit-details-marker{display:none;}
-.pv-scope.pv-home .pv-home-footer__acc summary::after{
-    content:"";width:9px;height:9px;flex-shrink:0;
-    border-right:2px solid var(--text-3);border-bottom:2px solid var(--text-3);
-    transform:rotate(45deg);transition:transform var(--t);
-}
-.pv-scope.pv-home .pv-home-footer__acc[open] summary::after{transform:rotate(-135deg);}
-.pv-scope.pv-home .pv-home-footer__acc .pv-home-footer__links{padding-top:4px;}
-@media (min-width:768px){
-    .pv-scope.pv-home .pv-home-footer__acc summary{padding-top:0;}
-}
-@media (min-width:1024px){
-    .pv-scope.pv-home .pv-home-footer__acc summary{cursor:default;pointer-events:none;}
-    .pv-scope.pv-home .pv-home-footer__acc summary::after{display:none;}
-}
 .pv-scope.pv-home .pv-home-footer__bottom-inner{
-    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
     padding-top:18px;padding-bottom:18px;font-size:12.5px;color:var(--text-3);
 }
-.pv-scope.pv-home .pv-home-footer__built{font-weight:600;}
 
 /* ── RADIOS DE TARJETAS (HOME-REDESIGN-005) — al final del <style> para
    ganar sobre las reglas específicas de cada sección (cat-bar items, hero
@@ -1521,18 +1578,38 @@ body.pv-home-native .ltms-header-access{display:none!important}
    definido arriba. Los bloques max-width de abajo cubren solo las secciones
    pendientes de su propio commit (vendors, footer). Las reglas viejas del
    header (max-width:980/560), del bento grid y del grid de productos fueron
-   ELIMINADAS — pisaban al sistema nuevo en la cascada. */
+   ELIMINADAS — pisaban al sistema nuevo en la cascada.
+   HOME-UX2-005 (2026-10-02): las reglas de las columnas del footer viejo
+   (grid 4-col / col--brand) fueron eliminadas junto con el footer de texto. */
 @media (max-width:1100px){
     .pv-scope.pv-home .pv-home__vendor-grid{grid-template-columns:repeat(2,1fr);}
-    .pv-scope.pv-home .pv-home-footer__inner{grid-template-columns:1fr 1fr;gap:32px;}
-    .pv-scope.pv-home .pv-home-footer__col--brand{grid-column:1 / -1;}
 }
 @media (max-width:760px){
     .pv-scope.pv-home .pv-home__vendor-grid{grid-template-columns:1fr;}
-    .pv-scope.pv-home .pv-home-footer__inner{grid-template-columns:1fr;gap:28px;}
+}
+
+/* ── MÓVIL (HOME-UX2-008, 2026-10-02) ──────────────────────────────────────
+   Decisión del operador: en móvil (<768px) el hero de banners y la sección
+   de vendedores destacados se OCULTAN, y el orden de compra es el natural
+   del funnel: header → categorías → tarjetas de productos → garantías →
+   vende → políticas → footer. La barra de categorías ya está justo debajo
+   del header (fuera de #pv-main), así que solo se reordena main con flex
+   order. Escritorio/tablet (≥768px) conserva el orden original completo. */
+@media (max-width:767px){
+    .pv-scope.pv-home .pv-home__hero-wrap{display:none;}
+    .pv-scope.pv-home .pv-home__vendors{display:none;}
+    .pv-scope.pv-home #pv-main{display:flex;flex-direction:column;}
+    .pv-scope.pv-home .pv-home__trending{order:1;}
+    .pv-scope.pv-home .pv-home__trust{order:2;}
+    .pv-scope.pv-home .pv-home__sell{order:3;}
+    .pv-scope.pv-home .pv-home__policies{order:4;}
+    /* Hero y vendors ocultos arriba, pero mantienen su orden para que un
+       futuro cambio de visibilidad no altere la intención. */
+    .pv-scope.pv-home .pv-home__hero-wrap{order:0;}
+    .pv-scope.pv-home .pv-home__vendors{order:5;}
 }
 @media (max-width:560px){
-    .pv-scope.pv-home .pv-home-footer__bottom-inner{flex-direction:column;align-items:flex-start;}
+    .pv-scope.pv-home .pv-home-footer__bottom-inner{flex-direction:column;align-items:center;}
 }
 </style>
 

@@ -745,22 +745,34 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	/**
 	 * AUDIT-FE-PV-DS-016 (P2-4, breathing room del footer home): el grid
 	 * 2fr 1fr 1fr 1fr apretaba las columnas de enlaces en 1100-1400px.
-	 * Fix: 1.6fr 1fr 1fr 1fr.
+	 * Fix original: 1.6fr 1fr 1fr 1fr.
+	 *
+	 * HOME-UX2-005 (2026-10-02): el footer de la home pasó a ser puramente
+	 * VISUAL (logo + redes + pagos + ©) — las columnas de enlaces fueron
+	 * eliminadas y su texto vive en la sección "Ayuda y políticas". Test
+	 * actualizado en el mismo commit (lección #119): ya no hay grid que
+	 * apretar; se vigila que el footer no vuelva a tener columnas de enlaces.
 	 */
 	public function test_018_home_footer_grid_breathing_room(): void {
 		$this->assertFileExists( $this->home_template_path );
 		$home = file_get_contents( $this->home_template_path );
 
-		// La columna de marca ya no absorbe 2fr.
+		// La columna de marca ya no absorbe 2fr (histórico) y NINGUNA grid
+		// de columnas debe existir en el footer visual nuevo.
 		$this->assertStringNotContainsString(
 			'grid-template-columns:2fr 1fr 1fr 1fr',
 			$home,
 			'AUDIT-FE-PV-DS-016 fix: el footer de home no debe volver a 2fr 1fr 1fr 1fr'
 		);
-		$this->assertMatchesRegularExpression(
-			'/pv-home-footer__inner\s*\{[^}]*grid-template-columns:\s*1\.6fr 1fr 1fr 1fr/s',
+		$this->assertStringNotContainsString(
+			'grid-template-columns:1.6fr 1fr 1fr 1fr',
 			$home,
-			'AUDIT-FE-PV-DS-016 fix: pv-home-footer__inner debe usar grid 1.6fr 1fr 1fr 1fr'
+			'HOME-UX2-005: el footer visual no tiene columnas de enlaces — el texto vive en la sección políticas'
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/pv-home-footer__inner\s*\{[^}]*grid-template-columns/s',
+			$home,
+			'HOME-UX2-005: pv-home-footer__inner es flex (logo + redes), no un grid de columnas'
 		);
 	}
 

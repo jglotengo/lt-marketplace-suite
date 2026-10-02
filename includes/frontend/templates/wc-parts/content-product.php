@@ -266,21 +266,41 @@ $pv_atc_attrs = $pv_purchasable && $pv_in_stock
             <a href="<?php echo esc_url( $pv_permalink ); ?>" title="<?php echo esc_attr( $pv_title ); ?>"><?php echo esc_html( $pv_title ); ?></a>
         </h3>
 
-        <div class="pv-product-card__rating" aria-label="<?php echo esc_attr( sprintf( __( 'Valoración media %s de 5', 'ltms' ), number_format_i18n( $pv_rating, 1 ) ) ); ?>">
-            <?php
-            /**
-             * Hook: woocommerce_after_shop_loop_item_title
-             * WC lo usa para imprimir rating y price por defecto. Lo suprimimos
-             * y usamos nuestro propio markup para control total del design.
-             */
-            remove_action( 'woocommerce_after_shop_loop_item_title', 'woocommerce_template_loop_rating', 5 );
-            remove_action( 'woocommerce_after_shop_loop_item_title', 'woocommerce_template_loop_price', 10 );
-            do_action( 'woocommerce_after_shop_loop_item_title' );
+        <?php
+        /**
+         * Hook: woocommerce_after_shop_loop_item_title
+         * (Sin output por defecto.)
+         */
+        remove_action( 'woocommerce_after_shop_loop_item_title', 'woocommerce_template_loop_rating', 5 );
+        remove_action( 'woocommerce_after_shop_loop_item_title', 'woocommerce_template_loop_price', 10 );
+        /* HOME-UX2-006 (2026-10-02): suprimir el badge "✅ Verificado" de
+         * LTMS_Trust_Badges::render_loop_vendor_badge dentro del card PV —
+         * duplicaba el escudo KYC que la línea de vendor ya muestra arriba.
+         * remove+re-add scoped: el hook queda intacto para terceros que
+         * rendericen loops SIN el card PV. */
+        $pv_suppress_loop_badge = class_exists( 'LTMS_Trust_Badges' )
+            && has_action( 'woocommerce_after_shop_loop_item_title', array( 'LTMS_Trust_Badges', 'render_loop_vendor_badge' ) );
+        if ( $pv_suppress_loop_badge ) {
+            remove_action( 'woocommerce_after_shop_loop_item_title', array( 'LTMS_Trust_Badges', 'render_loop_vendor_badge' ), 5 );
+        }
+        do_action( 'woocommerce_after_shop_loop_item_title' );
+        if ( $pv_suppress_loop_badge ) {
+            add_action( 'woocommerce_after_shop_loop_item_title', array( 'LTMS_Trust_Badges', 'render_loop_vendor_badge' ), 5 );
+        }
+        ?>
 
-            echo wc_get_rating_html( $pv_rating, $pv_review_count ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-            ?>
+        <?php
+        /* HOME-UX2-006 (2026-10-02): sin reseñas no hay fila de rating —
+         * antes renderaba "(0)" en cada card: ruido sin señal (las stars
+         * de WC devuelven vacío con average 0). Con reseñas, rating + count
+         * como siempre. */
+        if ( $pv_review_count > 0 ) :
+        ?>
+        <div class="pv-product-card__rating" aria-label="<?php echo esc_attr( sprintf( __( 'Valoración media %s de 5', 'ltms' ), number_format_i18n( $pv_rating, 1 ) ) ); ?>">
+            <?php echo wc_get_rating_html( $pv_rating, $pv_review_count ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
             <span class="pv-product-card__rating-count">(<?php echo esc_html( number_format_i18n( $pv_review_count ) ); ?>)</span>
         </div>
+        <?php endif; ?>
 
         <div class="pv-product-card__price">
             <?php if ( $pv_on_sale && $pv_sale !== '' && $pv_regular !== '' ) : ?>
@@ -312,20 +332,16 @@ $pv_atc_attrs = $pv_purchasable && $pv_in_stock
         <?php endif; ?>
 
         <?php
-        /* Low stock hint para urgencia */
+        /* Low stock hint para urgencia (HOME-UX2-006: el claim genérico
+         * "Envío a todo el país" fue ELIMINADO — no es señal por producto,
+         * duplicaba la franja de garantías de la home y el badge de
+         * "Envío gratis" real (free_absorbed) que vive sobre la imagen). */
         if ( $pv_in_stock && $pv_manage_stock && $pv_stock_qty !== null && $pv_stock_qty > 0 && $pv_stock_qty <= 5 ) :
             ?>
             <div class="pv-product-card__meta">
                 <span class="pv-product-card__stock-low" data-pv-stock-low="<?php echo esc_attr( (int) $pv_stock_qty ); ?>">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <?php echo esc_html( sprintf( _n( '¡Solo queda %d unidad!', '¡Solo quedan %d unidades!', (int) $pv_stock_qty, 'ltms' ), (int) $pv_stock_qty ) ); ?>
-                </span>
-            </div>
-        <?php elseif ( $pv_in_stock && ! $product->is_virtual() ) : ?>
-            <div class="pv-product-card__meta">
-                <span class="pv-product-card__shipping">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-                    <?php esc_html_e( 'Envío a todo el país', 'ltms' ); ?>
                 </span>
             </div>
         <?php endif; ?>
@@ -338,6 +354,22 @@ $pv_atc_attrs = $pv_purchasable && $pv_in_stock
      * porque ya tenemos nuestro propio ATC en .pv-product-card__actions.
      */
     remove_action( 'woocommerce_after_shop_loop_item', 'woocommerce_template_loop_add_to_cart', 10 );
+    /* HOME-UX2-007 (2026-10-02): el botón wishlist legacy de LTMS_Wishlist
+     * (.ltms-wishlist-btn, glyph ♡) se renderizaba ENCIMA del fav del card
+     * (.pv-product-card__fav, top:5-9 right:9 ambos) — dos corazones
+     * superpuestos por card, visibles siempre en touch (opacity:1 en
+     * hover:none) y en hover desktop. El card PV ya tiene su propio fav
+     * AJAX (data-pv-wishlist-toggle → ltms_pv_toggle_wishlist), así que el
+     * legacy se suprime AQUÍ (remove+re-add scoped: loops de terceros que
+     * no usan el card PV conservan su botón). */
+    $pv_suppress_wishlist_loop = class_exists( 'LTMS_Wishlist' )
+        && has_action( 'woocommerce_after_shop_loop_item', array( 'LTMS_Wishlist', 'render_wishlist_button' ) );
+    if ( $pv_suppress_wishlist_loop ) {
+        remove_action( 'woocommerce_after_shop_loop_item', array( 'LTMS_Wishlist', 'render_wishlist_button' ), 20 );
+    }
     do_action( 'woocommerce_after_shop_loop_item' );
+    if ( $pv_suppress_wishlist_loop ) {
+        add_action( 'woocommerce_after_shop_loop_item', array( 'LTMS_Wishlist', 'render_wishlist_button' ), 20 );
+    }
     ?>
 </article>
