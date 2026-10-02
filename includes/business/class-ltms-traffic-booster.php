@@ -444,8 +444,16 @@ class LTMS_Traffic_Booster {
     /**
      * Renderiza form de suscripción al newsletter en footer.
      */
+    /**
+     * HOME-REDESIGN-007 (2026-10-01): la home nativa (Plaza Viva) NO renderiza
+     * el bar de newsletter — quedaría colgando después del footer propio de
+     * la home (ruido visual; el operador confirmó retirar las capturas de
+     * email flotantes de la home). El bar sigue activo en las demás páginas.
+     * Misma condición de la rama del home en maybe_override().
+     */
     public static function render_newsletter_signup(): void {
         if ( is_admin() ) return;
+        if ( is_front_page() && is_page() ) return;
         ?>
         <div id="ltms-newsletter-bar" style="background:linear-gradient(135deg,#1e40af,#3730a3);color:#fff;padding:20px;text-align:center;margin-top:30px;">
             <h3 style="margin:0 0 8px;font-size:18px;">📬 <?php esc_html_e( 'Recibe ofertas exclusivas cada semana', 'ltms' ); ?></h3>

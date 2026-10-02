@@ -245,5 +245,14 @@ final class HomeTrustSellTest extends LTMS_Unit_Test_Case {
 			$booster_src,
 			'HOME-REDESIGN-007: render_push_subscription_prompt debe hacer return en la home nativa (is_front_page + is_page).'
 		);
+
+		// (c) Traffic Booster: guard en render_newsletter_signup (el bar quedaba
+		// colgando después del footer propio de la home).
+		$traffic_src = (string) preg_replace( '/\/\*.*?\*\//s', '', (string) file_get_contents( dirname( __DIR__, 2 ) . '/includes/business/class-ltms-traffic-booster.php' ) );
+		$this->assertMatchesRegularExpression(
+			"/function render_newsletter_signup\(\): void\s*\{[\s\S]*?is_front_page\(\)\s*&&\s*is_page\(\)\s*\)\s*return;/",
+			$traffic_src,
+			'HOME-REDESIGN-007: render_newsletter_signup debe hacer return en la home nativa (is_front_page + is_page).'
+		);
 	}
 }
