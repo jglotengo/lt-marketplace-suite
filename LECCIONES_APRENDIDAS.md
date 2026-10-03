@@ -4183,3 +4183,42 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (`data-pv-at-end="1"`, mask removido). Test:
    `HomeUxV2Test::test_010_scope_home_declara_helpers_locales` (cierre del IIFE principal
    ANTES del scope HOME + declaraciones locales preceden al primer uso bare).
+
+### Lección #188: un test de infra que pinnea LTMS_VERSION EXACTO rompe la suite en CADA bump — y el defecto de layout "invisible" se mide con getBoundingClientRect contra el contenedor, no con screenshots (HOME-UX4-001, 2026-10-03)
+
+1. **Caso real (pin de versión, 3ª reincidencia del patrón #119):** al bumpear
+   `LTMS_VERSION 2.9.410 → 2.9.411` para el fix de visibilidad de categorías, la suite
+   completa falló en `HomeUxV3Test::test_008` (asertaba `define( 'LTMS_VERSION', '2\.9\.410' )`).
+   Es la 3ª vez que un bump de versión rompe un test ajeno al cambio (HomeCategoriesBarTest
+   en HOME-MATRIX-FIX, pin de HomeUxV2Test actualizado en UX3, pin de UX3 ahora): cada ciclo
+   de UI paga el impuesto de cazar el pin exacto antes de que la suite pase.
+
+2. **Regla preventiva (para tests NUEVOS de infra de versión):** NUNCA pinnear la versión
+   exacta de `LTMS_VERSION` en un test — asertar un RANGO que cubra el ciclo actual y los
+   bumps previstos (el patrón correcto ya existe: `HomeUxV2Test` usa
+   `2\.9\.4(0[89]|[1-9][0-9])`, es decir `>= 2.9.408`, y NO ha vuelto a romper), o asertar
+   solo que la versión del commit vivió (formato semver + bump respecto al ciclo que introduce
+   el test). El pin exacto solo se justifica si el test verifica QUE el bump ocurrió como parte
+   del MISMO cambio que lo introduce — y aun así, el ciclo siguiente lo debe convertir a rango
+   en el mismo commit del siguiente bump (lección #119 aplicada a versiones).
+
+3. **Caso real (el defecto de layout que 2 ciclos no vieron):** la barra de categorías corría
+   edge-to-edge FUERA del contenedor de 1400px (primera card pegada al viewport en x=0,
+   "Ver todas" terminando en x=1440) desde HOME-REDESIGN-003 — 2 ciclos de auditoría y la
+   matriz de responsividad la dieron por buena porque la matriz validaba scrollX=0 y tamaños
+   de cards, no la ALINEACIÓN contra el resto de las secciones. El defecto solo fue visible
+   al comparar `getBoundingClientRect().left` del cat-bar (0) contra el de trending (20) en
+   el MISMO viewport.
+
+4. **Regla preventiva (matriz de responsividad):** añadir a la matriz el check de ALINEACIÓN
+   de contenedor: todo bloque de primera jerarquía (nav/section directo de main) debe compartir
+   `left/right` con sus hermanos en cada breakpoint (mismo `max-width` + mismo padding). Un
+   elemento desalineado edge-to-edge lee como "strip del sistema" y no como sección — es
+   exactamente el síntoma de "la sección no se percibe" que reportó el operador, aun con
+   cards bien renderizadas.
+
+5. **Fix aplicado (commit `79723fdb`, v2.9.411):** barra al contenedor `--pv-maxw` + padding
+   22/14px + head con título + cards tintadas. Verificado en producción a 1440
+   (barLeft=20, primera card x=42) y 390 (x=14, fade activo). Test:
+   `HomeCategoriesBarTest::test_006_visibilidad_head_contenedor_y_tinte` + pin de UX3
+   actualizado en el mismo commit.
