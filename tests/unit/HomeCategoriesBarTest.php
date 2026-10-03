@@ -205,4 +205,92 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 			'HOME-UX2-002: ltms-plaza-viva.js debe togglear data-pv-at-end al llegar al final del scroll.'
 		);
 	}
+
+	/**
+	 * HOME-UX4-001 (2026-10-03): VISIBILIDAD de la barra — el operador reportó
+	 * que la sección no se percibe. Causas verificadas en producción (DOM
+	 * 1440px): (a) barra edge-to-edge FUERA del contenedor (primera card en
+	 * x=0, "Ver todas" terminando en x=1440; las demás secciones arrancan en
+	 * el contenedor de 1400px); (b) cards blancas sobre --bg casi blanco
+	 * (#F6F5F8) — solo un borde tenue las separaba; (c) nombres 11.5px
+	 * truncados a 76px; (d) sin título visible (solo aria-label).
+	 *
+	 * Fix verificado por este test (forma del source — el runtime se valida
+	 * en el browser check del deploy, lección #186):
+	 *   - Head visible: h2 "Explora por categorías" + "Ver todas" arriba
+	 *     (nav aria-labelledby, patrón de pv-section__head de trending).
+	 *   - Contenedor: max-width:var(--pv-maxw) + margin:0 auto + padding
+	 *     22px / 14px en ≤760px (mismo patrón que .pv-section).
+	 *   - Cards tintadas --primary-50 con borde --primary-100 (visibles
+	 *     sobre --bg); hover invierte a surface + shadow.
+	 *   - Tipografía 12.5px/700 + ícono 28px.
+	 */
+	public function test_006_visibilidad_head_contenedor_y_tinte(): void {
+		$src = file_get_contents( $this->home_path );
+		$markup = $this->strip_php_comments( $src );
+
+		// Head visible con título y "Ver todas" (el enlace pasó de ir junto
+		// al scroll — donde comía ancho en móvil — a la fila del título).
+		$this->assertMatchesRegularExpression(
+			'/<nav class="pv-cat-bar" aria-labelledby="pv-home-cats-title">/',
+			$markup,
+			'HOME-UX4-001: el nav debe estar etiquetado por el título visible (patrón aria-labelledby de trending).'
+		);
+		$this->assertStringContainsString(
+			'<h2 class="pv-cat-bar__title" id="pv-home-cats-title">',
+			$markup,
+			'HOME-UX4-001: debe existir el título visible de la sección.'
+		);
+		$this->assertStringContainsString(
+			'pv-cat-bar__head',
+			$markup,
+			'HOME-UX4-001: el head (título + Ver todas) debe envolver la fila superior.'
+		);
+		$pos_head = strpos( $markup, 'pv-cat-bar__head' );
+		$pos_more = strpos( $markup, 'pv-cat-bar__more' );
+		$pos_scroll = strpos( $markup, 'pv-cat-bar__scroll' );
+		$this->assertNotFalse( $pos_head, 'El head de la barra debe existir.' );
+		$this->assertNotFalse( $pos_more, 'El enlace "Ver todas" debe existir.' );
+		$this->assertLessThan(
+			$pos_scroll,
+			$pos_more,
+			'HOME-UX4-001: "Ver todas" va en el head, ANTES del scroll — libera el ancho completo del scroll en móvil.'
+		);
+
+		// Contenedor igual al del resto de las secciones.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-cat-bar\{[^}]*max-width:var\(--pv-maxw\);[^}]*margin:0 auto;/s',
+			$src,
+			'HOME-UX4-001: la barra debe entrar al contenedor (--pv-maxw 1400px) — antes corría edge-to-edge (primera card en x=0).'
+		);
+		$this->assertMatchesRegularExpression(
+			'/@media \(max-width:760px\)\{\s*\.pv-scope\.pv-home \.pv-cat-bar\{padding-left:14px;padding-right:14px;\}/s',
+			$src,
+			'HOME-UX4-001: padding de contenedor móvil 14px, igual que .pv-section.'
+		);
+
+		// Cards tintadas — visibles sobre --bg casi blanco.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-cat-bar__item\{[^}]*background:var\(--primary-50\);[^}]*border:1px solid var\(--primary-100\);/s',
+			$src,
+			'HOME-UX4-001: las cards deben ser tintadas (--primary-50 + borde --primary-100) — las blancas no se distinguían del fondo.'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-cat-bar__item:hover\{[^}]*background:var\(--surface\);[^}]*border-color:var\(--primary\);/s',
+			$src,
+			'HOME-UX4-001: el hover invierte a blanco + borde primary (refuerzo de visibilidad en interacción).'
+		);
+
+		// Tipografía legible.
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-cat-bar__name\{[^}]*font-size:12\.5px;font-weight:700;/s',
+			$src,
+			'HOME-UX4-001: nombres 12.5px/700 (antes 11.5px/600 — poco legibles).'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-cat-bar__icon\{font-size:28px;/s',
+			$src,
+			'HOME-UX4-001: ícono 28px (antes 26px).'
+		);
+	}
 }

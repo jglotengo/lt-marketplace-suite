@@ -429,18 +429,34 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * CATEGORÍAS — barra de 8 accesos (Shein/Alibaba, HOME-REDESIGN-003)
+     * CATEGORÍAS — barra de accesos (Shein/Alibaba, HOME-REDESIGN-003)
      * Un único elemento de navegación de categorías, justo debajo del header
      * (antes del hero — orden de compra: 1 buscar, 2 elegir categoría,
      * 3 oferta principal, 4 productos). Reemplaza al bento grid de 6 tiles
      * (el brief: no repetir las categorías en otra grilla más abajo).
-     * Móvil = fila deslizable con la última asomando; tablet = deslizable
-     * más ancha; escritorio = barra fija + "Ver todas".
+     * HOME-UX2-002: TODAS las categorías activas (20) en scroll con fade.
+     * Móvil = fila deslizable con la última asomando; el scroll se mantiene
+     * en TODOS los tamaños.
+     * HOME-UX4-001 (2026-10-03): VISIBILIDAD — el operador reportó que la
+     * sección no se percibe. Causas verificadas en producción: (a) barra
+     * edge-to-edge fuera del contenedor de 1400px de las demás secciones
+     * (primera card en x=0); (b) cards blancas sobre --bg casi blanco, solo
+     * un borde tenue las separaba; (c) nombres 11.5px truncados; (d) sin
+     * título visible. Fix: head con título + "Ver todas", contenedor
+     * --pv-maxw, cards tintadas --primary-50 con hover que invierte a
+     * blanco, tipografía 12.5px/700 e ícono 28px.
      * =====================================================================
      */
     if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) :
     ?>
-        <nav class="pv-cat-bar" aria-label="<?php esc_attr_e( 'Explora por categorías', 'ltms' ); ?>">
+        <nav class="pv-cat-bar" aria-labelledby="pv-home-cats-title">
+            <div class="pv-cat-bar__head">
+                <h2 class="pv-cat-bar__title" id="pv-home-cats-title"><?php esc_html_e( 'Explora por categorías', 'ltms' ); ?></h2>
+                <a class="pv-cat-bar__more" href="<?php echo esc_url( $pv_shop_url ); ?>">
+                    <?php esc_html_e( 'Ver todas', 'ltms' ); ?>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </a>
+            </div>
             <div class="pv-cat-bar__scroll">
                 <ul class="pv-cat-bar__list" role="list">
                     <?php foreach ( $pv_cat_terms as $pv_term ) :
@@ -477,10 +493,6 @@ do_action( 'ltms_before_home_plazaviva' );
                     <?php endforeach; ?>
                 </ul>
             </div>
-            <a class="pv-cat-bar__more" href="<?php echo esc_url( $pv_shop_url ); ?>">
-                <?php esc_html_e( 'Ver todas', 'ltms' ); ?>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-            </a>
         </nav>
     <?php else : ?>
         <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
@@ -1327,14 +1339,31 @@ body.pv-home-native .ltms-header-access{display:none!important}
 
 /* ── CATEGORÍAS — barra de accesos (HOME-REDESIGN-003, Shein/Alibaba) ──────
    Móvil: fila deslizable con la última asomando (partial item = indicio de
-   que hay más). Escritorio ≥1024: barra fija sin deslizar. Íconos del mapa
-   emoji existente (filterable). Touch targets 72px de alto. */
+   que hay más). El scroll se mantiene en TODOS los tamaños (20 activas).
+   HOME-UX4-001 (2026-10-03) — VISIBILIDAD: (1) la barra entra al contenedor
+   de las demás secciones (--pv-maxw 1400px, padding 22px / 14px ≤760 — antes
+   corría edge-to-edge con la primera card pegada al borde del viewport);
+   (2) head visible: título 15px/800 + "Ver todas" arriba (libera el ancho
+   completo del scroll en móvil); (3) cards tintadas --primary-50 con borde
+   --primary-100 — sobre --bg casi blanco las blancas no se distinguían —
+   hover invierte a surface + shadow azul; (4) tipografía 12.5px/700 e ícono
+   28px (antes 11.5px/600, 26px). Touch targets ≥84px. Contraste AA:
+   --text sobre --primary-50 ≈ 16:1, título sobre --bg ≈ 15.9:1. */
 .pv-scope.pv-home .pv-cat-bar{
-    display:flex;align-items:center;gap:8px;
-    padding-top:12px;padding-bottom:4px;
+    display:flex;flex-direction:column;gap:10px;
+    width:100%;max-width:var(--pv-maxw);margin:0 auto;
+    padding:14px 22px 6px;
+}
+.pv-scope.pv-home .pv-cat-bar__head{
+    display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+}
+.pv-scope.pv-home .pv-cat-bar__title{
+    margin:0;
+    font-family:var(--display);font-weight:800;font-size:15px;
+    letter-spacing:-.01em;color:var(--text);
 }
 .pv-scope.pv-home .pv-cat-bar__scroll{
-    flex:1;min-width:0;
+    flex:1;min-width:0;width:100%;
     overflow-x:auto;
     scroll-snap-type:x proximity;
     -webkit-overflow-scrolling:touch;
@@ -1343,31 +1372,36 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-cat-bar__scroll::-webkit-scrollbar{display:none;}
 .pv-scope.pv-home .pv-cat-bar__list{
-    display:flex;gap:4px;width:max-content;
+    display:flex;gap:6px;width:max-content;
 }
 .pv-scope.pv-home .pv-cat-bar__item{
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:4px;min-width:76px;min-height:72px;
-    padding:10px 8px;
-    background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+    gap:6px;min-width:88px;min-height:84px;
+    padding:12px 10px;
+    background:var(--primary-50);border:1px solid var(--primary-100);border-radius:var(--r-md);
     text-decoration:none;color:var(--text);
     scroll-snap-align:start;
-    transition:transform var(--t),box-shadow var(--t),border-color var(--t);
+    transition:transform var(--t),box-shadow var(--t),border-color var(--t),background var(--t);
 }
 .pv-scope.pv-home .pv-cat-bar__item:hover{
-    transform:translateY(-2px);box-shadow:var(--sh-hover);border-color:var(--primary-100);
+    transform:translateY(-2px);box-shadow:var(--sh-hover);
+    background:var(--surface);border-color:var(--primary);
 }
-.pv-scope.pv-home .pv-cat-bar__icon{font-size:26px;line-height:1;}
+.pv-scope.pv-home .pv-cat-bar__icon{font-size:28px;line-height:1;}
 .pv-scope.pv-home .pv-cat-bar__name{
-    font-size:11.5px;font-weight:600;color:var(--text);
-    max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:12.5px;font-weight:700;color:var(--text);
+    max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .pv-scope.pv-home .pv-cat-bar__more{
     display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
-    font-size:13px;font-weight:700;color:var(--primary);text-decoration:none;
+    font-size:13.5px;font-weight:700;color:var(--primary);text-decoration:none;
     min-height:44px;padding:0 8px;
 }
 .pv-scope.pv-home .pv-cat-bar__more:hover{color:var(--primary-600);}
+/* HOME-UX4-001: padding de contenedor móvil igual al de .pv-section (14px). */
+@media (max-width:760px){
+    .pv-scope.pv-home .pv-cat-bar{padding-left:14px;padding-right:14px;}
+}
 /* HOME-UX2-002 (2026-10-02): fade del borde derecho del scroll de categorías
    — se activa solo cuando hay desborde (data-pv-scrollable lo togglea el JS
    del scope HOME en ltms-plaza-viva.js) y desaparece al llegar al final
@@ -1377,12 +1411,9 @@ body.pv-home-native .ltms-header-access{display:none!important}
     -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
     mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
 }
-@media (min-width:1024px){
-    /* HOME-UX2-002: antes esta regula hacía la barra fija (overflow:visible)
-       porque solo había 8 accesos — con las 20 categorías activas ya no caben
-       en el contenedor de 1400px: el scroll se mantiene en TODOS los tamaños. */
-    .pv-scope.pv-home .pv-cat-bar__list{width:max-content;}
-}
+/* HOME-UX2-002: con las 20 categorías activas ya no caben en el contenedor
+   de 1400px — el scroll se mantiene en TODOS los tamaños (no hay regla de
+   barra fija en escritorio). La lista es width:max-content en la base. */
 
 /* ── TRENDING ────────────────────────────────────────────────────────────── */
 /* HOME-REDESIGN-005: grid 2 col móvil / 3 tablet / 4 escritorio / 5 solo en

@@ -265,14 +265,17 @@ final class HomeUxV3Test extends LTMS_Unit_Test_Case {
 
 	/**
 	 * HOME-UX3 infra: versión 2.9.410 (cache-busting JS+CSS).
+	 * HOME-UX4-001 (2026-10-03): pin actualizado a 2.9.411 en el mismo commit
+	 * del bump (lección #119 — test que aserta el enfoque viejo se actualiza
+	 * junto al cambio, no queda huérfano rompiendo suites futuras).
 	 */
 	public function test_008_version_2_9_410(): void {
 		$this->assertFileExists( $this->plugin_path );
 		$plugin = file_get_contents( $this->plugin_path );
 		$this->assertMatchesRegularExpression(
-			"/define\( 'LTMS_VERSION', '2\.9\.410' \);/",
+			"/define\( 'LTMS_VERSION', '2\.9\.411' \);/",
 			$plugin,
-			'HOME-UX3: LTMS_VERSION debe estar en 2.9.410 (cache-busting JS+CSS del ciclo).'
+			'HOME-UX3/UX4: LTMS_VERSION debe estar en 2.9.411 (cache-busting del ciclo + visibilidad de categorías).'
 		);
 	}
 }

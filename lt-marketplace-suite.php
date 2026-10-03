@@ -76,7 +76,14 @@ define( 'LTMS_LOADED', true );
 // rating/price/ATC pero olvidaba woocommerce_template_loop_product_title)
 // + especificidad del h3 del título bumpada contra el kit de Elementor que
 // lo pisaba a 20px/700 (design: 14.5px/600). Cache-busting JS+CSS.
-define( 'LTMS_VERSION', '2.9.410' );
+// HOME-UX4-001 (2026-10-03): bump a 2.9.411 — visibilidad de la barra de
+// categorías de la home (el operador reportó que la sección no se percibe):
+// head con título "Explora por categorías" + "Ver todas" arriba, contenedor
+// --pv-maxw (antes edge-to-edge con la primera card pegada al borde del
+// viewport), cards tintadas --primary-50/--primary-100 con hover que invierte
+// a blanco (las blancas no se distinguían del fondo), tipografía 12.5px/700
+// e ícono 28px. CSS inline de la home — purga de page cache en el deploy.
+define( 'LTMS_VERSION', '2.9.411' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

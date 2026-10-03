@@ -4,6 +4,47 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-03
+
+### Fixed/Changed — `HOME-UX4-001` (visibilidad de la barra de categorías de la home)
+
+> **Reporte del operador:** "mejora la sección de las categorías que sea más
+> visible". Causas verificadas en producción (DOM 1440px + computed styles):
+> la barra corría edge-to-edge **fuera del contenedor** de 1400px que usan
+> todas las demás secciones (primera card pegada al borde del viewport en
+> x=0, "Ver todas" terminando en x=1440; trending arranca en x=20), las
+> cards eran **blancas sobre `--bg #F6F5F8` casi blanco** (solo un borde
+> tenue `#E7E5EC` las separaba — la sección casi no se distinguía), los
+> nombres a 11.5px/600 en CAPS truncados a 76px, y la sección **no tenía
+> título visible** (solo `aria-label`) — no registraba como sección.
+>
+> - **Head visible** (`home.php`): fila de título "Explora por categorías"
+>   (h2 15px/800, `--display`, patrón `aria-labelledby` igual al de
+>   trending) + "Ver todas" 13.5px/700 arriba a la derecha — el enlace
+>   pasaba de ir junto al scroll (donde comía ancho en móvil) a la fila del
+>   título, liberando el ancho completo del scroll.
+> - **Contenedor** (`home.php`): `max-width:var(--pv-maxw)` (1400px,
+>   100% en ≤760px) + `margin:0 auto` + padding 22px / 14px móvil — el
+>   mismo patrón de `.pv-section`, alinea la barra con trending/vendors.
+> - **Cards tintadas** (`home.php`): `--primary-50 #EFF4FF` + borde
+>   `--primary-100`, hover invierte a `--surface` + `--sh-hover` + borde
+>   `--primary` — refuerzo de presencia en interacción. Tamaño 88×84px
+>   (era 76×72), ícono 28px, nombre 12.5px/700 (era 11.5px/600),
+>   max-width del nombre 88px. Touch targets ≥84px. Contraste AA:
+>   `--text` sobre `--primary-50` ≈ 16:1.
+> - **Sin cambios**: fuente de datos (20 categorías activas, dedup +
+>   orden por # de productos, HOME-UX2-002), scroll con snap + fade
+>   `data-pv-scrollable` (JS de `ltms-plaza-viva.js` intacto), radios 8px
+>   del grupo de tarjetas, bloque `@media (min-width:1024)` redundante
+>   eliminado (la regla base `width:max-content` ya cubre todos los
+>   tamaños — sin código muerto).
+> - **Infra**: `LTMS_VERSION 2.9.410 → 2.9.411` (CSS inline de la home —
+>   purga de page cache vía `wp sg purge` en el deploy). +1 test
+>   (`HomeCategoriesBarTest::test_006_visibilidad_head_contenedor_y_tinte`)
+>   + pin de versión de `HomeUxV3Test` actualizado en el mismo commit
+>   (lección #119). Suite completa **5,227 tests, 11,276 assertions,
+>   0 fallas** (3 skips preexistentes).
+
 ## [Unreleased] — 2026-10-02
 
 ### Fixed/Changed — `HOME-UX2-001..008` + `HOME-UX2-008a` (ciclo de consistencia UI/UX de la home: 8 hallazgos del operador + 1 hallazgo estructural latente)
