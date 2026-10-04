@@ -127,6 +127,10 @@ $pv_cat_icons = apply_filters( 'ltms_home_category_icons', array(
     'juegos'       => '🎮',
     'juegos-de-mesa' => '🎲',
     'juego'        => '🎲',
+    /* QA-TAIWAN-SYNC (2026-10-04): DIDACTICO entró al catálogo vía la sync de
+     * PosGold del vendor 168 (52+49) — sin entrada en el mapa renderizaba el
+     * fallback genérico 🛍️ (verificado en el HTML servido). */
+    'didactico'    => '🧩',
     'libros'       => '📚',
     'juguetes'     => '🧸',
     'muebles'      => '🛋️',

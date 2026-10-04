@@ -293,4 +293,38 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 			'HOME-UX4-001: ícono 28px (antes 26px).'
 		);
 	}
+
+	/**
+	 * QA-TAIWAN-SYNC (2026-10-04): el catálogo de Juguetería Taiwan llegó vía
+	 * sync PosGold (52=JUEGO DE MESA, 49=DIDACTICO, 189 productos nuevos).
+	 * El mapa de íconos matchea por PREFIJO de slug — DIDACTICO no tenía
+	 * entrada y renderizaba el fallback genérico 🛍️ (verificado en el HTML
+	 * servido en producción). El test exige que las dos categorías del
+	 * catálogo real del vendor tengan ícono propio en el mapa.
+	 */
+	public function test_007_iconos_de_categorias_reales_del_catalogo(): void {
+		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+
+		// DIDACTICO (slug 'didactico' raíz) — debe matchear por prefijo exacto.
+		$this->assertMatchesRegularExpression(
+			'/\'didactico\'\s*=>\s*\'🧩\',/',
+			$src,
+			'QA-TAIWAN-SYNC: el mapa de íconos debe tener entrada para el slug didactico (sin ella renderiza el fallback 🛍️ genérico).'
+		);
+
+		// JUEGO DE MESA (slug 'juego-de-mesa') — cubierto por el prefijo 'juego' => 🎲
+		// (match por prefijo, no slug exacto — HOME-MATRIX-FIX).
+		$this->assertMatchesRegularExpression(
+			'/\'juego\'\s*=>\s*\'🎲\',/',
+			$src,
+			'QA-TAIWAN-SYNC: el prefijo juego => 🎲 debe seguir presente (cubre el slug real juego-de-mesa del catálogo).'
+		);
+
+		// El fallback 🛍️ se conserva para slugs fuera del mapa.
+		$this->assertStringContainsString(
+			"\$pv_icon = '🛍️';",
+			$src,
+			'QA-TAIWAN-SYNC: el fallback genérico 🛍️ debe conservarse para categorías sin entrada en el mapa.'
+		);
+	}
 }
