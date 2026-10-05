@@ -126,6 +126,13 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-UX5-003: la fila de chips debe ocultarse (max-height 0 + opacity 0) cuando el header tiene data-pv-scrolled="1".'
 		);
+		// HOME-UX5-005: en móvil los chips se limitan a DOS filas (44×2 + gap
+		// 6px = 94px) — con 8 chips y ~360px el wrap llegaba a 3+ filas.
+		$this->assertMatchesRegularExpression(
+			'/@media \(max-width:767px\)\{\s*\.pv-scope\.pv-home \.pv-home-header__chips\{max-height:94px;\}/s',
+			$src,
+			'HOME-UX5-005: en móvil (<768px) los chips muestran máximo 2 filas (clamp 94px = 44px×2 + gap).'
+		);
 	}
 
 	/**

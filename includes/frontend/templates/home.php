@@ -1229,6 +1229,17 @@ body.pv-home-native{font-size:16px;}
 .pv-scope.pv-home .pv-home-header[data-pv-scrolled="1"] .pv-home-header__chips{
     max-height:0;opacity:0;pointer-events:none;
 }
+/* HOME-UX5-005 (2026-10-04): en MÓVIL los chips muestran solo DOS filas —
+   con 8 chips del catálogo real (BELLEZA Y SALUD, CUIDADO CAPILAR, …,
+   JUEGO DE MESA, DIDACTICO) y ~360px de ancho el wrap llega a 3+ filas y
+   empujaba el hero muy abajo. Clamp por altura exacta de 2 filas:
+   44px (touch target del chip) × 2 + 6px de gap = 94px; el overflow queda
+   oculto sin scrollbar. Escritorio/tablet (≥768) sigue envolviendo libre.
+   La regla de scroll (max-height:0 arriba) gana por especificidad (0,5,0
+   > 0,3,0) — el colapso al desplazarse sigue intacto en ambos modos. */
+@media (max-width:767px){
+    .pv-scope.pv-home .pv-home-header__chips{max-height:94px;}
+}
 .pv-scope.pv-home .pv-home-header__chip{
     display:inline-flex;align-items:center;
     padding:8px 14px;border-radius:var(--r-pill);
