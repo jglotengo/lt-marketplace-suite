@@ -268,14 +268,17 @@ final class HomeUxV3Test extends LTMS_Unit_Test_Case {
 	 * HOME-UX4-001 (2026-10-03): pin actualizado a 2.9.411 en el mismo commit
 	 * del bump (lección #119 — test que aserta el enfoque viejo se actualiza
 	 * junto al cambio, no queda huérfano rompiendo suites futuras).
+	 * HOME-UX5 (2026-10-04): pin EXACTO → RANGO ≥2.9.412 (lección #188 — el
+	 * pin exacto rompía la suite en cada bump; los rangos son el patrón de
+	 * HomeUxV2Test). 2.9.412 = cache-busting del JS/CSS del ciclo HOME-UX5.
 	 */
 	public function test_008_version_2_9_410(): void {
 		$this->assertFileExists( $this->plugin_path );
 		$plugin = file_get_contents( $this->plugin_path );
 		$this->assertMatchesRegularExpression(
-			"/define\( 'LTMS_VERSION', '2\.9\.411' \);/",
+			"/define\( 'LTMS_VERSION', '2\.9\.4(1[2-9]|[2-9][0-9])' \);/",
 			$plugin,
-			'HOME-UX3/UX4: LTMS_VERSION debe estar en 2.9.411 (cache-busting del ciclo + visibilidad de categorías).'
+			'HOME-UX5: LTMS_VERSION debe ser >= 2.9.412 (cache-busting del JS/CSS del ciclo HOME-UX5).'
 		);
 	}
 }

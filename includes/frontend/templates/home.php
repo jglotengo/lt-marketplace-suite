@@ -146,11 +146,14 @@ $pv_cat_icons = apply_filters( 'ltms_home_category_icons', array(
     'regalos'      => '🎁',
 ) );
 
-/* HOME-UX2-003 (2026-10-02): chips = top 4 categorías activas, como enlaces
- * directos a su página de categoría. Siempre en sincronía con el catálogo. */
+/* HOME-UX2-003 (2026-10-02): chips = top categorías activas, como enlaces
+ * directos a su página de categoría. Siempre en sincronía con el catálogo.
+ * HOME-UX5-004 (2026-10-04): top 4 → top 8 — con 4 solo entraban las
+ * categorías de belleza; con 8 cubren también JUEGO DE MESA y DIDACTICO
+ * (nuevas del catálogo del marketplace, decisión del operador). */
 $pv_popular_chips = array();
 if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) {
-    foreach ( array_slice( $pv_cat_terms, 0, 4 ) as $pv_chip_term ) {
+    foreach ( array_slice( $pv_cat_terms, 0, 8 ) as $pv_chip_term ) {
         $pv_chip_tid  = (int) ( $pv_chip_term->term_id ?? 0 );
         $pv_chip_url  = $pv_chip_tid ? get_term_link( $pv_chip_tid ) : get_term_link( $pv_chip_term );
         if ( is_wp_error( $pv_chip_url ) ) {
@@ -165,50 +168,110 @@ if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) {
 $pv_popular_chips = apply_filters( 'ltms_home_popular_chips', $pv_popular_chips );
 
 /* ---------------------------------------------------------------------------
- * 3. Trending productos — WC()->query->get_catalog_ordering_args('popularity')
- *    8 productos más vendidos. Usamos get_posts() con los ordering args.
+ * 3. HOME-UX5 (2026-10-04): imagen representativa por categoría + carruseles
+ *    por categoría (top 8). Reemplaza el query de "Trending productos"
+ *    (decisión del operador: cada categoría exhibe su propio catálogo en
+ *    carruseles de 2 filas; ver sección CARRUSELES en el body).
+ *
+ *    3a. Imagen por categoría (HOME-UX5-002): para cada categoría activa se
+ *        toma la imagen del producto más vendido con thumbnail visible
+ *        (orderby popularity + _thumbnail_id EXISTS). Fallback al emoji del
+ *        mapa de iconos si la categoría no tiene imágenes. Queries livianas
+ *        (fields=ids, no_found_rows) amortizadas por la cache dinámica de SG.
  * ------------------------------------------------------------------------- */
-$pv_trending_ids = array();
+$pv_popularity_args = array();
+$pv_vis_meta_query  = array();
 if ( class_exists( 'WooCommerce' ) && isset( WC()->query ) && method_exists( WC()->query, 'get_catalog_ordering_args' ) ) {
-    $pv_order_args   = WC()->query->get_catalog_ordering_args( 'popularity' );
-    $pv_trending_qargs = wp_parse_args( $pv_order_args, array(
-        'post_type'           => 'product',
-        'post_status'         => 'publish',
-        'posts_per_page'      => 8,
-        'ignore_sticky_posts' => true,
-        'no_found_rows'       => true,
-        'fields'              => 'ids',
-        'tax_query'           => array(), // WC->query->get_tax_query() filtraría por la página actual; aquí queremos global.
-    ) );
-
-    // Meta query de visibilidad WC (excluir hidden/exclude-from-search).
+    $pv_popularity_args = WC()->query->get_catalog_ordering_args( 'popularity' );
     if ( method_exists( WC()->query, 'get_meta_query' ) ) {
-        $pv_trending_qargs['meta_query'] = WC()->query->get_meta_query();
+        // Meta query de visibilidad WC (excluir hidden/exclude-from-search).
+        $pv_vis_meta_query = (array) WC()->query->get_meta_query();
     }
-
-    $pv_trending_ids = get_posts( $pv_trending_qargs );
 }
 
-// Fallback: si no hay best-sellers, tomar los 8 productos más recientes.
-if ( empty( $pv_trending_ids ) ) {
-    $pv_trending_ids = get_posts( array(
-        'post_type'           => 'product',
-        'post_status'         => 'publish',
-        'posts_per_page'      => 8,
-        'ignore_sticky_posts' => true,
-        'no_found_rows'       => true,
-        'orderby'             => 'date',
-        'order'               => 'DESC',
-        'fields'              => 'ids',
-        'tax_query'           => array(
-            array(
-                'taxonomy' => 'product_visibility',
-                'field'    => 'name',
-                'terms'    => array( 'exclude-from-catalog', 'exclude-from-search' ),
-                'operator' => 'NOT IN',
+$pv_cat_images = array();
+if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) {
+    foreach ( $pv_cat_terms as $pv_ct ) {
+        $pv_ct_id = (int) ( $pv_ct->term_id ?? 0 );
+        if ( $pv_ct_id < 1 ) {
+            continue;
+        }
+        $pv_img_args = wp_parse_args( $pv_popularity_args, array(
+            'post_type'           => 'product',
+            'post_status'         => 'publish',
+            'posts_per_page'      => 1,
+            'ignore_sticky_posts' => true,
+            'no_found_rows'       => true,
+            'fields'              => 'ids',
+            'tax_query'           => array(
+                array(
+                    'taxonomy' => 'product_cat',
+                    'field'    => 'term_id',
+                    'terms'    => $pv_ct_id,
+                ),
             ),
-        ),
-    ) );
+            'meta_query'          => array_merge( $pv_vis_meta_query, array(
+                array(
+                    'key'     => '_thumbnail_id',
+                    'compare' => 'EXISTS',
+                ),
+            ) ),
+        ) );
+        $pv_img_ids = get_posts( $pv_img_args );
+        if ( empty( $pv_img_ids ) ) {
+            continue;
+        }
+        $pv_img_url = get_the_post_thumbnail_url( (int) $pv_img_ids[0], 'woocommerce_thumbnail' );
+        if ( is_string( $pv_img_url ) && '' !== $pv_img_url ) {
+            $pv_cat_images[ $pv_ct_id ] = $pv_img_url;
+        }
+    }
+}
+
+/* 3b. Carruseles por categoría (HOME-UX5-001): top 8 categorías activas
+ *     (por # de productos), 12 productos visibles c/u — best sellers
+ *     primero (popularity), visible-check en el render. tax_query con
+ *     include_children por defecto (TRUE) = mismo comportamiento del
+ *     archivo de la categoría al que enlaza "Ver más". */
+$pv_cat_carousels = array();
+if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) {
+    foreach ( array_slice( $pv_cat_terms, 0, 8 ) as $pv_cc_term ) {
+        $pv_cc_id = (int) ( $pv_cc_term->term_id ?? 0 );
+        if ( $pv_cc_id < 1 ) {
+            continue;
+        }
+        $pv_cc_args = wp_parse_args( $pv_popularity_args, array(
+            'post_type'           => 'product',
+            'post_status'         => 'publish',
+            'posts_per_page'      => 12,
+            'ignore_sticky_posts' => true,
+            'no_found_rows'       => true,
+            'fields'              => 'ids',
+            'tax_query'           => array(
+                array(
+                    'taxonomy' => 'product_cat',
+                    'field'    => 'term_id',
+                    'terms'    => $pv_cc_id,
+                ),
+            ),
+            'meta_query'          => $pv_vis_meta_query,
+        ) );
+        $pv_cc_ids = get_posts( $pv_cc_args );
+        if ( empty( $pv_cc_ids ) ) {
+            continue;
+        }
+        $pv_cc_url = get_term_link( $pv_cc_id );
+        if ( is_wp_error( $pv_cc_url ) ) {
+            $pv_cc_url = $pv_shop_url;
+        }
+        $pv_cat_carousels[] = array(
+            'term_id' => $pv_cc_id,
+            'name'    => (string) $pv_cc_term->name,
+            'count'   => (int) ( $pv_cc_term->count ?? 0 ),
+            'url'     => $pv_cc_url,
+            'ids'     => $pv_cc_ids,
+        );
+    }
 }
 
 /* ---------------------------------------------------------------------------
@@ -433,22 +496,18 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * CATEGORÍAS — barra de accesos (Shein/Alibaba, HOME-REDESIGN-003)
+     * CATEGORÍAS — grid multi-fila con imágenes (HOME-UX5-002, 2026-10-04)
      * Un único elemento de navegación de categorías, justo debajo del header
      * (antes del hero — orden de compra: 1 buscar, 2 elegir categoría,
-     * 3 oferta principal, 4 productos). Reemplaza al bento grid de 6 tiles
-     * (el brief: no repetir las categorías en otra grilla más abajo).
-     * HOME-UX2-002: TODAS las categorías activas (20) en scroll con fade.
-     * Móvil = fila deslizable con la última asomando; el scroll se mantiene
-     * en TODOS los tamaños.
-     * HOME-UX4-001 (2026-10-03): VISIBILIDAD — el operador reportó que la
-     * sección no se percibe. Causas verificadas en producción: (a) barra
-     * edge-to-edge fuera del contenedor de 1400px de las demás secciones
-     * (primera card en x=0); (b) cards blancas sobre --bg casi blanco, solo
-     * un borde tenue las separaba; (c) nombres 11.5px truncados; (d) sin
-     * título visible. Fix: head con título + "Ver todas", contenedor
-     * --pv-maxw, cards tintadas --primary-50 con hover que invierte a
-     * blanco, tipografía 12.5px/700 e ícono 28px.
+     * 3 oferta principal, 4 productos).
+     * Historia: barra deslizable con emojis (HOME-REDESIGN-003 → UX2-002 →
+     * UX4-001). Decisión del operador (HOME-UX5): TODAS las categorías
+     * activas organizadas en un grid ENVOLVENTE de varias filas (móvil 4
+     * col / tablet 6 / escritorio 7 — 21 activas ≈ 3 filas), y cada card
+     * exhibe la IMAGEN del producto más vendido de la categoría en vez del
+     * emoji (el emoji queda SOLO como fallback para categorías sin
+     * thumbnails — $pv_cat_images del bloque 3a). El head con título +
+     * "Ver todas" y el contenedor --pv-maxw se conservan (UX4-001).
      * =====================================================================
      */
     if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) :
@@ -461,42 +520,52 @@ do_action( 'ltms_before_home_plazaviva' );
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                 </a>
             </div>
-            <div class="pv-cat-bar__scroll">
-                <ul class="pv-cat-bar__list" role="list">
-                    <?php foreach ( $pv_cat_terms as $pv_term ) :
-                        /* HOME-MATRIX-FIX (2026-10-01): los slugs reales llevan
-                         * sufijos numéricos del dedup de WP (belleza-y-salud-342)
-                         * — matchear el mapa de íconos por PREFIJO; el fallback
-                         * 🛍️ solo si ningún prefijo coincide. */
-                        $pv_icon = '🛍️';
-                        if ( isset( $pv_cat_icons[ $pv_term->slug ] ) ) {
-                            $pv_icon = $pv_cat_icons[ $pv_term->slug ];
-                        } else {
-                            foreach ( $pv_cat_icons as $pv_icon_slug => $pv_icon_emoji ) {
-                                if ( '' !== $pv_icon_slug && strpos( (string) $pv_term->slug, (string) $pv_icon_slug ) === 0 ) {
-                                    $pv_icon = $pv_icon_emoji;
-                                    break;
-                                }
+            <ul class="pv-cat-bar__grid" role="list">
+                <?php foreach ( $pv_cat_terms as $pv_term ) :
+                    /* HOME-MATRIX-FIX (2026-10-01): los slugs reales llevan
+                     * sufijos numéricos del dedup de WP (belleza-y-salud-342)
+                     * — matchear el mapa de íconos por PREFIJO; el fallback
+                     * 🛍️ solo si ningún prefijo coincide. Con imágenes reales
+                     * (HOME-UX5-002) el emoji es el FALLBACK cuando la
+                     * categoría no tiene thumbnail. */
+                    $pv_icon = '🛍️';
+                    if ( isset( $pv_cat_icons[ $pv_term->slug ] ) ) {
+                        $pv_icon = $pv_cat_icons[ $pv_term->slug ];
+                    } else {
+                        foreach ( $pv_cat_icons as $pv_icon_slug => $pv_icon_emoji ) {
+                            if ( '' !== $pv_icon_slug && strpos( (string) $pv_term->slug, (string) $pv_icon_slug ) === 0 ) {
+                                $pv_icon = $pv_icon_emoji;
+                                break;
                             }
                         }
-                        $pv_term_id = (int) ( $pv_term->term_id ?? 0 );
-                        $pv_cat_url = $pv_term_id ? get_term_link( $pv_term_id ) : get_term_link( $pv_term );
-                        if ( is_wp_error( $pv_cat_url ) ) {
-                            $pv_cat_url = $pv_shop_url;
-                        }
-                        $pv_count = (int) $pv_term->count;
-                    ?>
-                        <li role="listitem">
-                            <a class="pv-cat-bar__item"
-                               href="<?php echo esc_url( $pv_cat_url ); ?>"
-                               aria-label="<?php echo esc_attr( sprintf( __( '%1$s — %2$s', 'ltms' ), $pv_term->name, sprintf( _n( '%d producto', '%d productos', $pv_count, 'ltms' ), $pv_count ) ) ); ?>">
+                    }
+                    $pv_term_id = (int) ( $pv_term->term_id ?? 0 );
+                    $pv_cat_url = $pv_term_id ? get_term_link( $pv_term_id ) : get_term_link( $pv_term );
+                    if ( is_wp_error( $pv_cat_url ) ) {
+                        $pv_cat_url = $pv_shop_url;
+                    }
+                    $pv_count = (int) $pv_term->count;
+                    $pv_img   = (string) ( $pv_cat_images[ $pv_term_id ] ?? '' );
+                ?>
+                    <li role="listitem">
+                        <a class="pv-cat-bar__item"
+                           href="<?php echo esc_url( $pv_cat_url ); ?>"
+                           aria-label="<?php echo esc_attr( sprintf( __( '%1$s — %2$s', 'ltms' ), $pv_term->name, sprintf( _n( '%d producto', '%d productos', $pv_count, 'ltms' ), $pv_count ) ) ); ?>">
+                            <?php if ( '' !== $pv_img ) : ?>
+                                <?php /* HOME-UX5-002: imagen del best-seller de la categoría;
+                                     * alt vacío (decorativa — el nombre visible + aria-label
+                                     * portan el significado), lazy (hay ~21 en el viewport). */ ?>
+                                <span class="pv-cat-bar__img-wrap" aria-hidden="true">
+                                    <img class="pv-cat-bar__img" src="<?php echo esc_url( $pv_img ); ?>" alt="" width="96" height="96" loading="lazy" decoding="async" />
+                                </span>
+                            <?php else : ?>
                                 <span class="pv-cat-bar__icon" aria-hidden="true"><?php echo esc_html( $pv_icon ); ?></span>
-                                <span class="pv-cat-bar__name"><?php echo esc_html( $pv_term->name ); ?></span>
-                            </a>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
+                            <?php endif; ?>
+                            <span class="pv-cat-bar__name"><?php echo esc_html( $pv_term->name ); ?></span>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
         </nav>
     <?php else : ?>
         <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
@@ -662,54 +731,75 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * TRENDING PRODUCTOS — 8 best sellers
+     * CARRUSELES POR CATEGORÍA (HOME-UX5-001, 2026-10-04)
+     * Reemplaza a "Productos en tendencia" (decisión del operador): las
+     * top 8 categorías activas exhiben su propio catálogo en un carrusel
+     * de 2 filas por categoría — track grid-auto-flow:column + 2 rows +
+     * scroll-snap (desliza con el dedo en móvil; en escritorio además
+     * flechas prev/next, JS del scope HOME). "Ver más" enlaza al archivo
+     * de la categoría. Cards delegadas al template part canónico
+     * content-product.php (AUDIT-FE-PV-DS-003: una sola fuente de verdad
+     * del UI de card — quick-view, wishlist, badges, ATC).
      * =====================================================================
      */
-    if ( ! empty( $pv_trending_ids ) ) :
+    if ( ! empty( $pv_cat_carousels ) ) :
     ?>
-        <section class="pv-section pv-home__trending" aria-labelledby="pv-home-trending-title">
-            <header class="pv-section__head">
-                <div>
-                    <h2 id="pv-home-trending-title" class="pv-section__title"><?php esc_html_e( 'Productos en tendencia', 'ltms' ); ?></h2>
-                    <p class="pv-section__sub"><?php esc_html_e( 'Los más vendidos del marketplace esta semana', 'ltms' ); ?></p>
-                </div>
-                <a class="pv-section__more" href="<?php echo esc_url( add_query_arg( 'orderby', 'popularity', $pv_shop_url ) ); ?>">
-                    <?php esc_html_e( 'Ver más', 'ltms' ); ?>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                </a>
-            </header>
-
-            <div class="pv-home__product-grid" role="list">
-                <?php
-                /*
-                 * AUDIT-FE-PV-DS-003 FIX (P1-1, DRY): la card trending delega al
-                 * template part canónico wc-parts/content-product.php — el mismo
-                 * markup que shop/related/cross-sells. El helper duplicado
-                 * ltms_pv_render_trending_card() fue eliminado físicamente.
-                 */
-                foreach ( $pv_trending_ids as $pv_tid ) :
-                    $pv_trending_product = wc_get_product( $pv_tid );
-                    if ( ! $pv_trending_product instanceof WC_Product || ! $pv_trending_product->is_visible() ) {
-                        continue;
-                    }
-                    // content-product.php consume los globals $product/$post.
-                    global $product, $post;
-                    // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- setup intencional para el template part
-                    $product = $pv_trending_product;
-                    // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- setup intencional para el template part
-                    $post    = get_post( $pv_tid );
-                    wc_get_template_part( 'content', 'product' );
-                endforeach;
-                wp_reset_postdata();
-                ?>
-            </div>
+        <section class="pv-section pv-home__cat-carousels" aria-label="<?php esc_attr_e( 'Productos por categoría', 'ltms' ); ?>">
+            <?php foreach ( $pv_cat_carousels as $pv_cc ) : ?>
+                <article class="pv-cat-carousel" aria-labelledby="pv-cat-carousel-<?php echo esc_attr( (string) $pv_cc['term_id'] ); ?>">
+                    <header class="pv-section__head">
+                        <div>
+                            <h2 id="pv-cat-carousel-<?php echo esc_attr( (string) $pv_cc['term_id'] ); ?>" class="pv-section__title"><?php echo esc_html( $pv_cc['name'] ); ?></h2>
+                            <p class="pv-section__sub">
+                                <?php
+                                /* translators: %d: número de productos de la categoría. */
+                                echo esc_html( sprintf(
+                                    _n( 'Los más vendidos — %d producto en la categoría', 'Los más vendidos — %d productos en la categoría', $pv_cc['count'], 'ltms' ),
+                                    $pv_cc['count']
+                                ) );
+                                ?>
+                            </p>
+                        </div>
+                        <a class="pv-section__more" href="<?php echo esc_url( $pv_cc['url'] ); ?>">
+                            <?php esc_html_e( 'Ver más', 'ltms' ); ?>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        </a>
+                    </header>
+                    <div class="pv-cat-carousel__wrap">
+                        <div class="pv-cat-carousel__track" role="list">
+                            <?php
+                            foreach ( $pv_cc['ids'] as $pv_cc_pid ) :
+                                $pv_cc_product = wc_get_product( $pv_cc_pid );
+                                if ( ! $pv_cc_product instanceof WC_Product || ! $pv_cc_product->is_visible() ) {
+                                    continue;
+                                }
+                                // content-product.php consume los globals $product/$post.
+                                global $product, $post;
+                                // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- setup intencional para el template part
+                                $product = $pv_cc_product;
+                                // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- setup intencional para el template part
+                                $post    = get_post( $pv_cc_pid );
+                                wc_get_template_part( 'content', 'product' );
+                            endforeach;
+                            wp_reset_postdata();
+                            ?>
+                        </div>
+                        <button type="button" class="pv-cat-carousel__nav pv-cat-carousel__nav--prev" data-pv-carousel-prev aria-label="<?php esc_attr_e( 'Anterior', 'ltms' ); ?>">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                        </button>
+                        <button type="button" class="pv-cat-carousel__nav pv-cat-carousel__nav--next" data-pv-carousel-next aria-label="<?php esc_attr_e( 'Siguiente', 'ltms' ); ?>">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                    </div>
+                </article>
+            <?php endforeach; ?>
         </section>
     <?php else : ?>
         <!-- AUDIT-FE-PV-DS-008 FIX (P1-6): empty state visible en vez de sección silenciosa -->
-        <section class="pv-section pv-home__trending">
+        <section class="pv-section pv-home__cat-carousels">
             <div class="pv-card pv-card--flat pv-home__empty-note">
-                <h3><?php esc_html_e( 'Aún no hay productos en tendencia', 'ltms' ); ?></h3>
-                <p><?php esc_html_e( 'Cuando los vendedores publiquen sus productos, los más vendidos aparecerán aquí.', 'ltms' ); ?></p>
+                <h3><?php esc_html_e( 'Aún no hay productos por categoría', 'ltms' ); ?></h3>
+                <p><?php esc_html_e( 'Cuando los vendedores publiquen sus productos, cada categoría tendrá su propia vitrina.', 'ltms' ); ?></p>
                 <a class="pv-btn pv-btn--sm" href="<?php echo esc_url( $pv_shop_url ); ?>"><?php esc_html_e( 'Explorar productos', 'ltms' ); ?></a>
             </div>
         </section>
@@ -1015,23 +1105,24 @@ body.pv-home-native{font-size:16px;}
    específica viene después en la cascada y gana por orden). */
 .pv-scope.pv-home .pv-btn{border-radius:12px;}
 
-/* ── HEADER (HOME-UX2-001, 2026-10-02) ────────────────────────────────────
-    Re-anclado a los tokens del design system Plaza Viva: fondo claro
-    (var(--surface)) + texto var(--text) + acentos var(--primary), igual que
-    el header del resto del sitio (antes navy #1A1A4E hardcodeado, un color
-    que no existe en ningún token — la home leía como otro site). El dorado
-    queda SOLO para el badge de contador. Contraste AA: --text 15.9:1,
-    --text-2 7:1, botón --primary + #fff 4.6:1 (texto bold 14px), badge
-    --gold + --text ≈ 8:1.
-    Mobile-first según brief:
+/* ── HEADER (HOME-UX5-003, 2026-10-04) ─────────────────────────────────────
+    ROJO institucional a pedido del operador ("la parte del buscador, íconos
+    de corazón y toda esa zona en rojo") — la home leía como otro site con el
+    fondo claro del ciclo UX2. Base: --danger-700 (#b73a3e, rojo del design
+    system) para que el texto blanco pase AA (5.7:1); --danger (#E5484D)
+    queda para hovers/bordes (3.9:1 con blanco — solo elementos no-texto).
+    Sticky conservado: la zona de búsqueda+acciones permanece fija al
+    desplazarse en TODOS los tamaños; los chips (palabras bajo el buscador)
+    se OCULTAN al scroll vía [data-pv-scrolled] (JS del scope HOME).
+    Mobile-first (heredado del ciclo UX2):
     - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
     - ≥480: filtro de categoría dentro del campo.
     - ≥768 (tablet): 1 fila con buscador flexible.
     - ≥1024: buscador central min 480px. */
 .pv-scope.pv-home .pv-home-header{
     position:sticky;top:0;z-index:50;
-    background:var(--surface);
-    border-bottom:1px solid var(--border);
+    background:var(--danger-700);
+    border-bottom:1px solid var(--danger);
     padding-top:calc(env(safe-area-inset-top, 0px) + 8px);
 }
 .pv-scope.pv-home .pv-home-header__inner{
@@ -1047,16 +1138,16 @@ body.pv-home-native{font-size:16px;}
 }
 .pv-scope.pv-home .pv-home-header__logo{
     grid-area:logo;
-    display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);
+    display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;
 }
 .pv-scope.pv-home .pv-home-header__logo-mark{
     width:40px;height:42px;flex-shrink:0;
     display:flex;align-items:center;justify-content:center;font-size:20px;
-    background:var(--primary-50);border-radius:var(--r-md);color:var(--primary-700);
+    background:rgba(255,255,255,.14);border-radius:var(--r-md);color:#fff;
 }
 .pv-scope.pv-home .pv-home-header__logo-text{display:flex;flex-direction:column;line-height:1.1;}
-.pv-scope.pv-home .pv-home-header__logo-name{font-family:var(--display);font-weight:800;font-size:19px;color:var(--text);}
-.pv-scope.pv-home .pv-home-header__logo-tag{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;}
+.pv-scope.pv-home .pv-home-header__logo-name{font-family:var(--display);font-weight:800;font-size:19px;color:#fff;}
+.pv-scope.pv-home .pv-home-header__logo-tag{font-size:11px;font-weight:600;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.06em;}
 
 .pv-scope.pv-home .pv-home-header__search{
     grid-area:search;
@@ -1095,9 +1186,9 @@ body.pv-home-native{font-size:16px;}
 .pv-scope.pv-home .pv-home-header__search-input:focus{outline:none;}
 .pv-scope.pv-home .pv-home-header__search-btn{
     border-radius:var(--r-pill);height:44px;min-width:44px;
-    background:var(--primary);padding:0 18px;flex-shrink:0;
+    background:var(--danger-700);color:#fff;padding:0 18px;flex-shrink:0;
 }
-.pv-scope.pv-home .pv-home-header__search-btn:hover{background:var(--primary-600);}
+.pv-scope.pv-home .pv-home-header__search-btn:hover{background:var(--danger);}
 
 /* Panel de sugerencias live (máx 6) — combobox ARIA accesible. */
 .pv-scope.pv-home .pv-home-header__suggestions{
@@ -1124,28 +1215,41 @@ body.pv-home-native{font-size:16px;}
     font-size:13px;font-weight:700;color:var(--primary-700);flex-shrink:0;white-space:nowrap;
 }
 
-.pv-scope.pv-home .pv-home-header__chips{display:flex;gap:6px;flex-wrap:wrap;}
+/* HOME-UX5-004: chips top 8 sobre el header rojo — overlay blanco sutil
+   (rgba .10) mantiene el contraste AA del texto blanco (~4.9:1 sobre el
+   blend con --danger-700). Touch target 44px (HOME-MATRIX-FIX). La fila se
+   COLAPSA al desplazarse ([data-pv-scrolled="1"], JS initHeaderScroll):
+   max-height 0 + opacity 0 — el header compacto deja solo logo + buscador
+   + acciones. Transición suave con --t; reaparece al volver arriba. */
+.pv-scope.pv-home .pv-home-header__chips{
+    display:flex;gap:6px;flex-wrap:wrap;
+    max-height:120px;overflow:hidden;
+    transition:max-height var(--t),opacity var(--t);
+}
+.pv-scope.pv-home .pv-home-header[data-pv-scrolled="1"] .pv-home-header__chips{
+    max-height:0;opacity:0;pointer-events:none;
+}
 .pv-scope.pv-home .pv-home-header__chip{
     display:inline-flex;align-items:center;
     padding:8px 14px;border-radius:var(--r-pill);
-    background:var(--bg-2);color:var(--text-2);
-    font-size:12px;font-weight:600;border:1px solid transparent;
+    background:rgba(255,255,255,.10);color:#fff;
+    font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.22);
     text-decoration:none;cursor:pointer;
     transition:background var(--t),color var(--t),border-color var(--t);
     /* HOME-MATRIX-FIX: touch target 44px mínimo (brief: 44×44 con 8px de
        separación; los chips estaban en 32px). */
     min-height:44px;
 }
-.pv-scope.pv-home .pv-home-header__chip:hover{background:var(--primary-50);color:var(--primary-700);border-color:var(--primary-100);}
+.pv-scope.pv-home .pv-home-header__chip:hover{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.55);}
 
 .pv-scope.pv-home .pv-home-header__actions{grid-area:actions;justify-self:end;display:flex;align-items:center;gap:4px;}
 .pv-scope.pv-home .pv-home-header__action{
     display:flex;flex-direction:column;align-items:center;gap:3px;
-    padding:6px 12px;border-radius:var(--r-md);color:var(--text-2);
+    padding:6px 12px;border-radius:var(--r-md);color:rgba(255,255,255,.92);
     text-decoration:none;transition:background var(--t),color var(--t);
     position:relative;min-height:44px;justify-content:center;
 }
-.pv-scope.pv-home .pv-home-header__action:hover{background:var(--bg-2);color:var(--primary);}
+.pv-scope.pv-home .pv-home-header__action:hover{background:rgba(255,255,255,.14);color:#fff;}
 .pv-scope.pv-home .pv-home-header__action-label{font-size:11px;font-weight:600;}
 .pv-scope.pv-home .pv-home-header__action-icon{position:relative;display:flex;}
 .pv-scope.pv-home .pv-home-header__badge{
@@ -1154,7 +1258,7 @@ body.pv-home-native{font-size:16px;}
     display:flex;align-items:center;justify-content:center;
     background:var(--gold);color:var(--text);
     border-radius:var(--r-pill);font-size:10.5px;font-weight:700;
-    border:2px solid var(--surface);
+    border:2px solid var(--danger-700);
 }
 .pv-scope.pv-home .pv-home-header__badge--accent{background:var(--gold);}
 /* HOME-UX3-001: badge de favoritos vacío (count 0) se oculta — el elemento
@@ -1341,20 +1445,18 @@ body.pv-home-native .ltms-header-access{display:none!important}
     }
 }
 
-/* ── CATEGORÍAS — barra de accesos (HOME-REDESIGN-003, Shein/Alibaba) ──────
-   Móvil: fila deslizable con la última asomando (partial item = indicio de
-   que hay más). El scroll se mantiene en TODOS los tamaños (20 activas).
-   HOME-UX4-001 (2026-10-03) — VISIBILIDAD: (1) la barra entra al contenedor
-   de las demás secciones (--pv-maxw 1400px, padding 22px / 14px ≤760 — antes
-   corría edge-to-edge con la primera card pegada al borde del viewport);
-   (2) head visible: título 15px/800 + "Ver todas" arriba (libera el ancho
-   completo del scroll en móvil); (3) cards tintadas --primary-50 con borde
-   --primary-100 — sobre --bg casi blanco las blancas no se distinguían —
-   hover invierte a surface + shadow azul; (4) tipografía 12.5px/700 e ícono
-   28px (antes 11.5px/600, 26px). Touch targets ≥84px. Contraste AA:
-   --text sobre --primary-50 ≈ 16:1, título sobre --bg ≈ 15.9:1. */
+/* ── CATEGORÍAS — grid multi-fila con imágenes (HOME-UX5-002, 2026-10-04) ───
+   Antes: fila deslizable con emojis (HOME-REDESIGN-003 → UX2-002 → UX4-001).
+   Ahora: TODAS las activas (21) en un grid ENVOLVENTE de varias filas —
+   móvil 4 col / ≥480 5 / ≥768 6 / ≥1024 7 (≈3 filas). Cada card exhibe la
+   IMAGEN del best-seller de la categoría (48px, object-fit cover) con el
+   emoji SOLO como fallback (categorías sin thumbnails). El contenedor
+   conserva --pv-maxw + head con título y "Ver todas" (UX4-001). Cards
+   blancas + borde --border + hover azul (patrón UX4-001 de presencia).
+   Nombres 2 líneas con clamp (los reales son largos:
+   "MASCARILLAS CAPILARES Y TRATAMIENTOS"). Touch targets ≥86px. */
 .pv-scope.pv-home .pv-cat-bar{
-    display:flex;flex-direction:column;gap:10px;
+    display:flex;flex-direction:column;gap:12px;
     width:100%;max-width:var(--pv-maxw);margin:0 auto;
     padding:14px 22px 6px;
 }
@@ -1366,35 +1468,36 @@ body.pv-home-native .ltms-header-access{display:none!important}
     font-family:var(--display);font-weight:800;font-size:15px;
     letter-spacing:-.01em;color:var(--text);
 }
-.pv-scope.pv-home .pv-cat-bar__scroll{
-    flex:1;min-width:0;width:100%;
-    overflow-x:auto;
-    scroll-snap-type:x proximity;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
-    padding-bottom:2px;
-}
-.pv-scope.pv-home .pv-cat-bar__scroll::-webkit-scrollbar{display:none;}
-.pv-scope.pv-home .pv-cat-bar__list{
-    display:flex;gap:6px;width:max-content;
+.pv-scope.pv-home .pv-cat-bar__grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
 }
 .pv-scope.pv-home .pv-cat-bar__item{
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:6px;min-width:88px;min-height:84px;
-    padding:12px 10px;
-    background:var(--primary-50);border:1px solid var(--primary-100);border-radius:var(--r-md);
+    gap:8px;min-height:96px;
+    padding:12px 8px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
     text-decoration:none;color:var(--text);
-    scroll-snap-align:start;
-    transition:transform var(--t),box-shadow var(--t),border-color var(--t),background var(--t);
+    transition:transform var(--t),box-shadow var(--t),border-color var(--t);
 }
 .pv-scope.pv-home .pv-cat-bar__item:hover{
     transform:translateY(-2px);box-shadow:var(--sh-hover);
-    background:var(--surface);border-color:var(--primary);
+    border-color:var(--primary);
 }
-.pv-scope.pv-home .pv-cat-bar__icon{font-size:28px;line-height:1;}
+.pv-scope.pv-home .pv-cat-bar__img-wrap{
+    width:48px;height:48px;flex-shrink:0;
+    border-radius:var(--r-sm);overflow:hidden;
+    background:var(--bg-2);
+    display:flex;align-items:center;justify-content:center;
+}
+.pv-scope.pv-home .pv-cat-bar__img{width:100%;height:100%;object-fit:cover;display:block;}
+/* HOME-UX5-002: el emoji queda SOLO como fallback sin imagen real. */
+.pv-scope.pv-home .pv-cat-bar__icon{font-size:30px;line-height:1;}
 .pv-scope.pv-home .pv-cat-bar__name{
-    font-size:12.5px;font-weight:700;color:var(--text);
-    max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:11.5px;font-weight:700;color:var(--text);
+    text-align:center;line-height:1.25;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .pv-scope.pv-home .pv-cat-bar__more{
     display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
@@ -1402,40 +1505,81 @@ body.pv-home-native .ltms-header-access{display:none!important}
     min-height:44px;padding:0 8px;
 }
 .pv-scope.pv-home .pv-cat-bar__more:hover{color:var(--primary-600);}
-/* HOME-UX4-001: padding de contenedor móvil igual al de .pv-section (14px). */
+/* HOME-UX4-001: padding de contenedor móvil igual al de .pv-section (14px).
+   HOME-UX5-002: cards compactas en móvil (4 col en ~360px ≈ 80px/celda). */
 @media (max-width:760px){
     .pv-scope.pv-home .pv-cat-bar{padding-left:14px;padding-right:14px;}
+    .pv-scope.pv-home .pv-cat-bar__grid{gap:6px;}
+    .pv-scope.pv-home .pv-cat-bar__item{gap:6px;min-height:86px;padding:10px 4px;}
+    .pv-scope.pv-home .pv-cat-bar__img-wrap{width:40px;height:40px;}
 }
-/* HOME-UX2-002 (2026-10-02): fade del borde derecho del scroll de categorías
-   — se activa solo cuando hay desborde (data-pv-scrollable lo togglea el JS
-   del scope HOME en ltms-plaza-viva.js) y desaparece al llegar al final
-   (data-pv-at-end). Así SI se percibe que hay más categorías sin ocultar
-   nada: hoy son 20 activas y ninguna queda fuera. */
-.pv-scope.pv-home .pv-cat-bar__scroll[data-pv-scrollable="1"]:not([data-pv-at-end="1"]){
+@media (min-width:480px){
+    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(5,1fr);}
+}
+@media (min-width:768px){
+    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(6,1fr);}
+}
+@media (min-width:1024px){
+    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(7,1fr);gap:10px;}
+    .pv-scope.pv-home .pv-cat-bar__img-wrap{width:52px;height:52px;}
+}
+
+/* ── CARRUSELES POR CATEGORÍA (HOME-UX5-001) ───────────────────────────────
+   8 secciones (top categorías activas), cada una con un carrusel de 2
+   filas: track grid-auto-flow:column + grid-template-rows:repeat(2,auto)
+   + scroll-snap proximity (desliza con el dedo en móvil; en escritorio
+   además flechas prev/next — initCatCarousels del scope HOME). Cards =
+   template canónico content-product.php (DRY, AUDIT-FE-PV-DS-003) con
+   snap-align start. Auto-columns: 160px móvil / 200px ≥768 / 248px ≥1024
+   (a 248px×5.6 visibles en 1400px las 12 cards requieren scroll → las
+   flechas tienen trabajo). Radio 8px (regla de radios uniformes arriba). */
+.pv-scope.pv-home .pv-home__cat-carousels{padding-top:8px;padding-bottom:8px;}
+.pv-scope.pv-home .pv-cat-carousel{padding-top:28px;}
+.pv-scope.pv-home .pv-cat-carousel__wrap{position:relative;}
+.pv-scope.pv-home .pv-cat-carousel__track{
+    display:grid;grid-auto-flow:column;
+    grid-template-rows:repeat(2,auto);
+    grid-auto-columns:160px;
+    gap:12px;
+    overflow-x:auto;
+    scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding-bottom:4px;
+}
+.pv-scope.pv-home .pv-cat-carousel__track::-webkit-scrollbar{display:none;}
+.pv-scope.pv-home .pv-cat-carousel__track .pv-product-card{
+    margin:0;border-radius:8px;scroll-snap-align:start;width:100%;
+}
+/* HOME-UX5-001: flechas (solo escritorio — en móvil el track se desliza con
+   el dedo). Flotan sobre el track, centradas verticalmente. */
+.pv-scope.pv-home .pv-cat-carousel__nav{
+    position:absolute;top:50%;transform:translateY(-50%);z-index:5;
+    width:38px;height:38px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--surface);color:var(--primary-700);
+    border:1px solid var(--border-2);box-shadow:var(--sh-2);
+    cursor:pointer;
+    transition:background var(--t),color var(--t);
+}
+.pv-scope.pv-home .pv-cat-carousel__nav:hover{background:var(--primary);color:#fff;}
+.pv-scope.pv-home .pv-cat-carousel__nav--prev{left:-12px;}
+.pv-scope.pv-home .pv-cat-carousel__nav--next{right:-12px;}
+/* Fade de bordes del track (mismo patrón data-pv-scrollable del ciclo UX2,
+   ahora por carrusel — lo togglea initCatCarousels en el JS). */
+.pv-scope.pv-home .pv-cat-carousel__track[data-pv-scrollable="1"]:not([data-pv-at-end="1"]){
     -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
     mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
 }
-/* HOME-UX2-002: con las 20 categorías activas ya no caben en el contenedor
-   de 1400px — el scroll se mantiene en TODOS los tamaños (no hay regla de
-   barra fija en escritorio). La lista es width:max-content en la base. */
-
-/* ── TRENDING ────────────────────────────────────────────────────────────── */
-/* HOME-REDESIGN-005: grid 2 col móvil / 3 tablet / 4 escritorio / 5 solo en
-   pantallas ≥1440px (el contenedor de 1400px lo permite). Tarjetas de igual
-   altura (grid stretch). Radio 8px (regla de radios uniformes arriba). */
-.pv-scope.pv-home .pv-home__trending{padding-top:40px;padding-bottom:8px;}
-.pv-scope.pv-home .pv-home__product-grid{
-    display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
+@media (max-width:767px){
+    .pv-scope.pv-home .pv-cat-carousel__nav{display:none;}
+    .pv-scope.pv-home .pv-cat-carousel__track{gap:10px;}
 }
-.pv-scope.pv-home .pv-home__product-grid .pv-product-card{margin:0;border-radius:8px;}
 @media (min-width:768px){
-    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(3,1fr);gap:16px;}
+    .pv-scope.pv-home .pv-cat-carousel__track{grid-auto-columns:200px;gap:14px;}
 }
 @media (min-width:1024px){
-    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(4,1fr);gap:18px;}
-}
-@media (min-width:1440px){
-    .pv-scope.pv-home .pv-home__product-grid{grid-template-columns:repeat(5,1fr);}
+    .pv-scope.pv-home .pv-cat-carousel__track{grid-auto-columns:248px;gap:16px;}
 }
 
 /* ── VENDORS ─────────────────────────────────────────────────────────────── */
@@ -1655,7 +1799,7 @@ body.pv-home-native .ltms-header-access{display:none!important}
     .pv-scope.pv-home .pv-home__hero-wrap{display:none;}
     .pv-scope.pv-home .pv-home__vendors{display:none;}
     .pv-scope.pv-home #pv-main{display:flex;flex-direction:column;}
-    .pv-scope.pv-home .pv-home__trending{order:1;}
+    .pv-scope.pv-home .pv-home__cat-carousels{order:1;}
     .pv-scope.pv-home .pv-home__trust{order:2;}
     .pv-scope.pv-home .pv-home__sell{order:3;}
     .pv-scope.pv-home .pv-home__policies{order:4;}

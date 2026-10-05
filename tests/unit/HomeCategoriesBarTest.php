@@ -163,78 +163,112 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-003-E: comportamiento responsivo — móvil deslizable.
-	 *
-	 * HOME-UX2-002 (2026-10-02): escritorio ya NO es barra fija — con las 20
-	 * categorías activas no caben en el contenedor: el scroll se mantiene en
-	 * TODOS los tamaños y el fade del borde derecho (mask-image activado por
-	 * data-pv-scrollable / desactivado por data-pv-at-end, toggled por el JS
-	 * del scope HOME) es el indicio de "hay más categorías".
+	 * HOME-UX5-002 (2026-10-04): el operador pidió "organiza las categorías
+	 * en varias filas, toma imágenes de algunos productos para las
+	 * categorías según aplique en vez de esos iconos" — la barra deslizable
+	 * del ciclo UX2 (scroll + fade con data-pv-scrollable) fue REEMPLAZADA
+	 * por un grid ENVOLVENTE multi-fila con la IMAGEN del best-seller de
+	 * cada categoría; el emoji queda SOLO como fallback. Este test reemplaza
+	 * al de scroll/fade (lección #119 — misma intención, enfoque nuevo).
 	 */
-	public function test_005_responsivo_scroll_todos_los_tamanos_con_fade(): void {
-		$src = file_get_contents( $this->home_path );
+	public function test_005_grid_multifila_con_imagenes_de_productos(): void {
+		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
-		// Base: fila deslizable.
-		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-cat-bar__scroll\{[^}]*overflow-x:auto;/s",
+		// Grid envolvente en el markup (reemplaza al scroll/list horizontal).
+		$this->assertStringContainsString(
+			'<ul class="pv-cat-bar__grid" role="list">',
 			$src,
-			'HOME-REDESIGN-003-E: la barra debe ser deslizable en móvil.'
+			'HOME-UX5-002: el markup debe usar el grid multi-fila (pv-cat-bar__grid), no la fila deslizable.'
 		);
-		// HOME-UX2-002: sin overflow:visible en escritorio — el scroll se mantiene.
 		$this->assertStringNotContainsString(
-			'.pv-cat-bar__scroll{overflow:visible;}',
+			'pv-cat-bar__scroll',
 			$src,
-			'HOME-UX2-002: el scroll de la barra se mantiene en TODOS los tamaños (20 categorías activas no caben).'
+			'HOME-UX5-002: el contenedor de scroll horizontal fue eliminado — el grid envuelve en varias filas.'
 		);
-		// Fade del borde: mask solo con data-pv-scrollable y sin data-pv-at-end.
+		$this->assertStringNotContainsString(
+			'pv-cat-bar__list',
+			$src,
+			'HOME-UX5-002: la lista flex width:max-content fue eliminada con el scroll.'
+		);
+
+		// Columnas: móvil 4 / ≥480 5 / ≥768 6 / ≥1024 7 (21 activas ≈ 3 filas).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-cat-bar__scroll\[data-pv-scrollable=\"1\"\]:not\(\[data-pv-at-end=\"1\"\]\)\{[^}]*mask-image:/s",
+			'/\.pv-scope\.pv-home \.pv-cat-bar__grid\{[^}]*grid-template-columns:repeat\(4,1fr\);/s',
 			$src,
-			'HOME-UX2-002: el fade del borde derecho (mask-image) debe existir y activarse solo con desborde.'
+			'HOME-UX5-002: base móvil del grid = 4 columnas.'
 		);
-		// El JS del scope HOME togglea los data-attrs del fade.
-		$js = file_get_contents( dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js' );
+		$this->assertMatchesRegularExpression(
+			'/@media \(min-width:1024px\)\{[^@]*\.pv-scope\.pv-home \.pv-cat-bar__grid\{grid-template-columns:repeat\(7,1fr\);/s',
+			$src,
+			'HOME-UX5-002: escritorio = 7 columnas (varias filas con las 21 activas).'
+		);
+
+		// Imagen del best-seller de la categoría con fallback al emoji.
 		$this->assertStringContainsString(
-			"data-pv-scrollable",
-			$js,
-			'HOME-UX2-002: ltms-plaza-viva.js debe togglear data-pv-scrollable en el scroll de categorías.'
+			'pv-cat-bar__img-wrap',
+			$src,
+			'HOME-UX5-002: la card debe envolver la imagen del producto de la categoría (pv-cat-bar__img-wrap).'
 		);
 		$this->assertStringContainsString(
-			"data-pv-at-end",
-			$js,
-			'HOME-UX2-002: ltms-plaza-viva.js debe togglear data-pv-at-end al llegar al final del scroll.'
+			'pv-cat-bar__img',
+			$src,
+			'HOME-UX5-002: la card debe renderizar el <img> de la categoría (pv-cat-bar__img).'
+		);
+		$this->assertStringContainsString(
+			'pv-cat-bar__icon',
+			$src,
+			'HOME-UX5-002: el emoji se conserva SOLO como fallback (categorías sin thumbnail).'
+		);
+		// El fallback por imagen es excluyente: img-wrap si hay imagen, icon si no.
+		$this->assertStringContainsString(
+			'( \'\' !== $pv_img ) :',
+			$src,
+			'HOME-UX5-002: el markup decide entre <img> (con imagen) y emoji (sin imagen) por categoría.'
+		);
+
+		// Origen de la imagen: best-seller visible con thumbnail del término.
+		$this->assertStringContainsString(
+			"'key'     => '_thumbnail_id',",
+			$src,
+			'HOME-UX5-002: el query de imagen exige _thumbnail_id EXISTS (producto con imagen real).'
+		);
+		$this->assertStringContainsString(
+			"get_catalog_ordering_args( 'popularity' )",
+			$src,
+			'HOME-UX5-002: la imagen se toma del producto MÁS VENDIDO de la categoría (popularity).'
+		);
+		$this->assertStringContainsString(
+			'get_the_post_thumbnail_url( (int) $pv_img_ids[0], \'woocommerce_thumbnail\' )',
+			$src,
+			'HOME-UX5-002: la URL debe ser el tamaño woocommerce_thumbnail (no la imagen full — payload).'
+		);
+
+		// CSS de la imagen: contenida y recortada (object-fit cover).
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-cat-bar__img\{[^}]*object-fit:cover;/s',
+			$src,
+			'HOME-UX5-002: la imagen debe recortarse con object-fit:cover dentro del wrap.'
 		);
 	}
 
 	/**
-	 * HOME-UX4-001 (2026-10-03): VISIBILIDAD de la barra — el operador reportó
-	 * que la sección no se percibe. Causas verificadas en producción (DOM
-	 * 1440px): (a) barra edge-to-edge FUERA del contenedor (primera card en
-	 * x=0, "Ver todas" terminando en x=1440; las demás secciones arrancan en
-	 * el contenedor de 1400px); (b) cards blancas sobre --bg casi blanco
-	 * (#F6F5F8) — solo un borde tenue las separaba; (c) nombres 11.5px
-	 * truncados a 76px; (d) sin título visible (solo aria-label).
-	 *
-	 * Fix verificado por este test (forma del source — el runtime se valida
-	 * en el browser check del deploy, lección #186):
-	 *   - Head visible: h2 "Explora por categorías" + "Ver todas" arriba
-	 *     (nav aria-labelledby, patrón de pv-section__head de trending).
-	 *   - Contenedor: max-width:var(--pv-maxw) + margin:0 auto + padding
-	 *     22px / 14px en ≤760px (mismo patrón que .pv-section).
-	 *   - Cards tintadas --primary-50 con borde --primary-100 (visibles
-	 *     sobre --bg); hover invierte a surface + shadow.
-	 *   - Tipografía 12.5px/700 + ícono 28px.
+	 * HOME-UX4-001 → HOME-UX5-002 (2026-10-04): VISIBILIDAD de la sección —
+	 * el head con título + "Ver todas" y el contenedor --pv-maxw se
+	 * conservan del ciclo UX4; las cards pasan de tintadas --primary-50 a
+	 * blancas con borde --border (la imagen real es la que da presencia),
+	 * hover azul + shadow, y los nombres usan clamp de 2 líneas (los reales
+	 * son largos: "MASCARILLAS CAPILARES Y TRATAMIENTOS"). Test actualizado
+	 * en el mismo commit (lección #119).
 	 */
-	public function test_006_visibilidad_head_contenedor_y_tinte(): void {
+	public function test_006_visibilidad_head_contenedor_y_cards(): void {
 		$src = file_get_contents( $this->home_path );
 		$markup = $this->strip_php_comments( $src );
 
-		// Head visible con título y "Ver todas" (el enlace pasó de ir junto
-		// al scroll — donde comía ancho en móvil — a la fila del título).
+		// Head visible con título y "Ver todas" (patrón UX4-001 intacto).
 		$this->assertMatchesRegularExpression(
 			'/<nav class="pv-cat-bar" aria-labelledby="pv-home-cats-title">/',
 			$markup,
-			'HOME-UX4-001: el nav debe estar etiquetado por el título visible (patrón aria-labelledby de trending).'
+			'HOME-UX4-001: el nav debe estar etiquetado por el título visible (patrón aria-labelledby).'
 		);
 		$this->assertStringContainsString(
 			'<h2 class="pv-cat-bar__title" id="pv-home-cats-title">',
@@ -248,49 +282,57 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 		);
 		$pos_head = strpos( $markup, 'pv-cat-bar__head' );
 		$pos_more = strpos( $markup, 'pv-cat-bar__more' );
-		$pos_scroll = strpos( $markup, 'pv-cat-bar__scroll' );
+		$pos_grid = strpos( $markup, 'pv-cat-bar__grid' );
 		$this->assertNotFalse( $pos_head, 'El head de la barra debe existir.' );
 		$this->assertNotFalse( $pos_more, 'El enlace "Ver todas" debe existir.' );
+		$this->assertNotFalse( $pos_grid, 'El grid de categorías debe existir.' );
 		$this->assertLessThan(
-			$pos_scroll,
+			$pos_grid,
 			$pos_more,
-			'HOME-UX4-001: "Ver todas" va en el head, ANTES del scroll — libera el ancho completo del scroll en móvil.'
+			'HOME-UX4-001: "Ver todas" va en el head, ANTES del grid de categorías.'
 		);
 
-		// Contenedor igual al del resto de las secciones.
+		// Contenedor igual al del resto de las secciones (UX4-001 intacto).
 		$this->assertMatchesRegularExpression(
 			'/\.pv-scope\.pv-home \.pv-cat-bar\{[^}]*max-width:var\(--pv-maxw\);[^}]*margin:0 auto;/s',
 			$src,
 			'HOME-UX4-001: la barra debe entrar al contenedor (--pv-maxw 1400px) — antes corría edge-to-edge (primera card en x=0).'
 		);
 		$this->assertMatchesRegularExpression(
-			'/@media \(max-width:760px\)\{\s*\.pv-scope\.pv-home \.pv-cat-bar\{padding-left:14px;padding-right:14px;\}/s',
+			'/@media \(max-width:760px\)\{[^}]*\.pv-scope\.pv-home \.pv-cat-bar\{padding-left:14px;padding-right:14px;\}/s',
 			$src,
 			'HOME-UX4-001: padding de contenedor móvil 14px, igual que .pv-section.'
 		);
 
-		// Cards tintadas — visibles sobre --bg casi blanco.
+		// HOME-UX5-002: cards blancas con borde — la IMAGEN del producto es
+		// la que da presencia ahora; el hover refuerza con azul + shadow.
 		$this->assertMatchesRegularExpression(
-			'/\.pv-scope\.pv-home \.pv-cat-bar__item\{[^}]*background:var\(--primary-50\);[^}]*border:1px solid var\(--primary-100\);/s',
+			'/\.pv-scope\.pv-home \.pv-cat-bar__item\{[^}]*background:var\(--surface\);[^}]*border:1px solid var\(--border\);/s',
 			$src,
-			'HOME-UX4-001: las cards deben ser tintadas (--primary-50 + borde --primary-100) — las blancas no se distinguían del fondo.'
+			'HOME-UX5-002: cards blancas con borde neutro — la imagen real destaca sobre el tinte del ciclo UX4.'
 		);
 		$this->assertMatchesRegularExpression(
-			'/\.pv-scope\.pv-home \.pv-cat-bar__item:hover\{[^}]*background:var\(--surface\);[^}]*border-color:var\(--primary\);/s',
+			'/\.pv-scope\.pv-home \.pv-cat-bar__item:hover\{[^}]*border-color:var\(--primary\);/s',
 			$src,
-			'HOME-UX4-001: el hover invierte a blanco + borde primary (refuerzo de visibilidad en interacción).'
+			'HOME-UX5-002: el hover marca la card con borde azul + shadow (presencia en interacción).'
 		);
 
-		// Tipografía legible.
+		// Tipografía legible con clamp de 2 líneas (nombres reales largos).
 		$this->assertMatchesRegularExpression(
-			'/\.pv-scope\.pv-home \.pv-cat-bar__name\{[^}]*font-size:12\.5px;font-weight:700;/s',
+			'/\.pv-scope\.pv-home \.pv-cat-bar__name\{[^}]*font-size:11\.5px;font-weight:700;/s',
 			$src,
-			'HOME-UX4-001: nombres 12.5px/700 (antes 11.5px/600 — poco legibles).'
+			'HOME-UX5-002: nombres 11.5px/700 con clamp de 2 líneas (los nombres reales son largos).'
 		);
 		$this->assertMatchesRegularExpression(
-			'/\.pv-scope\.pv-home \.pv-cat-bar__icon\{font-size:28px;/s',
+			'/-webkit-line-clamp:2;/',
 			$src,
-			'HOME-UX4-001: ícono 28px (antes 26px).'
+			'HOME-UX5-002: los nombres se limitan a 2 líneas con ellipsis (clamp).'
+		);
+		// Fallback emoji: 30px (creció de 28px — ahora es la excepción).
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-cat-bar__icon\{font-size:30px;/s',
+			$src,
+			'HOME-UX5-002: el emoji de fallback crece a 30px (es la excepción sin imagen).'
 		);
 	}
 

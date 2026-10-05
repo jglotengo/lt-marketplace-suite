@@ -84,17 +84,20 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 			);
 		}
 
-		// El botón del buscador usa el primary del design system (igual que .pv-btn).
+		// HOME-UX5-003 (2026-10-04): el botón Buscar pasó a var(--danger-700)
+		// — el header es ROJO a pedido del operador; el botón viaja DENTRO del
+		// campo blanco y mantiene el rojo institucional con texto blanco AA.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*background:var\(--primary\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*background:var\(--danger-700\);/s",
 			$src,
-			'HOME-UX2-001: el botón Buscar debe usar var(--primary) como todos los .pv-btn del sistema.'
+			'HOME-UX5-003: el botón Buscar usa var(--danger-700) — rojo del header, blanco 5.7:1 AA.'
 		);
-		// El header usa superficie clara (mismo lenguaje que el resto del sitio).
+		// HOME-UX5-003: el header es ROJO (var(--danger-700)) — decisión del
+		// operador que reemplaza el fondo claro del ciclo UX2.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--surface\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--danger-700\);/s",
 			$src,
-			'HOME-UX2-001: el header de la home debe ser claro (var(--surface)) como las demás páginas.'
+			'HOME-UX5-003: el header de la home es rojo var(--danger-700) (operador 2026-10-04).'
 		);
 		// La franja Vende usa el gradiente del design system (mismo del hero fallback).
 		$this->assertMatchesRegularExpression(
@@ -111,9 +114,12 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX2-003: chips = top 4 categorías activas como ENLACES directos.
-	 * Los términos muertos ('Tecnología', 'Regalos', 'Hogar' → 0-2 resultados
-	 * reales verificados en producción) quedaron eliminados.
+	 * HOME-UX2-003 → HOME-UX5-004 (2026-10-04): chips = top 8 categorías
+	 * activas como ENLACES directos. Los términos muertos ('Tecnología',
+	 * 'Regalos', 'Hogar' → 0-2 resultados reales verificados en producción)
+	 * quedaron eliminados; el top 4 pasó a 8 para cubrir también JUEGO DE
+	 * MESA y DIDACTICO (decisión del operador — con 4 solo entraban las
+	 * categorías de belleza). Test actualizado en el mismo commit (#119).
 	 */
 	public function test_002_chips_categorias_reales_como_enlaces(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
@@ -123,11 +129,16 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 		$this->assertStringNotContainsString( "'Regalos'", $src, "HOME-UX2-003: búsqueda de 'Regalos' = 0 resultados verificados." );
 		$this->assertStringNotContainsString( "'Hogar'", $src, "HOME-UX2-003: búsqueda de 'Hogar' = 2 resultados verificados — no es chip." );
 
-		// Los chips derivan del mismo query de categorías (top 4, enlaces).
+		// Los chips derivan del mismo query de categorías (top 8, enlaces).
 		$this->assertStringContainsString(
+			'array_slice( $pv_cat_terms, 0, 8 )',
+			$src,
+			'HOME-UX5-004: los chips derivan del top 8 de categorías activas (incluye JUEGO DE MESA y DIDACTICO).'
+		);
+		$this->assertStringNotContainsString(
 			'array_slice( $pv_cat_terms, 0, 4 )',
 			$src,
-			'HOME-UX2-003: los chips derivan del top 4 de categorías activas.'
+			'HOME-UX5-004: el top 4 de chips fue ampliado a 8 — con 4 solo entraban las categorías de belleza.'
 		);
 		$this->assertMatchesRegularExpression(
 			"/<a class=\"pv-home-header__chip\" href=\"<\?php echo esc_url\( \\\$pv_chip\['url'\] \); \?>/",
@@ -200,8 +211,8 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 			'HOME-UX2-008: #pv-main debe ser flex-column en móvil para el orden del funnel.'
 		);
 		foreach ( array(
-			'.pv-home__trending{order:1;}'  => 'tarjetas de productos inmediatamente tras las categorías',
-			'.pv-home__trust{order:2;}'     => 'garantías después de las tarjetas',
+			'.pv-home__cat-carousels{order:1;}' => 'carruseles por categoría inmediatamente tras las categorías (HOME-UX5-001 reemplaza a trending)',
+			'.pv-home__trust{order:2;}'     => 'garantías después de los carruseles',
 			'.pv-home__sell{order:3;}'       => 'franja Vende con nosotros después de garantías',
 			'.pv-home__policies{order:4;}'   => 'políticas al final, antes del footer',
 		) as $rule => $why ) {

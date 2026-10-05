@@ -111,35 +111,58 @@ final class HomeTrustSellTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-005-C: grid de productos 2/3/4/5 columnas (móvil-primero).
+	 * HOME-REDESIGN-005-C → HOME-UX5-001 (2026-10-04): el grid de productos
+	 * 2/3/4/5 columnas de la sección "Tendencia" fue REEMPLAZADO por los
+	 * carruseles por categoría (decisión del operador: "carruseles por
+	 * categoría de dos filas de todas las categorías" — top 8). Este test
+	 * valida la estructura del carrusel que ocupa su lugar (lección #119:
+	 * misma intención de layout de cards, enfoque nuevo).
 	 */
-	public function test_003_grid_productos_2_3_4_5_columnas(): void {
+	public function test_003_carruseles_por_categoria_2_filas(): void {
 		$src = file_get_contents( $this->home_path );
 
-		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home__product-grid\{[^}]*grid-template-columns:repeat\(2,1fr\);/s",
+		// El grid 2/3/4/5 de trending fue eliminado con la sección.
+		$this->assertStringNotContainsString(
+			'pv-home__product-grid',
 			$src,
-			'HOME-REDESIGN-005-C: base móvil 2 columnas.'
+			'HOME-UX5-001: el grid de productos de trending fue eliminado (reemplazado por carruseles por categoría).'
+		);
+		// Track del carrusel: 2 filas + flujo columnar + snap horizontal.
+		$this->assertMatchesRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-cat-carousel__track\{[^}]*grid-auto-flow:column;/s",
+			$src,
+			'HOME-UX5-001: el track del carrusel fluye en columnas (grid-auto-flow:column).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/@media \(min-width:768px\)\{[^@]*\.pv-scope\.pv-home \.pv-home__product-grid\{[^}]*repeat\(3,1fr\);/s",
+			"/\.pv-scope\.pv-home \.pv-cat-carousel__track\{[^}]*grid-template-rows:repeat\(2,auto\);/s",
 			$src,
-			'HOME-REDESIGN-005-C: tablet 3 columnas.'
+			'HOME-UX5-001: el carrusel de cada categoría tiene DOS filas (grid-template-rows:repeat(2,auto)).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/@media \(min-width:1024px\)\{[^@]*\.pv-scope\.pv-home \.pv-home__product-grid\{[^}]*repeat\(4,1fr\);/s",
+			"/\.pv-scope\.pv-home \.pv-cat-carousel__track\{[^}]*overflow-x:auto;/s",
 			$src,
-			'HOME-REDESIGN-005-C: escritorio 4 columnas.'
+			'HOME-UX5-001: el track es deslizable horizontalmente.'
 		);
 		$this->assertMatchesRegularExpression(
-			"/@media \(min-width:1440px\)\{[^@]*\.pv-scope\.pv-home \.pv-home__product-grid\{[^}]*repeat\(5,1fr\);/s",
+			"/\.pv-scope\.pv-home \.pv-cat-carousel__track\{[^}]*scroll-snap-type:x proximity;/s",
 			$src,
-			'HOME-REDESIGN-005-C: 5 columnas solo en pantallas ≥1440px.'
+			'HOME-UX5-001: scroll-snap para el deslizamiento por cards.'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home__product-grid \.pv-product-card\{margin:0;border-radius:8px;\}/",
+			"/\.pv-scope\.pv-home \.pv-cat-carousel__track \.pv-product-card\{[^}]*border-radius:8px;[^}]*scroll-snap-align:start;/s",
 			$src,
-			'HOME-REDESIGN-005-C: las cards de producto deben tener radio 8px (radios uniformes).'
+			'HOME-UX5-001: las cards del carrusel conservan radio 8px (radios uniformes) + snap-align.'
+		);
+		// Flechas prev/next (escritorio — ocultas en móvil vía CSS).
+		$this->assertMatchesRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-cat-carousel__nav\{[^}]*position:absolute;/s",
+			$src,
+			'HOME-UX5-001: flechas flotantes prev/next sobre el track.'
+		);
+		$this->assertMatchesRegularExpression(
+			"/@media \(max-width:767px\)\{[^}]*\.pv-scope\.pv-home \.pv-cat-carousel__nav\{display:none;\}/s",
+			$src,
+			'HOME-UX5-001: en móvil las flechas se ocultan — el track se desliza con el dedo.'
 		);
 	}
 

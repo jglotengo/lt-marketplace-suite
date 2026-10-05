@@ -85,32 +85,46 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-002-B → HOME-UX2-001 (2026-10-02): header CLARO re-anclado
-	 * a los tokens del design system (var(--surface) + var(--text)), igual que
-	 * el header del resto del sitio — el operador reportó que el navy
-	 * hardcodeado #1A1A4E (fuera de los tokens PV) hacía la home leer como
-	 * otro site. Test actualizado en el mismo commit (lección #119).
+	 * HOME-REDESIGN-002-B → HOME-UX2-001 → HOME-UX5-003 (2026-10-04): header
+	 * ROJO a pedido del operador ("la parte del buscador, íconos de corazón y
+	 * toda esa zona en rojo"). Base var(--danger-700) (#b73a3e — 5.7:1 con
+	 * blanco, AA) en vez del fondo claro del ciclo UX2 (--surface); --danger
+	 * (#E5484D) queda para borde/hover. Test actualizado en el mismo commit
+	 * (lección #119). El sticky se conserva y los chips se ocultan al scroll
+	 * vía [data-pv-scrolled] (HOME-UX5-003).
 	 */
-	public function test_002_header_claro_tokens(): void {
+	public function test_002_header_rojo_tokens(): void {
 		$src = file_get_contents( $this->home_path );
 
-		// Fondo claro del header (token del design system).
+		// Fondo rojo del header (token danger oscuro del design system, AA).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--surface\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--danger-700\);/s",
 			$src,
-			'HOME-UX2-001: el header debe tener fondo var(--surface) (claro, como las demás páginas).'
+			'HOME-UX5-003: el header debe tener fondo var(--danger-700) (rojo, blanco 5.7:1 AA).'
 		);
-		// Logo con texto del sistema (oscuro sobre claro).
+		// Logo blanco sobre rojo.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__logo\{[^}]*color:var\(--text\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header__logo\{[^}]*color:#fff;/s",
 			$src,
-			'HOME-UX2-001: el logo del header debe usar var(--text) sobre el fondo claro.'
+			'HOME-UX5-003: el logo del header debe usar blanco sobre el fondo rojo.'
 		);
 		// Safe-area en el header sticky.
 		$this->assertStringContainsString(
 			'env(safe-area-inset-top',
 			$src,
 			'HOME-REDESIGN-002-B: el header sticky debe respetar env(safe-area-inset-*).'
+		);
+		// Sticky: la zona de búsqueda+acciones permanece fija al desplazarse.
+		$this->assertMatchesRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*position:sticky;top:0;/s",
+			$src,
+			'HOME-UX5-003: el header debe seguir sticky (top:0) — se mantiene visible al hacer scroll.'
+		);
+		// Los chips (palabras bajo el buscador) se colapsan al desplazarse.
+		$this->assertMatchesRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-home-header\[data-pv-scrolled=\"1\"\] \.pv-home-header__chips\{[^}]*max-height:0;[^}]*opacity:0;/s",
+			$src,
+			'HOME-UX5-003: la fila de chips debe ocultarse (max-height 0 + opacity 0) cuando el header tiene data-pv-scrolled="1".'
 		);
 	}
 

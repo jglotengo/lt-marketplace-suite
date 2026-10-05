@@ -2080,44 +2080,79 @@
       });
     }
 
-    /* HOME-UX2-002 (2026-10-02): fade del borde derecho de la barra de
-       categorías de la home. El CSS (home.php <style>) pinta el mask
-       SOLO con data-pv-scrollable="1" y sin data-pv-at-end="1": el
-       indicio de "hay más categorías" aparece cuando hay desborde y
-       desaparece al llegar al final del scroll. Hoy son 20 activas —
-       nada queda oculto, el fade solo señala el scroll. */
-    function initCatBarFade(scope) {
-      var scroll = qs('.pv-cat-bar__scroll', scope);
-      if (!scroll) return;
-
-      function sync() {
-        var max = scroll.scrollWidth - scroll.clientWidth;
-        if (max > 4) {
-          scroll.setAttribute('data-pv-scrollable', '1');
-          if (max - scroll.scrollLeft < 8) {
-            scroll.setAttribute('data-pv-at-end', '1');
-          } else {
-            scroll.removeAttribute('data-pv-at-end');
-          }
+    /* HOME-UX5-003 (2026-10-04): estado de scroll del header — al
+       desplazarse (scrollY > 8) se marca data-pv-scrolled="1" en el header
+       y el CSS (home.php <style>) colapsa la fila de chips (palabras bajo
+       el buscador) en móvil Y escritorio; al volver arriba reaparecen.
+       El header en sí es sticky (position:sticky en CSS) — buscador,
+       corazón/carrito y cuenta permanecen fijos durante el scroll. Umbral
+       bajo (8px) para que el compacto se sienta inmediato; update() al
+       arranque refleja recargas con scroll restaurado por el navegador. */
+    function initHeaderScroll(scope) {
+      var header = qs('.pv-home-header', scope);
+      if (!header) return;
+      function update() {
+        if (window.scrollY > 8) {
+          header.setAttribute('data-pv-scrolled', '1');
         } else {
-          scroll.removeAttribute('data-pv-scrollable');
-          scroll.removeAttribute('data-pv-at-end');
+          header.setAttribute('data-pv-scrolled', '0');
         }
       }
+      on(window, 'scroll', update, { passive: true });
+      update();
+    }
 
-      on(scroll, 'scroll', sync);
-      on(window, 'resize', sync);
-      sync();
+    /* HOME-UX5-001 (2026-10-04): carruseles por categoría — flechas
+       prev/next (solo escritorio: el CSS las oculta en <768px, donde el
+       track se desliza con el dedo) y fade de bordes con el mismo patrón
+       data-pv-scrollable / data-pv-at-end del ciclo UX2, ahora por cada
+       track. Los tracks ya no son la barra de categorías (HOME-UX5-002 la
+       convirtió en grid estático multi-fila) — initCatBarFade fue
+       eliminado con su consumidor. */
+    function initCatCarousels(scope) {
+      qsa('.pv-cat-carousel', scope).forEach(function (carousel) {
+        var track = qs('.pv-cat-carousel__track', carousel);
+        var prev  = qs('[data-pv-carousel-prev]', carousel);
+        var next  = qs('[data-pv-carousel-next]', carousel);
+        if (!track) return;
+
+        function sync() {
+          var max = track.scrollWidth - track.clientWidth;
+          if (max > 4) {
+            track.setAttribute('data-pv-scrollable', '1');
+            if (max - track.scrollLeft < 8) {
+              track.setAttribute('data-pv-at-end', '1');
+            } else {
+              track.removeAttribute('data-pv-at-end');
+            }
+          } else {
+            track.removeAttribute('data-pv-scrollable');
+            track.removeAttribute('data-pv-at-end');
+          }
+        }
+
+        function step(dir) {
+          track.scrollBy({ left: dir * Math.max(160, track.clientWidth * 0.8), behavior: 'smooth' });
+        }
+
+        if (prev && next) {
+          on(prev, 'click', function () { step(-1); });
+          on(next, 'click', function () { step(1); });
+        }
+        on(track, 'scroll', sync, { passive: true });
+        on(window, 'resize', sync);
+        sync();
+      });
     }
 
     function initHome() {
       var scope = document.querySelector('.pv-scope.pv-home');
       if (!scope) return;
       initLiveSearch(scope);
-      initCatBarFade(scope);
-      // El handler global AUDIT-FE-HOME-003 cubre los chips, y la clase
-      // is-scrolled no tiene CSS. El IIFE sigue siendo la válvula de
-      // extensión para futuros behaviours específicos de la home.
+      initHeaderScroll(scope);
+      initCatCarousels(scope);
+      // El handler global AUDIT-FE-HOME-003 cubre los chips. El IIFE sigue
+      // siendo la válvula de extensión para futuros behaviours de la home.
     }
 
     if (document.readyState === 'loading') {

@@ -239,8 +239,8 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * AUDIT-FE-PV-DS-003 (P1-1, DRY): la sección trending de home.php delega
-	 * al template part canónico wc-parts/content-product.php vía
+	 * AUDIT-FE-PV-DS-003 (P1-1, DRY): la home delega las cards de producto al
+	 * template part canónico wc-parts/content-product.php vía
 	 * wc_get_template_part( 'content', 'product' ). Antes el helper
 	 * ltms_pv_render_trending_card() reimplementaba .pv-product-card con un
 	 * subconjunto de features (sin KYC, sin SF-04, sin swatches, sin stock
@@ -248,18 +248,22 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	 * mismo UI que divergían con cada fix del card. Helper eliminado
 	 * físicamente (Lecciones #119/#141).
 	 *
-	 * Beneficio colateral: las cards trending ahora heredan automáticamente
-	 * cualquier fix futuro de content-product.php (incluidos PV-DS-001).
+	 * Beneficio colateral: las cards heredan automáticamente cualquier fix
+	 * futuro de content-product.php (incluidos PV-DS-001).
+	 *
+	 * HOME-UX5-001 (2026-10-04): el loop que delega pasó de la sección
+	 * trending (eliminada) a los CARRUSELES por categoría — la intención
+	 * DRY se conserva, la variable del loop es ahora $pv_cc_product.
 	 */
 	public function test_005_home_trending_delega_a_content_product(): void {
 		$this->assertFileExists( $this->home_template_path );
 		$home = file_get_contents( $this->home_template_path );
 
-		// (1) Delegación presente en el loop trending.
+		// (1) Delegación presente en el loop de productos de la home.
 		$this->assertStringContainsString(
 			"wc_get_template_part( 'content', 'product' )",
 			$home,
-			'AUDIT-FE-PV-DS-003 fix: el loop trending de home.php debe delegar a wc_get_template_part(content,product)'
+			'AUDIT-FE-PV-DS-003 fix: el loop de productos de home.php debe delegar a wc_get_template_part(content,product)'
 		);
 
 		// (2) La DEFINICIÓN del helper duplicado fue eliminada físicamente
@@ -273,7 +277,7 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 
 		// (3) El setup de globals para el template part ($product/$post).
 		$this->assertStringContainsString(
-			'$product = $pv_trending_product;',
+			'$product = $pv_cc_product;',
 			$home,
 			'AUDIT-FE-PV-DS-003: el loop debe setear el global $product antes de wc_get_template_part (content-product.php lo consume)'
 		);
@@ -454,9 +458,10 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * AUDIT-FE-PV-DS-008 (P1-6, secciones silenciosas en home): bento cats,
-	 * trending y star vendors usaban if(!empty) sin else — si el query no
-	 * devuelve datos la sección desaparece sin explicación (UX confusa en
-	 * installs nuevos o catálogos vacíos).
+	 * productos por categoría (antes trending — HOME-UX5-001 la reemplazó
+	 * con carruseles por categoría) y star vendors usaban if(!empty) sin
+	 * else — si el query no devuelve datos la sección desaparece sin
+	 * explicación (UX confusa en installs nuevos o catálogos vacíos).
 	 *
 	 * Fix: cada sección tiene else con .pv-home__empty-note (título + texto
 	 * + CTA donde aplica) estilado con tokens del sistema.
@@ -466,7 +471,7 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$home = file_get_contents( $this->home_template_path );
 
 		// (1) Las 3 secciones tienen rama else visible.
-		foreach ( [ 'pv-home__cats', 'pv-home__trending', 'pv-home__vendors' ] as $section_class ) {
+		foreach ( [ 'pv-home__cats', 'pv-home__cat-carousels', 'pv-home__vendors' ] as $section_class ) {
 			$this->assertMatchesRegularExpression(
 				'/else\s*:\s*\?\>[\s\S]{0,600}?class="[^"]*' . $section_class . '/',
 				$home,

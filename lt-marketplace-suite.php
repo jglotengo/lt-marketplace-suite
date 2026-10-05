@@ -83,7 +83,7 @@ define( 'LTMS_LOADED', true );
 // viewport), cards tintadas --primary-50/--primary-100 con hover que invierte
 // a blanco (las blancas no se distinguían del fondo), tipografía 12.5px/700
 // e ícono 28px. CSS inline de la home — purga de page cache en el deploy.
-define( 'LTMS_VERSION', '2.9.411' );
+define( 'LTMS_VERSION', '2.9.412' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
