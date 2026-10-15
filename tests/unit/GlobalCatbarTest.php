@@ -267,4 +267,37 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			'BRAND-2026-002: el topbar del storefront sigue sticky !important (nunca se oculta — comportamiento verificado).'
 		);
 	}
+
+	/**
+	 * HOME-CATBAR-2026-004-F: AUTOLOADER — LTMS_Global_Catbar deriva a un
+	 * subdir 'global/' que no existe (la clase vive en frontend/); sin la
+	 * entrada en el mapa de excepciones del SPL fallback del autoloader la
+	 * clase NUNCA carga (bug real detectado en producción: class_exists
+	 * devolvía false con el archivo presente y php -l limpio). También el
+	 * whitelist del webhook de deploy debe incluir los archivos nuevos.
+	 */
+	public function test_007_autoloader_y_whitelist_del_webhook(): void {
+		$main = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/lt-marketplace-suite.php' ) );
+		$this->assertStringContainsString(
+			"'ltms-global-catbar'                     => 'frontend/class-ltms-global-catbar.php'",
+			$main,
+			'HOME-CATBAR-2026-004-F: el autoloader SPL debe mapear ltms-global-catbar a frontend/ (sin ella la clase nunca carga).'
+		);
+
+		$webhook = file_get_contents( dirname( __DIR__, 2 ) . '/deploy/ltms-deploy-webhook.php' );
+		foreach ( array(
+			'includes/frontend/class-ltms-global-catbar.php' => 'la clase de la barra',
+			'assets/css/ltms-catbar.css'                    => 'el CSS de la barra',
+			'assets/js/ltms-catbar.js'                       => 'el JS de la barra',
+			'assets/js/ltms-catbar.min.js'                   => 'el min.js de la barra',
+			'assets/img/logo-lo-tengo-white.png'             => 'el logo blanco (header/footer/barra)',
+			'assets/img/logo-lo-tengo.png'                   => 'el logo a color (favicon/og/storefront)',
+		) as $file => $why ) {
+			$this->assertStringContainsString(
+				"'" . $file . "'",
+				$webhook,
+				"HOME-CATBAR-2026-004-F: el webhook de deploy debe sincronizar {$file} ({$why})."
+			);
+		}
+	}
 }

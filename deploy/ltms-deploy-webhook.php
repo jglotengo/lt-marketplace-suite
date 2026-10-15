@@ -567,6 +567,17 @@ $files = [
     'includes/frontend/class-ltms-rating-summary.php',
     'includes/frontend/class-ltms-frontend-notifications.php',
     'includes/frontend/class-ltms-branding-engine.php',
+    // HOME-CATBAR-2026-004 (2026-10-15): barra global de categorías sticky.
+    'includes/frontend/class-ltms-global-catbar.php',
+    'assets/css/ltms-catbar.css',
+    'assets/js/ltms-catbar.js',
+    'assets/js/ltms-catbar.min.js',
+    // BRAND-2026-001 (2026-10-15): logos oficiales del brief (color, blanca,
+    // og 1200x630, icono cuadrado 512 para favicon).
+    'assets/img/logo-lo-tengo.png',
+    'assets/img/logo-lo-tengo-white.png',
+    'assets/img/logo-lo-tengo-og.png',
+    'assets/img/logo-lo-tengo-icon.png',
     'includes/admin/views/html-admin-kyc.php',
     'includes/admin/views/html-admin-payouts.php',
     'includes/admin/views/html-admin-orders.php',

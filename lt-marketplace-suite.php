@@ -714,6 +714,10 @@ function ltms_load_autoloader(): void {
                 'ltms-vtex-price-calculator'             => 'business/class-ltms-vtex-price-calculator.php',
                 // v2.9.204 — Native Templates (Plaza Viva design system).
                 'ltms-native-templates'                  => 'frontend/class-ltms-native-templates.php',
+                // v2.9.414 — Global Catbar (HOME-CATBAR-2026-004): barra global
+                // de categorías sticky. Subdir derivado 'global/' no existe —
+                // la clase vive en frontend/ como el resto de módulos públicos.
+                'ltms-global-catbar'                     => 'frontend/class-ltms-global-catbar.php',
             ];
 
             if ( isset( $exceptions_npart[ $class_file ] ) ) {
