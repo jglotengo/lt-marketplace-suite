@@ -191,16 +191,24 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 			'HOME-UX5-002: la lista flex width:max-content fue eliminada con el scroll.'
 		);
 
-		// Columnas: móvil 4 / ≥480 5 / ≥768 6 / ≥1024 7 (21 activas ≈ 3 filas).
+		// Columnas: móvil 3 / ≥480 5 / ≥768 6 / ≥1024 7 (21 activas ≈ 3-4 filas).
+		// HOME-CATBAR-2026-001 (2026-10-15, operador: "en móvil se desborda una
+		// tarjeta de las categorías — sobresale por el lateral derecho, resta
+		// una tarjeta"): 1fr = minmax(auto,1fr) — una palabra larga
+		// ("TRATAMIENTOS" ≈ 90px a 11.5px/700) expandía la pista a min-content
+		// y el grid excedía el contenedor. Fix de raíz: minmax(0,1fr) en TODOS
+		// los breakpoints + una columna MENOS en móvil (petición explícita:
+		// 3 col ≈ 106px/celda a 360px). Test actualizado en el mismo commit
+		// (lección #119).
 		$this->assertMatchesRegularExpression(
-			'/\.pv-scope\.pv-home \.pv-cat-bar__grid\{[^}]*grid-template-columns:repeat\(4,1fr\);/s',
+			'/\.pv-scope\.pv-home \.pv-cat-bar__grid\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\);/s',
 			$src,
-			'HOME-UX5-002: base móvil del grid = 4 columnas.'
+			'HOME-CATBAR-2026-001: base móvil del grid = 3 columnas con minmax(0,1fr) — una menos (operador) y sin mínimo auto (no desborda).'
 		);
 		$this->assertMatchesRegularExpression(
-			'/@media \(min-width:1024px\)\{[^@]*\.pv-scope\.pv-home \.pv-cat-bar__grid\{grid-template-columns:repeat\(7,1fr\);/s',
+			'/@media \(min-width:1024px\)\{[^@]*\.pv-scope\.pv-home \.pv-cat-bar__grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);/s',
 			$src,
-			'HOME-UX5-002: escritorio = 7 columnas (varias filas con las 21 activas).'
+			'HOME-CATBAR-2026-001: escritorio = 7 columnas con minmax(0,1fr) (varias filas con las 21 activas, sin desborde).'
 		);
 
 		// Imagen del best-seller de la categoría con fallback al emoji.

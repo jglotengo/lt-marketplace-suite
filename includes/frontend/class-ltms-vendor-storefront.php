@@ -568,10 +568,21 @@ body.ltms-storefront-page .wh-header{display:none!important}
         </a>
         <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-logo">
             <?php
-            $logo_id = get_theme_mod( 'custom_logo' );
-            $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
-            if ( $logo_url ) {
+            /* BRAND-2026-002 (HOME-CATBAR-2026, 2026-10-15): logo OFICIAL del
+             * brief — el theme mod custom_logo era la bandera (inconsistencia
+             * #8 del brief: "el logo auto-detectado es la bandera, no el
+             * logotipo"). El topbar es claro (rgba(255,255,255,.94)) →
+             * variante 'white' del branding engine = logo A COLOR sobre fondo
+             * transparente. Fallback al theme logo si el asset no existe. */
+            $logo_url   = ( class_exists( 'LTMS_Branding_Engine' ) && method_exists( 'LTMS_Branding_Engine', 'get_logo_url' ) )
+                ? LTMS_Branding_Engine::get_logo_url( 'white' )
+                : '';
+            $logo_id    = get_theme_mod( 'custom_logo' );
+            $theme_logo = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
+            if ( $logo_url && ! str_contains( $logo_url, 'site_icon' ) ) {
                 echo '<img src="' . esc_url( $logo_url ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
+            } elseif ( $theme_logo ) {
+                echo '<img src="' . esc_url( $theme_logo ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
             } else {
                 echo esc_html( get_bloginfo( 'name' ) ?: 'Lo Tengo' );
             }

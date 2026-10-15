@@ -198,11 +198,26 @@ final class HomeHeroTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-REDESIGN-004-F: en escritorio el banner va a la izquierda (≈66%) y las tarjetas a la derecha (≈33%).'
 		);
-		// Banner: aspect-ratio panorámico en tablet+.
-		$this->assertMatchesRegularExpression(
-			"/@media \(min-width:768px\)\{[^@]*\.pv-scope\.pv-home \.pv-home-hero__banner\{aspect-ratio:16\/6;/s",
+		// HOME-CATBAR-2026-002 (2026-10-15, operador: "las imágenes de la
+		// sección de banner no se ven completas en vista escritorio"): el
+		// recorte 16/6 + img absolute + object-fit:cover de ≥768 fue
+		// ELIMINADO — el banner fluye con su ALTURA NATURAL en todos los
+		// breakpoints (la imagen del admin se ve completa). Test actualizado
+		// en el mismo commit (lección #119).
+		$this->assertStringNotContainsString(
+			'aspect-ratio:16/6',
 			$src,
-			'HOME-REDESIGN-004-F: el banner debe tener aspect-ratio panorámico desde tablet (sin crop en móvil).'
+			'HOME-CATBAR-2026-002: el banner NO debe forzar aspect-ratio 16/6 (recortaba la imagen en escritorio).'
+		);
+		$this->assertDoesNotMatchRegularExpression(
+			'/\.pv-home-hero__banner img\{[^}]*object-fit:cover;/s',
+			$src,
+			'HOME-CATBAR-2026-002: la img del banner NO debe usar object-fit:cover (la imagen se ve COMPLETA, altura natural).'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-home-hero__banner img\{display:block;width:100%;height:auto;\}/',
+			$src,
+			'HOME-CATBAR-2026-002: la img del banner fluye con altura natural (width:100%;height:auto) en todos los breakpoints.'
 		);
 	}
 }

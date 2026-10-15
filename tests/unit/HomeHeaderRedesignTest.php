@@ -85,13 +85,14 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-002-B → HOME-UX2-001 → HOME-UX5-003 → BRAND-2026-001
-	 * (2026-10-15): header ROJO DE MARCA del brief — var(--brand) (#E80001,
-	 * blanco 4.74:1 AA) en vez del --danger-700 (#b73a3e) aproximado del ciclo
-	 * UX5 (el brief, inconsistencia #2, exige unificar todos los rojos en
-	 * #E80001). --brand-600 (#C70001) queda para borde/hover. Test actualizado
-	 * en el mismo commit (lección #119). El sticky se conserva y los chips se
-	 * ocultan al scroll vía [data-pv-scrolled] (HOME-UX5-003).
+	 * HOME-REDESIGN-002-B → HOME-UX2-001 → HOME-UX5-003 → BRAND-2026-001 →
+	 * HOME-CATBAR-2026-003 (2026-10-15): header ROJO DE MARCA del brief —
+	 * var(--brand) (#E80001, blanco 4.74:1 AA). La fila de chips (barra de
+	 * categorías del header) es SIEMPRE visible (petición del operador:
+	 * "que esa barra no se oculte mientras se desplaza") — el colapso al
+	 * scroll de HOME-UX5-003 ([data-pv-scrolled], parpadeo reportado al
+	 * escrolear) fue ELIMINADO; la fila es única y deslizable con TODAS las
+	 * categorías. Test actualizado en el mismo commit (lección #119).
 	 */
 	public function test_002_header_rojo_tokens(): void {
 		$src = file_get_contents( $this->home_path );
@@ -120,18 +121,22 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-UX5-003: el header debe seguir sticky (top:0) — se mantiene visible al hacer scroll.'
 		);
-		// Los chips (palabras bajo el buscador) se colapsan al desplazarse.
-		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\[data-pv-scrolled=\"1\"\] \.pv-home-header__chips\{[^}]*max-height:0;[^}]*opacity:0;/s",
+		// HOME-CATBAR-2026-003: la fila de chips es SIEMPRE visible — el
+		// colapso al scroll fue eliminado (parpadeo reportado por el operador).
+		$this->assertStringNotContainsString(
+			'data-pv-scrolled',
 			$src,
-			'HOME-UX5-003: la fila de chips debe ocultarse (max-height 0 + opacity 0) cuando el header tiene data-pv-scrolled="1".'
+			'HOME-CATBAR-2026-003: el mecanismo de colapso [data-pv-scrolled] fue eliminado — la barra de categorías nunca se oculta.'
 		);
-		// HOME-UX5-005: en móvil los chips se limitan a DOS filas (44×2 + gap
-		// 6px = 94px) — con 8 chips y ~360px el wrap llegaba a 3+ filas.
 		$this->assertMatchesRegularExpression(
-			'/@media \(max-width:767px\)\{\s*\.pv-scope\.pv-home \.pv-home-header__chips\{max-height:94px;\}/s',
+			"/\.pv-scope\.pv-home \.pv-home-header__chips\{[^}]*flex-wrap:nowrap;/s",
 			$src,
-			'HOME-UX5-005: en móvil (<768px) los chips muestran máximo 2 filas (clamp 94px = 44px×2 + gap).'
+			'HOME-CATBAR-2026-003: los chips van en FILA ÚNICA (nowrap) — la barra de categorías no ocupa varias filas.'
+		);
+		$this->assertMatchesRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-home-header__chips\{[^}]*overflow-x:auto;/s",
+			$src,
+			'HOME-CATBAR-2026-003: la fila de chips es deslizable horizontalmente (todas las categorías accesibles).'
 		);
 	}
 

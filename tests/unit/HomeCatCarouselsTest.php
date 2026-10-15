@@ -7,9 +7,11 @@
  *     12 productos c/u (popularity), track de 2 filas con scroll-snap +
  *     flechas prev/next (escritorio), "Ver más" → archivo de la categoría.
  *     REEMPLAZA la sección "Productos en tendencia" (decisión del operador).
- *   - HOME-UX5-003: header ROJO sticky + initHeaderScroll — los chips
- *     (palabras bajo el buscador) se ocultan al desplazarse
- *     (data-pv-scrolled) en móvil Y escritorio.
+ *   - HOME-UX5-003 → HOME-CATBAR-2026-003 (2026-10-15): header ROJO sticky
+ *     con fila de chips (barra de categorías) SIEMPRE visible — el colapso
+ *     al scroll (initHeaderScroll/data-pv-scrolled) fue eliminado por
+ *     parpadeo + petición del operador; initChipsFade aplica el fade de
+ *     la fila única deslizable (móvil Y escritorio).
  *
  * Tests PURAMENTE estructurales (file_get_contents + asserts sobre el
  * source PHP/JS): NO cargan clases del plugin ni invocan WP → deterministas
@@ -137,30 +139,38 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX5-003: JS del scope HOME — initHeaderScroll togglea
-	 * data-pv-scrolled en el header al desplazarse (chips se ocultan por
-	 * CSS) e initCatCarousels cable las flechas + el fade de bordes.
-	 * El initCatBarFade del ciclo UX2 fue ELIMINADO con el scroll de la
-	 * barra (la barra es ahora un grid estático multi-fila).
+	 * HOME-UX5-003 → HOME-CATBAR-2026-003 (2026-10-15): JS del scope HOME —
+	 * initHeaderScroll (colapso de chips al scroll, [data-pv-scrolled]) fue
+	 * ELIMINADO (parpadeo reportado por el operador + petición de que la
+	 * barra nunca se oculte). initChipsFade aplica el fade del borde derecho
+	 * de la fila de chips (patrón data-pv-scrollable/at-end, como los
+	 * carruseles) e initCatCarousels cable las flechas + el fade por track.
+	 * Test actualizado en el mismo commit (lección #119).
 	 */
 	public function test_003_js_header_scroll_y_carruseles(): void {
 		$js = file_get_contents( $this->pv_js_path );
 
-		// Header: estado de scroll (chips colapsan via CSS).
-		$this->assertMatchesRegularExpression(
-			"/function initHeaderScroll\(scope\)/",
+		// HOME-CATBAR-2026-003: el colapso al scroll fue eliminado del JS.
+		$this->assertStringNotContainsString(
+			'function initHeaderScroll',
 			$js,
-			'HOME-UX5-003: el scope HOME debe declarar initHeaderScroll.'
+			'HOME-CATBAR-2026-003: initHeaderScroll fue eliminado — los chips nunca se ocultan.'
 		);
-		$this->assertMatchesRegularExpression(
-			"/window\.scrollY > 8/",
+		$this->assertStringNotContainsString(
+			'data-pv-scrolled',
 			$js,
-			'HOME-UX5-003: umbral de scroll 8px para marcar data-pv-scrolled.'
+			'HOME-CATBAR-2026-003: el toggle data-pv-scrolled fue eliminado del JS (la barra es siempre visible).'
+		);
+		// Chips: fade del borde derecho de la fila única deslizable.
+		$this->assertMatchesRegularExpression(
+			"/function initChipsFade\(scope\)/",
+			$js,
+			'HOME-CATBAR-2026-003: el scope HOME debe declarar initChipsFade (fade de la fila de chips).'
 		);
 		$this->assertStringContainsString(
-			"data-pv-scrolled",
+			"qs('.pv-home-header__chips', scope)",
 			$js,
-			'HOME-UX5-003: el JS togglea data-pv-scrolled en el header (el CSS colapsa los chips).'
+			'HOME-CATBAR-2026-003: initChipsFade sincroniza la fila de chips (barra de categorías del header).'
 		);
 
 		// Carruseles: flechas + fade por track.
@@ -187,9 +197,9 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 
 		// Ambos inicializadores montan en initHome.
 		$this->assertStringContainsString(
-			'initHeaderScroll(scope);',
+			'initChipsFade(scope);',
 			$js,
-			'HOME-UX5-003: initHome debe montar initHeaderScroll.'
+			'HOME-CATBAR-2026-003: initHome debe montar initChipsFade.'
 		);
 		$this->assertStringContainsString(
 			'initCatCarousels(scope);',
@@ -213,17 +223,24 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX5 infra: el .min.js debe estar REGENERADO con el código nuevo
-	 * (SG Optimizer sirve el min en producción — un min viejo dejaría los
-	 * carruseles sin flechas y los chips sin ocultarse al scroll).
+	 * HOME-UX5 infra → HOME-CATBAR-2026-003: el .min.js debe estar REGENERADO
+	 * con el código nuevo (SG Optimizer sirve el min en producción — un min
+	 * viejo dejaría los carruseles sin flechas y el fade de los chips muerto).
 	 */
 	public function test_004_min_js_regenerado(): void {
 		$min = file_get_contents( $this->pv_min_js_path );
 
-		$this->assertStringContainsString(
+		// HOME-CATBAR-2026-003: el toggle del colapso fue eliminado del min.
+		$this->assertStringNotContainsString(
 			'data-pv-scrolled',
 			$min,
-			'HOME-UX5-003: el .min.js debe contener el toggle data-pv-scrolled (header rojo + chips ocultos al scroll).'
+			'HOME-CATBAR-2026-003: el .min.js NO debe contener el toggle data-pv-scrolled (los chips nunca se ocultan).'
+		);
+		// El fade de los chips viaja en el min (mismos atributos que los tracks).
+		$this->assertStringContainsString(
+			'data-pv-scrollable',
+			$min,
+			'HOME-CATBAR-2026-003: el .min.js debe contener el fade data-pv-scrollable (chips + carruseles).'
 		);
 		$this->assertStringContainsString(
 			'data-pv-carousel-prev',

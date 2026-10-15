@@ -418,6 +418,15 @@ final class LTMS_Core_Kernel {
             LTMS_Branding_Engine::init();
         }
 
+        // v2.9.414 — Global Catbar (HOME-CATBAR-2026-004): barra global de
+        // categorías sticky (logo oficial + todas las activas en fila deslizable)
+        // — nunca se oculta al escrolear (petición del operador 2026-10-15).
+        // Exclusiones documentadas en la clase: home nativa, checkout, panel
+        // del vendedor; la vitrina no dispara wp_body_open (topbar propio).
+        if ( class_exists( 'LTMS_Global_Catbar' ) ) {
+            LTMS_Global_Catbar::init();
+        }
+
         // SYNC-VIS-GATE (2026-09-28): gate de vendibilidad pública — productos sin
         // stock, imagen o precio (VTEX/PosGold/panel) no aparecen en NINGUNA página
         // pública, solo en el panel del vendedor. Hooks new/update product +

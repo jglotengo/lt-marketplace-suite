@@ -118,12 +118,12 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX2-003 → HOME-UX5-004 (2026-10-04): chips = top 8 categorías
-	 * activas como ENLACES directos. Los términos muertos ('Tecnología',
-	 * 'Regalos', 'Hogar' → 0-2 resultados reales verificados en producción)
-	 * quedaron eliminados; el top 4 pasó a 8 para cubrir también JUEGO DE
-	 * MESA y DIDACTICO (decisión del operador — con 4 solo entraban las
-	 * categorías de belleza). Test actualizado en el mismo commit (#119).
+	 * HOME-UX2-003 → HOME-UX5-004 → HOME-CATBAR-2026-003 (2026-10-15): chips =
+	 * TODAS las categorías activas — la fila del header es la barra de
+	 * categorías siempre visible del operador ("que el usuario pueda
+	 * seleccionar las categorías que desee"). El slice top 8 fue eliminado
+	 * (la fila es única y deslizable — caben todas). Test actualizado en el
+	 * mismo commit (lección #119).
 	 */
 	public function test_002_chips_categorias_reales_como_enlaces(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
@@ -133,16 +133,22 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 		$this->assertStringNotContainsString( "'Regalos'", $src, "HOME-UX2-003: búsqueda de 'Regalos' = 0 resultados verificados." );
 		$this->assertStringNotContainsString( "'Hogar'", $src, "HOME-UX2-003: búsqueda de 'Hogar' = 2 resultados verificados — no es chip." );
 
-		// Los chips derivan del mismo query de categorías (top 8, enlaces).
+		// HOME-CATBAR-2026-003: los chips derivan de TODAS las categorías
+		// activas (foreach directo, sin slice).
 		$this->assertStringContainsString(
-			'array_slice( $pv_cat_terms, 0, 8 )',
+			'foreach ( $pv_cat_terms as $pv_chip_term )',
 			$src,
-			'HOME-UX5-004: los chips derivan del top 8 de categorías activas (incluye JUEGO DE MESA y DIDACTICO).'
+			'HOME-CATBAR-2026-003: los chips iteran TODAS las categorías activas (la fila es la barra de categorías del header).'
+		);
+		$this->assertStringNotContainsString(
+			'array_slice( $pv_cat_terms, 0, 8 ) as $pv_chip_term',
+			$src,
+			'HOME-CATBAR-2026-003: el slice top-8 de chips fue eliminado — todas las categorías son accesibles siempre.'
 		);
 		$this->assertStringNotContainsString(
 			'array_slice( $pv_cat_terms, 0, 4 )',
 			$src,
-			'HOME-UX5-004: el top 4 de chips fue ampliado a 8 — con 4 solo entraban las categorías de belleza.'
+			'HOME-UX5-004: el top 4 de chips fue ampliado hace 2 ciclos — no debe volver.'
 		);
 		$this->assertMatchesRegularExpression(
 			"/<a class=\"pv-home-header__chip\" href=\"<\?php echo esc_url\( \\\$pv_chip\['url'\] \); \?>/",

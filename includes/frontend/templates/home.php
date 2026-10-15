@@ -62,10 +62,12 @@ $pv_wishlist_count = apply_filters( 'ltms_wishlist_count', 0 );
  * Popular Requests — chips de accesos rápidos.
  * HOME-UX2-003 (2026-10-02): antes eran 4 términos hardcodeados que no
  * existían en el catálogo ('Tecnología', 'Regalos', 'Hogar' → 0-2 resultados
- * reales). Ahora derivan del top 4 de categorías activas (mismo query de la
- * barra de categorías) y enlazan DIRECTO a la página de la categoría —
- * nunca a una búsqueda de texto que puede llegar vacía. Se computan tras la
- * consulta de categorías (sección 2). Filterable via ltms_home_popular_chips.
+ * reales). HOME-CATBAR-2026-003 (2026-10-15): la fila derivó de top 4 → top 8
+ * → TODAS las categorías activas — es la barra de categorías siempre visible
+ * del header (fila única deslizable). Enlazan DIRECTO a la página de la
+ * categoría — nunca a una búsqueda de texto que puede llegar vacía. Se
+ * computan tras la consulta de categorías (sección 2). Filterable via
+ * ltms_home_popular_chips.
  */
 
 /* ---------------------------------------------------------------------------
@@ -146,14 +148,18 @@ $pv_cat_icons = apply_filters( 'ltms_home_category_icons', array(
     'regalos'      => '🎁',
 ) );
 
-/* HOME-UX2-003 (2026-10-02): chips = top categorías activas, como enlaces
- * directos a su página de categoría. Siempre en sincronía con el catálogo.
- * HOME-UX5-004 (2026-10-04): top 4 → top 8 — con 4 solo entraban las
- * categorías de belleza; con 8 cubren también JUEGO DE MESA y DIDACTICO
- * (nuevas del catálogo del marketplace, decisión del operador). */
+/* HOME-UX2-003 → HOME-UX5-004 → HOME-CATBAR-2026-003 (2026-10-15): chips =
+ * TODAS las categorías activas del catálogo. Antes top 4 → top 8; ahora la
+ * fila del header es la BARRA DE CATEGORÍAS de la home (decisión del
+ * operador: "una barra de categorías que no se oculte mientras se desplaza
+ * — que el usuario pueda seleccionar las categorías que desee") — con
+ * fila única deslizable (ver CSS) las ~21 caben sin ocupar varias filas y
+ * quedan SIEMPRE accesibles (el colapso al scroll fue eliminado).
+ * Enlaces DIRECTOS a la página de la categoría, nunca a búsquedas de texto
+ * que pueden llegar vacías. Filterable via ltms_home_popular_chips. */
 $pv_popular_chips = array();
 if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) {
-    foreach ( array_slice( $pv_cat_terms, 0, 8 ) as $pv_chip_term ) {
+    foreach ( $pv_cat_terms as $pv_chip_term ) {
         $pv_chip_tid  = (int) ( $pv_chip_term->term_id ?? 0 );
         $pv_chip_url  = $pv_chip_tid ? get_term_link( $pv_chip_tid ) : get_term_link( $pv_chip_term );
         if ( is_wp_error( $pv_chip_url ) ) {
@@ -442,12 +448,14 @@ do_action( 'ltms_before_home_plazaviva' );
                      el JS del scope HOME lo llena contra ltms_live_search
                      (productos visibles, rate limit 30/min server-side). */ ?>
                 <div id="pv-home-suggestions" class="pv-home-header__suggestions" role="listbox" aria-label="<?php esc_attr_e( 'Sugerencias de búsqueda', 'ltms' ); ?>" hidden></div>
-                <?php /* HOME-UX2-003: chips = enlaces directos a las categorías top
-                     * del catálogo real (sin data-pv-search-chip: el handler JS
-                     * del design system rellenaría el input y lanzaría una
+                <?php /* HOME-UX2-003 → HOME-CATBAR-2026-003: chips = TODAS las
+                     * categorías activas como enlaces directos a su página
+                     * (fila única deslizable — barra de categorías siempre
+                     * visible del header; sin data-pv-search-chip: el handler
+                     * JS del design system rellenaría el input y lanzaría una
                      * búsqueda de texto que puede llegar vacía). */ ?>
                 <?php if ( ! empty( $pv_popular_chips ) ) : ?>
-                    <ul class="pv-home-header__chips" aria-label="<?php esc_attr_e( 'Categorías populares', 'ltms' ); ?>">
+                    <ul class="pv-home-header__chips" aria-label="<?php esc_attr_e( 'Categorías del marketplace', 'ltms' ); ?>">
                         <?php foreach ( $pv_popular_chips as $pv_chip ) : ?>
                             <li>
                                 <a class="pv-home-header__chip" href="<?php echo esc_url( $pv_chip['url'] ); ?>">
@@ -1113,7 +1121,7 @@ body.pv-home-native{font-size:16px;}
    específica viene después en la cascada y gana por orden). */
 .pv-scope.pv-home .pv-btn{border-radius:12px;}
 
-/* ── HEADER (HOME-UX5-003 → BRAND-2026-001, 2026-10-15) ─────────────────────
+/* ── HEADER (HOME-UX5-003 → BRAND-2026-001 → HOME-CATBAR-2026-003) ────────────
     ROJO DE MARCA del brief (#E80001, token --brand) — reemplaza el rojo del
     design system (--danger-700 #b73a3e) que el ciclo UX5-003 usaba como
     aproximación. El brief (inconsistencia #2) exige unificar TODOS los rojos
@@ -1122,7 +1130,8 @@ body.pv-home-native{font-size:16px;}
     pasando AA). Hover/borde: --brand-600 (#C70001, rojo marca hover del
     brief, 6.2:1). Sticky conservado: la zona de búsqueda+acciones permanece
     fija al desplazarse en TODOS los tamaños; los chips (palabras bajo el
-    buscador) se OCULTAN al scroll vía [data-pv-scrolled] (JS del scope HOME).
+    buscador) son la barra de categorías SIEMPRE visible (HOME-CATBAR-2026-003
+    — el colapso al scroll fue eliminado; fade con initChipsFade).
     Mobile-first (heredado del ciclo UX2):
     - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
     - ≥480: filtro de categoría dentro del campo.
@@ -1220,30 +1229,28 @@ body.pv-home-native{font-size:16px;}
     font-size:13px;font-weight:700;color:var(--primary-700);flex-shrink:0;white-space:nowrap;
 }
 
-/* HOME-UX5-004: chips top 8 sobre el header rojo — overlay blanco sutil
-   (rgba .10) mantiene el contraste AA del texto blanco (~4.9:1 sobre el
-   blend con --danger-700). Touch target 44px (HOME-MATRIX-FIX). La fila se
-   COLAPSA al desplazarse ([data-pv-scrolled="1"], JS initHeaderScroll):
-   max-height 0 + opacity 0 — el header compacto deja solo logo + buscador
-   + acciones. Transición suave con --t; reaparece al volver arriba. */
+/* HOME-UX5-004 → HOME-CATBAR-2026-003 (2026-10-15, operador): la fila de
+    chips es la BARRA DE CATEGORÍAS del header — TODAS las categorías en
+    fila ÚNICA DESLIZABLE (nowrap + overflow-x auto), SIEMPRE visible (el
+    colapso al scroll de HOME-UX5-003 fue ELIMINADO: el operador reportó
+    que "las palabras que están debajo del buscador parpadean" al escrolear
+    — el toggle de estado de scroll re-disparaba la transición de
+    max-height/opacity en cada evento scroll). El fade del borde derecho lo
+    togglea initChipsFade (JS del scope HOME) con el mismo patrón
+    data-pv-scrollable/data-pv-at-end de los carruseles. Overlay blanco
+    sutil (rgba .10) mantiene el contraste AA del texto blanco sobre el
+    rojo de marca. Touch target 44px (HOME-MATRIX-FIX). */
 .pv-scope.pv-home .pv-home-header__chips{
-    display:flex;gap:6px;flex-wrap:wrap;
-    max-height:120px;overflow:hidden;
-    transition:max-height var(--t),opacity var(--t);
+    display:flex;gap:6px;flex-wrap:nowrap;
+    overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    scroll-snap-type:x proximity;
+    min-width:0;
 }
-.pv-scope.pv-home .pv-home-header[data-pv-scrolled="1"] .pv-home-header__chips{
-    max-height:0;opacity:0;pointer-events:none;
-}
-/* HOME-UX5-005 (2026-10-04): en MÓVIL los chips muestran solo DOS filas —
-   con 8 chips del catálogo real (BELLEZA Y SALUD, CUIDADO CAPILAR, …,
-   JUEGO DE MESA, DIDACTICO) y ~360px de ancho el wrap llega a 3+ filas y
-   empujaba el hero muy abajo. Clamp por altura exacta de 2 filas:
-   44px (touch target del chip) × 2 + 6px de gap = 94px; el overflow queda
-   oculto sin scrollbar. Escritorio/tablet (≥768) sigue envolviendo libre.
-   La regla de scroll (max-height:0 arriba) gana por especificidad (0,5,0
-   > 0,3,0) — el colapso al desplazarse sigue intacto en ambos modos. */
-@media (max-width:767px){
-    .pv-scope.pv-home .pv-home-header__chips{max-height:94px;}
+.pv-scope.pv-home .pv-home-header__chips::-webkit-scrollbar{display:none;}
+.pv-scope.pv-home .pv-home-header__chips[data-pv-scrollable="1"]:not([data-pv-at-end="1"]){
+    -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
+    mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
 }
 .pv-scope.pv-home .pv-home-header__chip{
     display:inline-flex;align-items:center;
@@ -1255,6 +1262,8 @@ body.pv-home-native{font-size:16px;}
     /* HOME-MATRIX-FIX: touch target 44px mínimo (brief: 44×44 con 8px de
        separación; los chips estaban en 32px). */
     min-height:44px;
+    scroll-snap-align:start;
+    flex-shrink:0;
 }
 .pv-scope.pv-home .pv-home-header__chip:hover{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.55);}
 
@@ -1419,14 +1428,17 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 /* Fallback sin banners: el hero gradiente del design system. */
 .pv-scope.pv-home .pv-home-hero{padding:52px 48px;min-height:360px;}
+/* HOME-CATBAR-2026-002 (2026-10-15, operador: "las imágenes de la sección
+   de banner no se ven completas en vista escritorio"): el bloque ≥768 que
+   forzaba un recorte panorámico fijo (aspect-ratio 16:6) + img absolute +
+   object-fit:cover fue ELIMINADO — recortaba la imagen del admin
+   verticalmente. El banner fluye con su ALTURA NATURAL en todos los
+   breakpoints (img width:100%;height:auto, igual que en móvil): la imagen
+   completa siempre visible. Las tarjetas secundarias conservan el cover
+   (son cards pequeñas, el recorte es su patrón); el grid ≥1024 sigue
+   estirándolas a la altura del banner. */
 @media (min-width:768px){
-    .pv-scope.pv-home .pv-home-hero__banner{aspect-ratio:16/6;min-height:0;}
-    .pv-scope.pv-home .pv-home-hero__banner picture{
-        position:absolute;inset:0;
-    }
-    .pv-scope.pv-home .pv-home-hero__banner img{
-        position:absolute;inset:0;height:100%;object-fit:cover;
-    }
+    .pv-scope.pv-home .pv-home-hero__banner{min-height:0;}
 }
 @media (min-width:1024px){
     .pv-scope.pv-home .pv-home-hero__grid{grid-template-columns:2fr 1fr;gap:16px;}
@@ -1462,15 +1474,25 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 
 /* ── CATEGORÍAS — grid multi-fila con imágenes (HOME-UX5-002, 2026-10-04) ───
-   Antes: fila deslizable con emojis (HOME-REDESIGN-003 → UX2-002 → UX4-001).
-   Ahora: TODAS las activas (21) en un grid ENVOLVENTE de varias filas —
-   móvil 4 col / ≥480 5 / ≥768 6 / ≥1024 7 (≈3 filas). Cada card exhibe la
-   IMAGEN del best-seller de la categoría (48px, object-fit cover) con el
-   emoji SOLO como fallback (categorías sin thumbnails). El contenedor
-   conserva --pv-maxw + head con título y "Ver todas" (UX4-001). Cards
-   blancas + borde --border + hover azul (patrón UX4-001 de presencia).
-   Nombres 2 líneas con clamp (los reales son largos:
-   "MASCARILLAS CAPILARES Y TRATAMIENTOS"). Touch targets ≥86px. */
+    Antes: fila deslizable con emojis (HOME-REDESIGN-003 → UX2-002 → UX4-001).
+    Ahora: TODAS las activas (21) en un grid ENVOLVENTE de varias filas —
+    móvil 3 col / ≥480 5 / ≥768 6 / ≥1024 7 (≈3 filas). Cada card exhibe la
+    IMAGEN del best-seller de la categoría (48px, object-fit cover) con el
+    emoji SOLO como fallback (categorías sin thumbnails). El contenedor
+    conserva --pv-maxw + head con título y "Ver todas" (UX4-001). Cards
+    blancas + borde --border + hover azul (patrón UX4-001 de presencia).
+    Nombres 2 líneas con clamp (los reales son largos:
+    "MASCARILLAS CAPILARES Y TRATAMIENTOS"). Touch targets ≥86px.
+    HOME-CATBAR-2026-001 (2026-10-15, operador: "en móvil se desborda una
+    tarjeta de las categorías — sobresale por el lateral derecho, resta una
+    tarjeta"): causa raíz = 1fr equivale a minmax(auto,1fr) — una palabra
+    larga ("TRATAMIENTOS" a 11.5px/700 ≈ 90px) supera la celda de ~78px a
+    360px y el mínimo auto EXPANDE la pista → el grid total excede el
+    contenedor y la última columna sobresale por la derecha. Fix de raíz:
+    minmax(0,1fr) en TODOS los breakpoints (mínimo 0 = las pistas pueden
+    encoger bajo el min-content; el nombre ya está contenido por su clamp +
+    overflow hidden) + una columna MENOS en móvil (petición explícita del
+    operador: 3 columnas ≈ 106px/celda a 360px — nombres legibles). */
 .pv-scope.pv-home .pv-cat-bar{
     display:flex;flex-direction:column;gap:12px;
     width:100%;max-width:var(--pv-maxw);margin:0 auto;
@@ -1486,7 +1508,7 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-cat-bar__grid{
     display:grid;
-    grid-template-columns:repeat(4,1fr);
+    grid-template-columns:repeat(3,minmax(0,1fr));
     gap:8px;
 }
 .pv-scope.pv-home .pv-cat-bar__item{
@@ -1522,7 +1544,8 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-cat-bar__more:hover{color:var(--primary-600);}
 /* HOME-UX4-001: padding de contenedor móvil igual al de .pv-section (14px).
-   HOME-UX5-002: cards compactas en móvil (4 col en ~360px ≈ 80px/celda). */
+   HOME-UX5-002 → HOME-CATBAR-2026-001: cards compactas en móvil (3 col en
+   ~360px ≈ 106px/celda — antes 4 col ≈ 78px con desborde de palabras largas). */
 @media (max-width:760px){
     .pv-scope.pv-home .pv-cat-bar{padding-left:14px;padding-right:14px;}
     .pv-scope.pv-home .pv-cat-bar__grid{gap:6px;}
@@ -1530,13 +1553,13 @@ body.pv-home-native .ltms-header-access{display:none!important}
     .pv-scope.pv-home .pv-cat-bar__img-wrap{width:40px;height:40px;}
 }
 @media (min-width:480px){
-    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(5,1fr);}
+    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(5,minmax(0,1fr));}
 }
 @media (min-width:768px){
-    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(6,1fr);}
+    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(6,minmax(0,1fr));}
 }
 @media (min-width:1024px){
-    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(7,1fr);gap:10px;}
+    .pv-scope.pv-home .pv-cat-bar__grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;}
     .pv-scope.pv-home .pv-cat-bar__img-wrap{width:52px;height:52px;}
 }
 

@@ -2080,26 +2080,37 @@
       });
     }
 
-    /* HOME-UX5-003 (2026-10-04): estado de scroll del header — al
-       desplazarse (scrollY > 8) se marca data-pv-scrolled="1" en el header
-       y el CSS (home.php <style>) colapsa la fila de chips (palabras bajo
-       el buscador) en móvil Y escritorio; al volver arriba reaparecen.
-       El header en sí es sticky (position:sticky en CSS) — buscador,
-       corazón/carrito y cuenta permanecen fijos durante el scroll. Umbral
-       bajo (8px) para que el compacto se sienta inmediato; update() al
-       arranque refleja recargas con scroll restaurado por el navegador. */
-    function initHeaderScroll(scope) {
-      var header = qs('.pv-home-header', scope);
-      if (!header) return;
-      function update() {
-        if (window.scrollY > 8) {
-          header.setAttribute('data-pv-scrolled', '1');
+    /* HOME-CATBAR-2026-003 (2026-10-15): la fila de chips (barra de
+       categorías del header) es SIEMPRE visible — el colapso al scroll de
+       HOME-UX5-003 (initHeaderScroll y su atributo de estado de scroll)
+       fue ELIMINADO: el operador reportó parpadeo al escrolear (el toggle
+       re-disparaba la transición max-height/opacity en cada evento scroll)
+       y pidió que la barra no se oculte nunca. initChipsFade aplica el
+       mismo patrón data-pv-scrollable / data-pv-at-end de los carruseles
+       (HOME-UX5-001) para el fade del borde derecho — la fila es una
+       sola línea deslizable con TODAS las categorías. */
+    function initChipsFade(scope) {
+      var row = qs('.pv-home-header__chips', scope);
+      if (!row) return;
+
+      function sync() {
+        var max = row.scrollWidth - row.clientWidth;
+        if (max > 4) {
+          row.setAttribute('data-pv-scrollable', '1');
+          if (max - row.scrollLeft < 8) {
+            row.setAttribute('data-pv-at-end', '1');
+          } else {
+            row.removeAttribute('data-pv-at-end');
+          }
         } else {
-          header.setAttribute('data-pv-scrolled', '0');
+          row.removeAttribute('data-pv-scrollable');
+          row.removeAttribute('data-pv-at-end');
         }
       }
-      on(window, 'scroll', update, { passive: true });
-      update();
+
+      on(row, 'scroll', sync, { passive: true });
+      on(window, 'resize', sync);
+      sync();
     }
 
     /* HOME-UX5-001 (2026-10-04): carruseles por categoría — flechas
@@ -2149,7 +2160,7 @@
       var scope = document.querySelector('.pv-scope.pv-home');
       if (!scope) return;
       initLiveSearch(scope);
-      initHeaderScroll(scope);
+      initChipsFade(scope);
       initCatCarousels(scope);
       // El handler global AUDIT-FE-HOME-003 cubre los chips. El IIFE sigue
       // siendo la válvula de extensión para futuros behaviours de la home.
