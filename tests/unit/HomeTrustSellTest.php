@@ -14,9 +14,10 @@
  *     ≥1440px. Radio 8px.
  *   - Radios uniformes: 8px tarjetas, 12px botones (scoped a la home, sin
  *     tocar tokens globales).
- *   - Franja "Vende con nosotros" (AliExpress): fondo azul marino con detalle
- *     dorado, sin cifras inventadas; desktop texto izq + botón der, móvil
- *     apilado con botón full-width.
+ *   - Franja "Vende con nosotros" (AliExpress): BRAND-2026-001 — gradiente
+ *     ROJO de marca del brief con detalle dorado primario --ltms-gold, sin
+ *     cifras inventadas; desktop texto izq + botón der, móvil apilado con
+ *     botón full-width.
  *
  * Tests PURAMENTE estructurales (file_get_contents + asserts): deterministas
  * en LTMS_UNIT_ONLY=true (mismo patrón que HomeTemplateWiringTest).
@@ -187,9 +188,11 @@ final class HomeTrustSellTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-005-E: franja "Vende con nosotros" — fondo azul marino con
-	 * detalle dorado, CTA dorado con texto navy (nunca dorado sobre blanco),
-	 * desktop fila, móvil botón full-width.
+	 * HOME-REDESIGN-005-E → BRAND-2026-001 (2026-10-15): franja "Vende con
+	 * nosotros" — gradiente ROJO DE MARCA del brief con detalle dorado
+	 * primario --ltms-gold, CTA dorado #F7B731 con texto NEGRO (réplica del
+	 * botón "VENDER GRATIS" del brief; el dorado nunca como texto), desktop
+	 * fila, móvil botón full-width.
 	 */
 	public function test_005_franja_vende_con_nosotros(): void {
 		$src = file_get_contents( $this->home_path );
@@ -209,19 +212,21 @@ final class HomeTrustSellTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-REDESIGN-005-E: el CTA debe apuntar al registro de vendedor (URL filterable).'
 		);
-		// Fondo: gradiente azul del design system (HOME-UX2-001 reemplazó el
-		// navy hardcodeado #1A1A4E — fuera de los tokens PV — por el mismo
-		// gradiente del hero fallback) con detalle dorado token (línea superior).
+		// BRAND-2026-001: fondo = gradiente rojo de marca (--brand #E80001 →
+		// --brand-600 #C70001) con detalle dorado primario (línea superior) —
+		// el gradiente azul del design system fue reemplazado por la paleta
+		// oficial del brief (rojo/negro/dorado).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-sell\{[^}]*radial-gradient\(120% 100% at 0% 0%,#3b82f6 0%,var\(--primary\) 45%,var\(--primary-700\) 100%\);[^}]*border-top:3px solid var\(--gold\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-sell\{[^}]*radial-gradient\(120% 100% at 0% 0%,var\(--brand\) 0%,var\(--brand-600\) 100%\);[^}]*border-top:3px solid var\(--ltms-gold\);/s",
 			$src,
-			'HOME-UX2-001: la franja debe usar el gradiente del design system con detalle dorado var(--gold).'
+			'BRAND-2026-001: la franja debe usar el gradiente rojo de marca con detalle dorado var(--ltms-gold).'
 		);
-		// CTA dorado token con texto del sistema (el dorado nunca como texto sobre blanco).
+		// BRAND-2026-001: CTA dorado primario del brief (#F7B731) con texto
+		// NEGRO (contraste 11.8:1 — patrón del botón "VENDER GRATIS").
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-sell__cta\{[^}]*background:var\(--gold\);color:var\(--text\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-sell__cta\{[^}]*background:var\(--ltms-gold\);color:#000;/s",
 			$src,
-			'HOME-UX2-001: el CTA debe ser var(--gold) con texto var(--text) (AA ~8:1).'
+			'BRAND-2026-001: el CTA debe ser var(--ltms-gold) con texto #000 (dorado primario del brief, AA 11.8:1).'
 		);
 		// Desktop: texto izq + botón der en una sola fila.
 		$this->assertMatchesRegularExpression(

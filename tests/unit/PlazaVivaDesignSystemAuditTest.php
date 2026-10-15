@@ -1341,22 +1341,37 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	 * lectores. Fix: logo → SVG map-pin (header + footer); títulos limpios.
 	 * Los emojis de categorías del bento quedan como identidad por-categoría
 	 * (data-driven, intencional).
+	 *
+	 * BRAND-2026-001 (2026-10-15, brief): el placeholder SVG map-pin fue
+	 * reemplazado por el LOGO OFICIAL "Lo Tengo" (variante blanca PNG,
+	 * logo-lo-tengo-white.png) en header y footer — el brief exige el logo
+	 * real de marca. El test se actualiza en el mismo commit (lección #119):
+	 * la intención anti-emoji se conserva y la identidad pasa a ser el
+	 * asset oficial.
 	 */
 	public function test_036_home_sin_emoji_estructurales(): void {
 		$home = file_get_contents( $this->home_template_path );
 
-		// (1) El logo del header usa el SVG map-pin.
+		// (1) El logo del header es el oficial (variante blanca, <img> con
+		//     dimensiones explícitas — sin CLS). El src es PHP (esc_url) — el
+		//     match llega hasta el nombre del archivo.
 		$this->assertMatchesRegularExpression(
-			'/__logo-mark" aria-hidden="true">\s*<svg[\s\S]{0,200}?M21 10c0 7-9 13-9 13/s',
+			'/__logo-img"\s*src="[^"]*logo-lo-tengo-white\.png/s',
 			$home,
-			'UIUX2-D17 fix: el logo-mark del header debe ser el SVG map-pin'
+			'BRAND-2026-001: el logo del header debe ser el logo oficial (variante blanca)'
+		);
+		$this->assertStringContainsString(
+			'width="95" height="40"',
+			$home,
+			'BRAND-2026-001: el logo del header lleva width/height explícitos (CLS 0)'
 		);
 
-		// (2) El logo del footer también (con su clase propia, sin style inline).
+		// (2) El logo del footer también (misma variante blanca sobre el
+		//     footer negro de marca).
 		$this->assertMatchesRegularExpression(
-			'/footer__logo-mark" aria-hidden="true">\s*<svg/s',
+			'/footer__logo-img"\s*src="[^"]*logo-lo-tengo-white\.png/s',
 			$home,
-			'UIUX2-D17 fix: el logo del footer debe usar la clase logo-mark con SVG'
+			'BRAND-2026-001: el logo del footer debe ser el logo oficial en variante blanca'
 		);
 
 		// (3) Los títulos de sección no llevan emoji.

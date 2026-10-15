@@ -10,6 +10,7 @@
   --primary-50:#EFF4FF; --primary-100:#DBE6FE;
   --accent:#0BA37F; --accent-50:#E5F7F1; --accent-100:#C7EFE2; --accent-700:#0a8a68;
   --gold:#D4A857; --gold-50:#FBF4E5; --gold-100:#F4E5C5; --gold-700:#8a6d20;
+  --ltms-gold:#F7B731; /* BRAND-2026-001: dorado primario del brief (CTA "Vender", badges de contador). --gold queda como dorado premium secundario. */
   --danger:#E5484D; --danger-50:#FDECEC; --danger-700:#b73a3e;
   --warn:#F5A623; --warn-50:#FFF4E0; --warn-700:#a06b00;
   --brand:#E80001; --brand-600:#C70001; --brand-50:#FEEFF0; --brand-100:#FCD9DA;

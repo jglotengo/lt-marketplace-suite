@@ -84,32 +84,36 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 			);
 		}
 
-		// HOME-UX5-003 (2026-10-04): el botón Buscar pasó a var(--danger-700)
-		// — el header es ROJO a pedido del operador; el botón viaja DENTRO del
-		// campo blanco y mantiene el rojo institucional con texto blanco AA.
+		// BRAND-2026-001 (2026-10-15, brief): el botón Buscar pasó a var(--brand)
+		// — rojo DE MARCA #E80001 del brief (unifica los rojos de la home,
+		// inconsistencia #2); viaja DENTRO del campo blanco y mantiene texto
+		// blanco AA (4.74:1). Hover --brand-600.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*background:var\(--danger-700\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*background:var\(--brand\);/s",
 			$src,
-			'HOME-UX5-003: el botón Buscar usa var(--danger-700) — rojo del header, blanco 5.7:1 AA.'
+			'BRAND-2026-001: el botón Buscar usa var(--brand) — rojo de marca del brief, blanco 4.74:1 AA.'
 		);
-		// HOME-UX5-003: el header es ROJO (var(--danger-700)) — decisión del
-		// operador que reemplaza el fondo claro del ciclo UX2.
+		// BRAND-2026-001: el header es el ROJO DE MARCA (var(--brand) #E80001) —
+		// el brief reemplaza la aproximación --danger-700 del ciclo UX5-003.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--danger-700\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--brand\);/s",
 			$src,
-			'HOME-UX5-003: el header de la home es rojo var(--danger-700) (operador 2026-10-04).'
+			'BRAND-2026-001: el header de la home es el rojo de marca var(--brand) (#E80001, brief 15/10/2026).'
 		);
-		// La franja Vende usa el gradiente del design system (mismo del hero fallback).
+		// BRAND-2026-001: la franja Vende usa el gradiente ROJO de marca del
+		// brief (--brand → --brand-600) — el azul queda para enlaces/interactivo.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-home-sell\{[^}]*radial-gradient\(120% 100% at 0% 0%,#3b82f6 0%,var\(--primary\) 45%,var\(--primary-700\) 100%\)/s",
+			"/\.pv-home-sell\{[^}]*radial-gradient\(120% 100% at 0% 0%,var\(--brand\) 0%,var\(--brand-600\) 100%\)/s",
 			$src,
-			'HOME-UX2-001: la franja Vende con nosotros debe usar el gradiente azul del design system.'
+			'BRAND-2026-001: la franja Vende con nosotros debe usar el gradiente rojo de marca del brief.'
 		);
-		// El badge del header es dorado token.
+		// BRAND-2026-001: el badge del header es el dorado PRIMARIO del brief
+		// (--ltms-gold #F7B731, botón "VENDER GRATIS"); --gold queda como
+		// dorado premium secundario.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__badge\{[^}]*background:var\(--gold\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header__badge\{[^}]*background:var\(--ltms-gold\);/s",
 			$src,
-			'HOME-UX2-001: el badge del contador usa var(--gold) (token) con texto var(--text).'
+			'BRAND-2026-001: el badge del contador usa var(--ltms-gold) (dorado primario del brief) con texto var(--text).'
 		);
 	}
 

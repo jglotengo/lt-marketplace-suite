@@ -85,22 +85,22 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-REDESIGN-002-B → HOME-UX2-001 → HOME-UX5-003 (2026-10-04): header
-	 * ROJO a pedido del operador ("la parte del buscador, íconos de corazón y
-	 * toda esa zona en rojo"). Base var(--danger-700) (#b73a3e — 5.7:1 con
-	 * blanco, AA) en vez del fondo claro del ciclo UX2 (--surface); --danger
-	 * (#E5484D) queda para borde/hover. Test actualizado en el mismo commit
-	 * (lección #119). El sticky se conserva y los chips se ocultan al scroll
-	 * vía [data-pv-scrolled] (HOME-UX5-003).
+	 * HOME-REDESIGN-002-B → HOME-UX2-001 → HOME-UX5-003 → BRAND-2026-001
+	 * (2026-10-15): header ROJO DE MARCA del brief — var(--brand) (#E80001,
+	 * blanco 4.74:1 AA) en vez del --danger-700 (#b73a3e) aproximado del ciclo
+	 * UX5 (el brief, inconsistencia #2, exige unificar todos los rojos en
+	 * #E80001). --brand-600 (#C70001) queda para borde/hover. Test actualizado
+	 * en el mismo commit (lección #119). El sticky se conserva y los chips se
+	 * ocultan al scroll vía [data-pv-scrolled] (HOME-UX5-003).
 	 */
 	public function test_002_header_rojo_tokens(): void {
 		$src = file_get_contents( $this->home_path );
 
-		// Fondo rojo del header (token danger oscuro del design system, AA).
+		// Fondo rojo de marca del brief (token --brand, AA).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--danger-700\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--brand\);/s",
 			$src,
-			'HOME-UX5-003: el header debe tener fondo var(--danger-700) (rojo, blanco 5.7:1 AA).'
+			'BRAND-2026-001: el header debe tener fondo var(--brand) (#E80001, rojo de marca del brief, blanco 4.74:1 AA).'
 		);
 		// Logo blanco sobre rojo.
 		$this->assertMatchesRegularExpression(

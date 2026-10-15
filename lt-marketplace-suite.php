@@ -83,7 +83,10 @@ define( 'LTMS_LOADED', true );
 // viewport), cards tintadas --primary-50/--primary-100 con hover que invierte
 // a blanco (las blancas no se distinguían del fondo), tipografía 12.5px/700
 // e ícono 28px. CSS inline de la home — purga de page cache en el deploy.
-define( 'LTMS_VERSION', '2.9.412' );
+// BRAND-2026-001 (brief 15/10/2026): bump 2.9.412 → 2.9.413 — cache-busting del
+// CSS/JS tras aplicar la paleta oficial del brief a la home (header rojo #E80001,
+// slab Vende rojo+dorado #F7B731, footer negro, logo oficial en header/footer).
+define( 'LTMS_VERSION', '2.9.413' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

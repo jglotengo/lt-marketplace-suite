@@ -42,6 +42,7 @@ class LTMS_Branding_Engine {
      *   → Usar en: headers premium, gradientes de marca, footer.
      */
     public const COLOR_PALETTE = [
+        'brand'          => '#E80001',  // BRAND-2026-001: rojo de marca del brief — theme-color, tile, mask-icon.
         'primary'        => '#1e40af',  // Azul confianza — botones de pago.
         'primary_hover'  => '#1e3a8a',
         'primary_light'  => '#dbeafe',
@@ -222,29 +223,40 @@ class LTMS_Branding_Engine {
     /**
      * Inyecta meta tags de favicon, apple-touch-icon, MS tile.
      *
+     * BRAND-2026-001 (brief 15/10/2026):
+     *   - Favicon → logo oficial cuadrado PNG 512x512 (logo-lo-tengo-icon.png),
+     *     transparente — antes apuntaba a un JPG rectangular 951x960 con
+     *     artefactos y los navegadores recortan favicons no cuadrados.
+     *   - theme-color → rojo de marca #E80001 (inconsistencia #3 del brief:
+     *     era azul #1e40af mientras la marca es roja/negra).
+     *   - MS TileColor → rojo de marca.
+     *
      * Sin estos tags, Google y navegadores muestran un icono genérico
      * en lugar del logo de marca.
      */
     public static function inject_brand_meta_tags(): void {
-        $logo_url = self::get_logo_url( 'white' );
-        $logo_dark = self::get_logo_url( 'dark' );
+        // BRAND-2026-001: icono cuadrado oficial (favicon + apple-touch + tile).
+        $icon_url = defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL . 'img/logo-lo-tengo-icon.png' : '';
+        if ( '' === $icon_url || ! file_exists( LTMS_PLUGIN_DIR . 'assets/img/logo-lo-tengo-icon.png' ) ) {
+            $icon_url = self::get_logo_url( 'white' );
+        }
 
-        // Favicon (16x16, 32x32).
-        echo '<link rel="icon" type="image/jpeg" href="' . esc_url( $logo_url ) . '" sizes="32x32" />' . "\n";
-        echo '<link rel="icon" type="image/jpeg" href="' . esc_url( $logo_url ) . '" sizes="16x16" />' . "\n";
+        // Favicon (16x16, 32x32 — el navegador escala el PNG 512).
+        echo '<link rel="icon" type="image/png" href="' . esc_url( $icon_url ) . '" sizes="32x32" />' . "\n";
+        echo '<link rel="icon" type="image/png" href="' . esc_url( $icon_url ) . '" sizes="16x16" />' . "\n";
 
-        // Apple Touch Icon (180x180 — iOS home screen).
-        echo '<link rel="apple-touch-icon" href="' . esc_url( $logo_url ) . '" />' . "\n";
+        // Apple Touch Icon (180x180 — iOS home screen; escala desde el 512).
+        echo '<link rel="apple-touch-icon" href="' . esc_url( $icon_url ) . '" />' . "\n";
 
         // MS Tile (Windows Start Menu).
-        echo '<meta name="msapplication-TileImage" content="' . esc_url( $logo_url ) . '" />' . "\n";
-        echo '<meta name="msapplication-TileColor" content="' . esc_attr( self::COLOR_PALETTE['premium'] ) . '" />' . "\n";
+        echo '<meta name="msapplication-TileImage" content="' . esc_url( $icon_url ) . '" />' . "\n";
+        echo '<meta name="msapplication-TileColor" content="' . esc_attr( self::COLOR_PALETTE['brand'] ) . '" />' . "\n";
 
-        // Theme color (mobile browser UI bar).
-        echo '<meta name="theme-color" content="' . esc_attr( self::COLOR_PALETTE['primary'] ) . '" />' . "\n";
+        // Theme color (mobile browser UI bar) — BRAND-2026-001: rojo de marca.
+        echo '<meta name="theme-color" content="' . esc_attr( self::COLOR_PALETTE['brand'] ) . '" />' . "\n";
 
-        // Mask icon (Safari pinned tab).
-        echo '<link rel="mask-icon" href="' . esc_url( $logo_url ) . '" color="' . esc_attr( self::COLOR_PALETTE['primary'] ) . '" />' . "\n";
+        // Mask icon (Safari pinned tab) — rojo de marca.
+        echo '<link rel="mask-icon" href="' . esc_url( $icon_url ) . '" color="' . esc_attr( self::COLOR_PALETTE['brand'] ) . '" />' . "\n";
 
         // Manifest link (PWA) — v2.9.99 fix: apuntar al manifest real del plugin (no a home_url que no existe).
         $manifest_url = defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL . 'json/manifest.json' : '';
@@ -252,8 +264,8 @@ class LTMS_Branding_Engine {
             echo '<link rel="manifest" href="' . esc_url( $manifest_url ) . '" />' . "\n";
         }
 
-        // og:logo (Facebook认可的 marca logo).
-        echo '<meta property="og:logo" content="' . esc_url( $logo_url ) . '" />' . "\n";
+        // og:logo (Facebook-approved marca logo).
+        echo '<meta property="og:logo" content="' . esc_url( self::get_logo_url( 'white' ) ) . '" />' . "\n";
     }
 
     // ================================================================
@@ -497,10 +509,14 @@ class LTMS_Branding_Engine {
 
     /**
      * Asegura que og:image tenga el logo de marca (no solo site icon).
+     *
+     * BRAND-2026-001: usa la variante 'og' — canvas 1200x630 con fondo blanco
+     * (antes servía el logo crudo 769x324 declarando 1200x630: las redes
+     * renderizaban transparencia como negro y el tamaño declarado no coincidía).
      */
     public static function ensure_logo_in_og_image( array $og ): array {
         if ( empty( $og['og:image'] ) || $og['og:image'] === get_site_icon_url( 512 ) ) {
-            $logo = self::get_logo_url( 'white' );
+            $logo = self::get_logo_url( 'og' );
             if ( $logo ) {
                 $og['og:image'] = $logo;
                 $og['og:image:width'] = '1200';
@@ -614,18 +630,37 @@ class LTMS_Branding_Engine {
     /**
      * Devuelve la URL del logo según variante.
      *
-     * @param string $variant 'white' (fondo blanco) o 'dark' (fondo negro).
+     * BRAND-2026-001 (brief 15/10/2026): logo oficial "Lo Tengo" (PNG con
+     * fondo transparente 769x324) en reemplazo de los JPG cuadrados
+     * logo-{white,dark}-bg.jpg (con artefactos de compresión y canvas
+     * rellenado). Variantes:
+     *   - 'white' (superficies claras): logo a COLOR (transparente) — para
+     *     schema Organization (≥112x112 ✓), favicon claro y emails.
+     *   - 'dark'  (superficies oscuras): variante BLANCA monochrome — el
+     *     logo a color lleva "TENGO" en rojo, ilegible sobre negro/rojo.
+     *   - 'og'    (og:image social): canvas 1200x630 con fondo BLANCO (las
+     *     redes renderizan transparencia como negro) — corrige el og:image
+     *     que declaraba 1200x630 pero servía la imagen 769x324 cruda.
+     *
+     * @param string $variant 'white' | 'dark' | 'og'.
      * @return string URL del logo.
      */
     public static function get_logo_url( string $variant = 'white' ): string {
-        // 1. Intentar option configurada.
-        $option_key = 'ltms_logo_' . $variant . '_url';
-        $url = LTMS_Core_Config::get( $option_key, '' );
-        if ( ! empty( $url ) ) return $url;
+        // 1. Intentar option configurada (solo variantes históricas white/dark).
+        if ( 'og' !== $variant ) {
+            $option_key = 'ltms_logo_' . $variant . '_url';
+            $url = LTMS_Core_Config::get( $option_key, '' );
+            if ( ! empty( $url ) ) return $url;
+        }
 
-        // 2. Intentar assets del plugin.
+        // 2. Assets oficiales del plugin (BRAND-2026-001).
         $assets_url = defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : plugin_dir_url( __DIR__ . '/../../lt-marketplace-suite.php' ) . 'assets/';
-        $file = $variant === 'dark' ? 'img/logo-dark-bg.jpg' : 'img/logo-white-bg.jpg';
+        $files = [
+            'dark'  => 'img/logo-lo-tengo-white.png',
+            'og'    => 'img/logo-lo-tengo-og.png',
+            'white' => 'img/logo-lo-tengo.png',
+        ];
+        $file = $files[ $variant ] ?? $files['white'];
         $full_path = LTMS_PLUGIN_DIR . 'assets/' . $file;
         if ( file_exists( $full_path ) ) {
             return $assets_url . $file;

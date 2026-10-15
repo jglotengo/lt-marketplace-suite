@@ -375,12 +375,14 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * HEADER — 3 zonas: logo · buscador (sugerencias live + filtro categoría) ·
-     * acciones de cuenta. HOME-REDESIGN-002 (patrón Amazon simplificado):
-     * fondo azul marino, texto blanco, buscador protagonista con sugerencias
-     * (máx 6 — JS en el scope HOME de ltms-plaza-viva.js) y filtro opcional
-     * de categoría dentro del campo (select product_cat — apply_shop_filters()
-     * ya lo soporta en /tienda/). Móvil 2 filas, tablet 1 fila, escritorio
+     * HEADER — 3 zonas: logo oficial · buscador (sugerencias live + filtro
+     * categoría) · acciones de cuenta. HOME-REDESIGN-002 (patrón Amazon
+     * simplificado) → UX5-003 → BRAND-2026-001 (brief 15/10/2026): fondo
+     * ROJO DE MARCA #E80001, texto blanco, logo oficial "Lo Tengo" en
+     * variante blanca, buscador protagonista con sugerencias (máx 6 — JS en
+     * el scope HOME de ltms-plaza-viva.js) y filtro opcional de categoría
+     * dentro del campo (select product_cat — apply_shop_filters() ya lo
+     * soporta en /tienda/). Móvil 2 filas, tablet 1 fila, escritorio
      * buscador min 480px. CSP-compliant: sin <script> inline.
      * =====================================================================
      */
@@ -388,16 +390,17 @@ do_action( 'ltms_before_home_plazaviva' );
     <header class="pv-home-header" role="banner">
         <div class="pv-section pv-home-header__inner">
 
-            <?php /* --- Zona 1: Logo "Lo Tengo" --- */ ?>
-            <a class="pv-home-header__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
-                <?php /* AUDIT-FE-UIUX2-D17 FIX: emoji 📍 → SVG map-pin (lenguaje de iconos stroke consistente con el resto del sistema). */ ?>
-                <span class="pv-home-header__logo-mark" aria-hidden="true">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                </span>
-                <span class="pv-home-header__logo-text">
-                    <span class="pv-home-header__logo-name"><?php esc_html_e( 'Lo Tengo', 'ltms' ); ?></span>
-                    <span class="pv-home-header__logo-tag"><?php esc_html_e( 'Marketplace', 'ltms' ); ?></span>
-                </span>
+            <?php /* --- Zona 1: Logo "Lo Tengo" --- */
+            /* BRAND-2026-001 (brief 15/10/2026): logo OFICIAL del brief en vez del
+             * placeholder SVG map-pin del ciclo UIUX2-D17. Variante BLANCA porque
+             * el header es el rojo de marca #E80001 (el logo a color lleva "TENGO"
+             * en rojo — invisible sobre rojo). PNG 769x324 renderizado a 40px de
+             * altura = densidad 8x: nítido en cualquier DPI. */ ?>
+            <a class="pv-home-header__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
+                <img class="pv-home-header__logo-img"
+                     src="<?php echo esc_url( ( defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : '' ) . 'img/logo-lo-tengo-white.png' ); ?>"
+                     alt="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>"
+                     width="95" height="40" />
             </a>
 
             <?php /* --- Zona 2: Buscador con chips --- */ ?>
@@ -907,11 +910,12 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * VENDE CON NOSOTROS (HOME-REDESIGN-005, patrón AliExpress): franja con
-     * un único botón de registro de vendedor. Fondo azul marino con detalle
-     * dorado. Sin cifras inventadas (brief). Desktop: texto a la izquierda +
-     * botón a la derecha en una sola fila; móvil: apilado, botón a todo el
-     * ancho.
+     * VENDE CON NOSOTROS (HOME-REDESIGN-005, patrón AliExpress → BRAND-2026-001):
+     * franja con un único botón de registro de vendedor. BRAND-2026-001 (brief):
+     * gradiente ROJO de marca (--brand → --brand-600) con detalle dorado
+     * primario --ltms-gold #F7B731. Sin cifras inventadas (brief). Desktop:
+     * texto a la izquierda + botón a la derecha en una sola fila; móvil:
+     * apilado, botón a todo el ancho.
      * =====================================================================
      */
     ?>
@@ -1000,12 +1004,16 @@ do_action( 'ltms_before_home_plazaviva' );
     <footer class="pv-home-footer" role="contentinfo">
         <div class="pv-section pv-home-footer__inner">
 
-            <?php /* --- Marca --- */ ?>
+            <?php /* --- Marca --- */
+            /* BRAND-2026-001 (brief): logo oficial en variante BLANCA — el footer
+             * es NEGRO (#000000, color de marca del brief) y el logo a color
+             * llevaría "TENGO" en rojo (invisible sobre negro). PNG 769x324 a
+             * 36px de altura = densidad 9x. */ ?>
             <a class="pv-home-footer__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
-                <span class="pv-home-footer__logo-mark" aria-hidden="true">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                </span>
-                <span><?php esc_html_e( 'Lo Tengo', 'ltms' ); ?></span>
+                <img class="pv-home-footer__logo-img"
+                     src="<?php echo esc_url( ( defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : '' ) . 'img/logo-lo-tengo-white.png' ); ?>"
+                     alt="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>"
+                     width="85" height="36" />
             </a>
 
             <?php /* --- Redes reales del operador (HOME-UX2-005: antes eran
@@ -1105,15 +1113,16 @@ body.pv-home-native{font-size:16px;}
    específica viene después en la cascada y gana por orden). */
 .pv-scope.pv-home .pv-btn{border-radius:12px;}
 
-/* ── HEADER (HOME-UX5-003, 2026-10-04) ─────────────────────────────────────
-    ROJO institucional a pedido del operador ("la parte del buscador, íconos
-    de corazón y toda esa zona en rojo") — la home leía como otro site con el
-    fondo claro del ciclo UX2. Base: --danger-700 (#b73a3e, rojo del design
-    system) para que el texto blanco pase AA (5.7:1); --danger (#E5484D)
-    queda para hovers/bordes (3.9:1 con blanco — solo elementos no-texto).
-    Sticky conservado: la zona de búsqueda+acciones permanece fija al
-    desplazarse en TODOS los tamaños; los chips (palabras bajo el buscador)
-    se OCULTAN al scroll vía [data-pv-scrolled] (JS del scope HOME).
+/* ── HEADER (HOME-UX5-003 → BRAND-2026-001, 2026-10-15) ─────────────────────
+    ROJO DE MARCA del brief (#E80001, token --brand) — reemplaza el rojo del
+    design system (--danger-700 #b73a3e) que el ciclo UX5-003 usaba como
+    aproximación. El brief (inconsistencia #2) exige unificar TODOS los rojos
+    de la home en #E80001. Contraste blanco sobre #E80001 = 4.74:1 → AA para
+    texto normal (la aproximación anterior era 5.7:1; la marca real sigue
+    pasando AA). Hover/borde: --brand-600 (#C70001, rojo marca hover del
+    brief, 6.2:1). Sticky conservado: la zona de búsqueda+acciones permanece
+    fija al desplazarse en TODOS los tamaños; los chips (palabras bajo el
+    buscador) se OCULTAN al scroll vía [data-pv-scrolled] (JS del scope HOME).
     Mobile-first (heredado del ciclo UX2):
     - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
     - ≥480: filtro de categoría dentro del campo.
@@ -1121,8 +1130,8 @@ body.pv-home-native{font-size:16px;}
     - ≥1024: buscador central min 480px. */
 .pv-scope.pv-home .pv-home-header{
     position:sticky;top:0;z-index:50;
-    background:var(--danger-700);
-    border-bottom:1px solid var(--danger);
+    background:var(--brand);
+    border-bottom:1px solid var(--brand-600);
     padding-top:calc(env(safe-area-inset-top, 0px) + 8px);
 }
 .pv-scope.pv-home .pv-home-header__inner{
@@ -1138,16 +1147,12 @@ body.pv-home-native{font-size:16px;}
 }
 .pv-scope.pv-home .pv-home-header__logo{
     grid-area:logo;
-    display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:#fff;
+    display:inline-flex;align-items:center;text-decoration:none;color:#fff;
 }
-.pv-scope.pv-home .pv-home-header__logo-mark{
-    width:40px;height:42px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;font-size:20px;
-    background:rgba(255,255,255,.14);border-radius:var(--r-md);color:#fff;
-}
-.pv-scope.pv-home .pv-home-header__logo-text{display:flex;flex-direction:column;line-height:1.1;}
-.pv-scope.pv-home .pv-home-header__logo-name{font-family:var(--display);font-weight:800;font-size:19px;color:#fff;}
-.pv-scope.pv-home .pv-home-header__logo-tag{font-size:11px;font-weight:600;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.06em;}
+/* BRAND-2026-001: logo oficial (variante blanca, PNG transparente 769x324)
+   renderizado a 40px de altura — el atributo width/height evita el layout
+   shift (CLS) y la densidad 8x lo mantiene nítido en retina. */
+.pv-scope.pv-home .pv-home-header__logo-img{height:40px;width:auto;display:block;}
 
 .pv-scope.pv-home .pv-home-header__search{
     grid-area:search;
@@ -1186,9 +1191,9 @@ body.pv-home-native{font-size:16px;}
 .pv-scope.pv-home .pv-home-header__search-input:focus{outline:none;}
 .pv-scope.pv-home .pv-home-header__search-btn{
     border-radius:var(--r-pill);height:44px;min-width:44px;
-    background:var(--danger-700);color:#fff;padding:0 18px;flex-shrink:0;
+    background:var(--brand);color:#fff;padding:0 18px;flex-shrink:0;
 }
-.pv-scope.pv-home .pv-home-header__search-btn:hover{background:var(--danger);}
+.pv-scope.pv-home .pv-home-header__search-btn:hover{background:var(--brand-600);}
 
 /* Panel de sugerencias live (máx 6) — combobox ARIA accesible. */
 .pv-scope.pv-home .pv-home-header__suggestions{
@@ -1267,11 +1272,11 @@ body.pv-home-native{font-size:16px;}
     position:absolute;top:-4px;right:-6px;
     min-width:18px;height:18px;padding:0 5px;
     display:flex;align-items:center;justify-content:center;
-    background:var(--gold);color:var(--text);
+    background:var(--ltms-gold);color:var(--text);
     border-radius:var(--r-pill);font-size:10.5px;font-weight:700;
-    border:2px solid var(--danger-700);
+    border:2px solid var(--brand);
 }
-.pv-scope.pv-home .pv-home-header__badge--accent{background:var(--gold);}
+.pv-scope.pv-home .pv-home-header__badge--accent{background:var(--ltms-gold);}
 /* HOME-UX3-001: badge de favoritos vacío (count 0) se oculta — el elemento
    existe SIEMPRE para que el JS pueda actualizarlo en vivo. */
 .pv-scope.pv-home .pv-home-header__badge:empty{display:none;}
@@ -1629,18 +1634,21 @@ body.pv-home-native .ltms-header-access{display:none!important}
 .pv-scope.pv-home .pv-vendor-card__sales{font-size:12.5px;color:var(--text-3);}
 .pv-scope.pv-home .pv-vendor-card__products{font-size:12.5px;color:var(--text-3);font-weight:600;}
 
-/* ── VENDE CON NOSOTROS (HOME-UX2-001) ────────────────────────────────────
-   Slab de marca del design system: el mismo gradiente azul del hero
-   fallback (.pv-hero — radial #3b82f6 → var(--primary) → var(--primary-700))
-   con detalle dorado en la línea superior de 3px. Desktop: texto izq +
-   botón der en una sola fila. Móvil: apilado, botón full-width.
-   Contraste: #fff sobre --primary-700 ≈ 10.4:1; sub rgba .8 ≈ 8:1; CTA
-   dorado --gold + --text ≈ 8:1 (el dorado NUNCA como texto sobre blanco). */
+/* ── VENDE CON NOSOTROS (HOME-UX2-001 → BRAND-2026-001, 2026-10-15) ────────
+    BRAND-2026-001 (brief): el slab pasa del gradiente azul del design system
+    al ROJO DE MARCA (--brand #E80001 → --brand-600 #C70001) con detalle
+    dorado primario del brief (--ltms-gold #F7B731) — la paleta oficial es
+    rojo/negro/dorado (azul queda reservado a enlaces e interactivo, soporte
+    del brief). El CTA replica el botón "VENDER GRATIS" del brief: dorado
+    #F7B731 con texto NEGRO (contraste 11.8:1 — el dorado NUNCA como texto).
+    Contraste del texto: #fff sobre #E80001 = 4.74:1 (AA); sobre #C70001 el
+    cierre del gradiente = 6.2:1. Desktop: texto izq + botón der. Móvil:
+    apilado, botón full-width. */
 .pv-scope.pv-home .pv-home__sell{padding-top:40px;padding-bottom:8px;}
 .pv-scope.pv-home .pv-home-sell{
     display:flex;flex-direction:column;align-items:flex-start;gap:18px;
-    background:radial-gradient(120% 100% at 0% 0%,#3b82f6 0%,var(--primary) 45%,var(--primary-700) 100%);
-    border-top:3px solid var(--gold);
+    background:radial-gradient(120% 100% at 0% 0%,var(--brand) 0%,var(--brand-600) 100%);
+    border-top:3px solid var(--ltms-gold);
     border-radius:var(--r-md);
     padding:32px 24px;
 }
@@ -1650,13 +1658,13 @@ body.pv-home-native .ltms-header-access{display:none!important}
     color:#fff;line-height:1.15;margin:0;
 }
 .pv-scope.pv-home .pv-home-sell__sub{
-    font-size:14.5px;color:rgba(255,255,255,.8);line-height:1.5;margin:0;
+    font-size:14.5px;color:#fff;line-height:1.5;margin:0;
     max-width:560px;
 }
 .pv-scope.pv-home .pv-home-sell__cta{
     display:inline-flex;align-items:center;justify-content:center;
     min-height:48px;padding:0 28px;flex-shrink:0;
-    background:var(--gold);color:var(--text);
+    background:var(--ltms-gold);color:#000;
     font-family:var(--display);font-size:14.5px;font-weight:700;
     border-radius:12px;text-decoration:none;
     transition:filter var(--t),transform var(--t);
@@ -1719,41 +1727,41 @@ body.pv-home-native .ltms-header-access{display:none!important}
     .pv-scope.pv-home .pv-home-policies{grid-template-columns:repeat(4,1fr);}
 }
 
-/* ── FOOTER (HOME-UX2-005: puramente visual) ───────────────────────────── */
+/* ── FOOTER (HOME-UX2-005: puramente visual → BRAND-2026-001, 2026-10-15) ──
+    BRAND-2026-001 (brief): fondo NEGRO #000000 (color de marca del brief —
+    "footer negro"), texto blanco, hover dorado --ltms-gold. Las imágenes de
+    pagos/afiliaciones viajan sobre chips blancos redondeados (los assets del
+    operador tienen fondo claro — el chip los hace intencionales sobre negro). */
 .pv-scope.pv-home .pv-home-footer{
-    margin-top:56px;background:var(--surface);border-top:1px solid var(--border);
+    margin-top:56px;background:#000000;border-top:1px solid rgba(255,255,255,.14);
 }
 .pv-scope.pv-home .pv-home-footer__inner{
     display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
     padding-top:32px;padding-bottom:28px;
 }
 .pv-scope.pv-home .pv-home-footer__logo{
-    display:inline-flex;align-items:center;gap:8px;
-    font-family:var(--display);font-weight:800;font-size:20px;color:var(--text);
+    display:inline-flex;align-items:center;
     text-decoration:none;
 }
-/* AUDIT-FE-UIUX2-D17 FIX: el mark del footer ahora es SVG (antes emoji 📍). */
-.pv-scope.pv-home .pv-home-footer__logo-mark{
-    display:inline-flex;align-items:center;justify-content:center;
-    width:30px;height:30px;border-radius:var(--r-sm);
-    background:var(--primary-50);color:var(--primary);
-}
+/* BRAND-2026-001: logo oficial (variante blanca, transparente) — 36px. */
+.pv-scope.pv-home .pv-home-footer__logo-img{height:36px;width:auto;display:block;}
 .pv-scope.pv-home .pv-home-footer__social{display:flex;gap:8px;}
 .pv-scope.pv-home .pv-home-footer__social-link{
     width:40px;height:40px;border-radius:var(--r-md);
     display:flex;align-items:center;justify-content:center;
-    background:var(--bg);border:1px solid var(--border);color:var(--text-2);
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:#fff;
     transition:background var(--t),color var(--t),border-color var(--t),transform var(--t);
 }
 .pv-scope.pv-home .pv-home-footer__social-link:hover{
-    background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-2px);
+    background:var(--ltms-gold);color:#000;border-color:var(--ltms-gold);transform:translateY(-2px);
 }
 /* Fila de marcas (pagos/donaciones/afiliaciones — las imágenes reales del
-   operador) + selector de moneda (bajo la marca). HOME-UX3-002. */
+   operador) + selector de moneda (bajo la marca). HOME-UX3-002.
+   BRAND-2026-001: chips blancos sobre el footer negro. */
 .pv-scope.pv-home .pv-home-footer__payrow{
     display:flex;flex-direction:column;gap:10px;
     padding-top:24px;padding-bottom:32px;
-    border-top:1px solid var(--border);
+    border-top:1px solid rgba(255,255,255,.14);
 }
 .pv-scope.pv-home .pv-home-footer__brands{
     display:flex;align-items:center;justify-content:center;
@@ -1761,15 +1769,18 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-home-footer__brand-item img{
     height:56px;width:auto;max-width:190px;object-fit:contain;display:block;
+    background:#fff;border-radius:8px;padding:6px 10px;
 }
 @media (max-width:560px){
     .pv-scope.pv-home .pv-home-footer__brands{gap:12px;}
     .pv-scope.pv-home .pv-home-footer__brand-item img{height:44px;max-width:150px;}
 }
-.pv-scope.pv-home .pv-home-footer__bottom{border-top:1px solid var(--border);}
+/* Selector de moneda sobre fondo negro (label legible; el select es blanco). */
+.pv-scope.pv-home .pv-home-footer__payrow .ltms-currency-switcher__label{color:rgba(255,255,255,.7);}
+.pv-scope.pv-home .pv-home-footer__bottom{border-top:1px solid rgba(255,255,255,.14);}
 .pv-scope.pv-home .pv-home-footer__bottom-inner{
     display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
-    padding-top:18px;padding-bottom:18px;font-size:12.5px;color:var(--text-3);
+    padding-top:18px;padding-bottom:18px;font-size:12.5px;color:rgba(255,255,255,.66);
 }
 
 /* ── RADIOS DE TARJETAS (HOME-REDESIGN-005) — al final del <style> para
