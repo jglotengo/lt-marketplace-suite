@@ -2080,39 +2080,10 @@
       });
     }
 
-    /* HOME-CATBAR-2026-003 (2026-10-15): la fila de chips (barra de
-       categorías del header) es SIEMPRE visible — el colapso al scroll de
-       HOME-UX5-003 (initHeaderScroll y su atributo de estado de scroll)
-       fue ELIMINADO: el operador reportó parpadeo al escrolear (el toggle
-       re-disparaba la transición max-height/opacity en cada evento scroll)
-       y pidió que la barra no se oculte nunca. initChipsFade aplica el
-       mismo patrón data-pv-scrollable / data-pv-at-end de los carruseles
-       (HOME-UX5-001) para el fade del borde derecho — la fila es una
-       sola línea deslizable con TODAS las categorías. */
-    function initChipsFade(scope) {
-      var row = qs('.pv-home-header__chips', scope);
-      if (!row) return;
-
-      function sync() {
-        var max = row.scrollWidth - row.clientWidth;
-        if (max > 4) {
-          row.setAttribute('data-pv-scrollable', '1');
-          if (max - row.scrollLeft < 8) {
-            row.setAttribute('data-pv-at-end', '1');
-          } else {
-            row.removeAttribute('data-pv-at-end');
-          }
-        } else {
-          row.removeAttribute('data-pv-scrollable');
-          row.removeAttribute('data-pv-at-end');
-        }
-      }
-
-      on(row, 'scroll', sync, { passive: true });
-      on(window, 'resize', sync);
-      sync();
-    }
-
+    /* HOME-CATBAR-2026-005 (2026-10-15): la fila de chips del header fue
+       REEMPLAZADA por la barra global LTMS_Global_Catbar (el JS de
+       ltms-catbar.js la adopta dentro del header sticky y aplica su fade)
+       — initChipsFade murió con su consumidor. */
     /* HOME-UX5-001 (2026-10-04): carruseles por categoría — flechas
        prev/next (solo escritorio: el CSS las oculta en <768px, donde el
        track se desliza con el dedo) y fade de bordes con el mismo patrón
@@ -2160,10 +2131,10 @@
       var scope = document.querySelector('.pv-scope.pv-home');
       if (!scope) return;
       initLiveSearch(scope);
-      initChipsFade(scope);
       initCatCarousels(scope);
-      // El handler global AUDIT-FE-HOME-003 cubre los chips. El IIFE sigue
-      // siendo la válvula de extensión para futuros behaviours de la home.
+      // HOME-CATBAR-2026-005: la barra de categorías global (ltms-catbar.js)
+      // reemplazó la fila de chips del header — este scope queda con live
+      // search y carruseles; válvula de extensión para futuros behaviours.
     }
 
     if (document.readyState === 'loading') {

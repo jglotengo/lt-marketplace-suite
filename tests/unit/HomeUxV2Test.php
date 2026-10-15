@@ -118,53 +118,37 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX2-003 → HOME-UX5-004 → HOME-CATBAR-2026-003 (2026-10-15): chips =
-	 * TODAS las categorías activas — la fila del header es la barra de
-	 * categorías siempre visible del operador ("que el usuario pueda
-	 * seleccionar las categorías que desee"). El slice top 8 fue eliminado
-	 * (la fila es única y deslizable — caben todas). Test actualizado en el
-	 * mismo commit (lección #119).
+	 * HOME-UX2-003 → HOME-CATBAR-2026-003 → HOME-CATBAR-2026-005
+	 * (2026-10-15, operador — "reemplace la barra que existe en las páginas
+	 * del proyecto por esta"): la fila de chips de categorías del header fue
+	 * REEMPLAZADA por la barra global LTMS_Global_Catbar — una sola barra en
+	 * todo el proyecto; la home ya no lleva su propia implementación.
+	 * Test actualizado en el mismo commit (lección #119).
 	 */
-	public function test_002_chips_categorias_reales_como_enlaces(): void {
+	public function test_002_barra_global_reemplaza_chips_del_header(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
-		// Términos muertos eliminados del default de chips.
+		// Términos muertos eliminados del default de chips (histórico UX2-003).
 		$this->assertStringNotContainsString( "'Tecnología'", $src, "HOME-UX2-003: 'Tecnología' no existe en el catálogo (0 categorías, 113 matches de descripción — no es chip)." );
 		$this->assertStringNotContainsString( "'Regalos'", $src, "HOME-UX2-003: búsqueda de 'Regalos' = 0 resultados verificados." );
 		$this->assertStringNotContainsString( "'Hogar'", $src, "HOME-UX2-003: búsqueda de 'Hogar' = 2 resultados verificados — no es chip." );
 
-		// HOME-CATBAR-2026-003: los chips derivan de TODAS las categorías
-		// activas (foreach directo, sin slice).
-		$this->assertStringContainsString(
-			'foreach ( $pv_cat_terms as $pv_chip_term )',
+		// HOME-CATBAR-2026-005: la fila de chips y su filtro murieron con el
+		// consumidor — la barra global (ltms-catbar) es la única barra.
+		$this->assertStringNotContainsString(
+			'pv-home-header__chip',
 			$src,
-			'HOME-CATBAR-2026-003: los chips iteran TODAS las categorías activas (la fila es la barra de categorías del header).'
+			'HOME-CATBAR-2026-005: la fila de chips fue eliminada del header (reemplazada por la barra global LTMS_Global_Catbar).'
 		);
 		$this->assertStringNotContainsString(
-			'array_slice( $pv_cat_terms, 0, 8 ) as $pv_chip_term',
+			"apply_filters( 'ltms_home_popular_chips',",
 			$src,
-			'HOME-CATBAR-2026-003: el slice top-8 de chips fue eliminado — todas las categorías son accesibles siempre.'
-		);
-		$this->assertStringNotContainsString(
-			'array_slice( $pv_cat_terms, 0, 4 )',
-			$src,
-			'HOME-UX5-004: el top 4 de chips fue ampliado hace 2 ciclos — no debe volver.'
-		);
-		$this->assertMatchesRegularExpression(
-			"/<a class=\"pv-home-header__chip\" href=\"<\?php echo esc_url\( \\\$pv_chip\['url'\] \); \?>/",
-			$src,
-			'HOME-UX2-003: los chips son enlaces <a> a la página de la categoría (no botones de búsqueda).'
+			'HOME-CATBAR-2026-005: el filtro ltms_home_popular_chips fue eliminado con su consumidor (la barra global provee las categorías).'
 		);
 		$this->assertStringNotContainsString(
 			'data-pv-search-chip',
 			$src,
 			'HOME-UX2-003: sin data-pv-search-chip — el handler JS lanzaría una búsqueda de texto que puede llegar vacía.'
-		);
-		// El filtro de personalización se conserva.
-		$this->assertStringContainsString(
-			"apply_filters( 'ltms_home_popular_chips',",
-			$src,
-			'HOME-UX2-003: el filtro ltms_home_popular_chips se conserva (backward compat).'
 		);
 	}
 

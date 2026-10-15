@@ -9,9 +9,12 @@
  * ltms_home_template_enabled = 'yes').
  *
  * Secciones:
- *  - Header 3 zonas (logo · buscador con chips de categorías reales · acciones
- *    de cuenta). Carrito abre el mini-cart lateral (HOME-UX2-004).
- *  - Barra de categorías con TODAS las activas (HOME-UX2-002).
+ *  - Header 3 zonas (logo · buscador · acciones de cuenta). Carrito abre el
+ *    mini-cart lateral (HOME-UX2-004). La barra global de categorías
+ *    (LTMS_Global_Catbar, HOME-CATBAR-2026-005) se adopta DENTRO del header
+ *    sticky como última fila — reemplazó la fila de chips propia.
+ *  - Grid de categorías «Explora por categorías» con TODAS las activas
+ *    (HOME-UX2-002).
  *  - Hero banner (slide 1 del Home Slider + tarjetas 2-3, texto en HTML).
  *  - Trust bar (4 items: Compra Protegida, Pago Seguro,
  *    Vendedores Verificados, Envío a todo el país). SIN devoluciones.
@@ -59,15 +62,13 @@ $pv_wishlist_url = apply_filters( 'ltms_wishlist_url', home_url( '/favoritos' ) 
 $pv_wishlist_count = apply_filters( 'ltms_wishlist_count', 0 );
 
 /**
- * Popular Requests — chips de accesos rápidos.
- * HOME-UX2-003 (2026-10-02): antes eran 4 términos hardcodeados que no
- * existían en el catálogo ('Tecnología', 'Regalos', 'Hogar' → 0-2 resultados
- * reales). HOME-CATBAR-2026-003 (2026-10-15): la fila derivó de top 4 → top 8
- * → TODAS las categorías activas — es la barra de categorías siempre visible
- * del header (fila única deslizable). Enlazan DIRECTO a la página de la
- * categoría — nunca a una búsqueda de texto que puede llegar vacía. Se
- * computan tras la consulta de categorías (sección 2). Filterable via
- * ltms_home_popular_chips.
+ * HOME-CATBAR-2026-005 (2026-10-15, operador — "reemplace la barra que
+ * existe en las páginas del proyecto por esta"): la fila de chips de
+ * categorías del header fue REEMPLAZADA por la barra global
+ * LTMS_Global_Catbar — una sola barra de categorías en todo el proyecto
+ * (el JS de ltms-catbar.js la adopta dentro de este header sticky como
+ * última fila). El filtro ltms_home_popular_chips y su markup murieron
+ * con el consumidor.
  */
 
 /* ---------------------------------------------------------------------------
@@ -148,30 +149,6 @@ $pv_cat_icons = apply_filters( 'ltms_home_category_icons', array(
     'regalos'      => '🎁',
 ) );
 
-/* HOME-UX2-003 → HOME-UX5-004 → HOME-CATBAR-2026-003 (2026-10-15): chips =
- * TODAS las categorías activas del catálogo. Antes top 4 → top 8; ahora la
- * fila del header es la BARRA DE CATEGORÍAS de la home (decisión del
- * operador: "una barra de categorías que no se oculte mientras se desplaza
- * — que el usuario pueda seleccionar las categorías que desee") — con
- * fila única deslizable (ver CSS) las ~21 caben sin ocupar varias filas y
- * quedan SIEMPRE accesibles (el colapso al scroll fue eliminado).
- * Enlaces DIRECTOS a la página de la categoría, nunca a búsquedas de texto
- * que pueden llegar vacías. Filterable via ltms_home_popular_chips. */
-$pv_popular_chips = array();
-if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) {
-    foreach ( $pv_cat_terms as $pv_chip_term ) {
-        $pv_chip_tid  = (int) ( $pv_chip_term->term_id ?? 0 );
-        $pv_chip_url  = $pv_chip_tid ? get_term_link( $pv_chip_tid ) : get_term_link( $pv_chip_term );
-        if ( is_wp_error( $pv_chip_url ) ) {
-            $pv_chip_url = $pv_shop_url;
-        }
-        $pv_popular_chips[] = array(
-            'name' => $pv_chip_term->name,
-            'url'  => $pv_chip_url,
-        );
-    }
-}
-$pv_popular_chips = apply_filters( 'ltms_home_popular_chips', $pv_popular_chips );
 
 /* ---------------------------------------------------------------------------
  * 3. HOME-UX5 (2026-10-04): imagen representativa por categoría + carruseles
@@ -409,7 +386,7 @@ do_action( 'ltms_before_home_plazaviva' );
                      width="95" height="40" />
             </a>
 
-            <?php /* --- Zona 2: Buscador con chips --- */ ?>
+            <?php /* --- Zona 2: Buscador --- */ ?>
             <div class="pv-home-header__search" role="search">
                 <form class="pv-home-header__search-form" method="get" action="<?php echo esc_url( $pv_shop_url ); ?>">
                     <label class="pv-visually-hidden" for="pv-home-search"><?php esc_html_e( 'Buscar productos', 'ltms' ); ?></label>
@@ -448,23 +425,6 @@ do_action( 'ltms_before_home_plazaviva' );
                      el JS del scope HOME lo llena contra ltms_live_search
                      (productos visibles, rate limit 30/min server-side). */ ?>
                 <div id="pv-home-suggestions" class="pv-home-header__suggestions" role="listbox" aria-label="<?php esc_attr_e( 'Sugerencias de búsqueda', 'ltms' ); ?>" hidden></div>
-                <?php /* HOME-UX2-003 → HOME-CATBAR-2026-003: chips = TODAS las
-                     * categorías activas como enlaces directos a su página
-                     * (fila única deslizable — barra de categorías siempre
-                     * visible del header; sin data-pv-search-chip: el handler
-                     * JS del design system rellenaría el input y lanzaría una
-                     * búsqueda de texto que puede llegar vacía). */ ?>
-                <?php if ( ! empty( $pv_popular_chips ) ) : ?>
-                    <ul class="pv-home-header__chips" aria-label="<?php esc_attr_e( 'Categorías del marketplace', 'ltms' ); ?>">
-                        <?php foreach ( $pv_popular_chips as $pv_chip ) : ?>
-                            <li>
-                                <a class="pv-home-header__chip" href="<?php echo esc_url( $pv_chip['url'] ); ?>">
-                                    <?php echo esc_html( $pv_chip['name'] ); ?>
-                                </a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
             </div>
 
             <?php /* --- Zona 3: Acciones de cuenta --- */ ?>
@@ -1181,8 +1141,9 @@ body.pv-home-native{font-size:16px;}
 }
 .pv-scope.pv-home .pv-home-header__search-icon{color:var(--text-3);flex-shrink:0;display:flex;}
 /* Filtro de categoría dentro del campo (patrón Amazon). En base móvil se
-   oculta (la barra de categorías está 20px debajo — mismo camino); visible
-   desde 480px. font-size 16px: evita el zoom automático de iOS en campos. */
+   oculta (la barra global de categorías va justo debajo dentro del header
+   — mismo camino); visible desde 480px. font-size 16px: evita el zoom
+   automático de iOS en campos. */
 .pv-scope.pv-home .pv-home-header__search-cat{
     display:none;
     height:44px;min-width:0;flex-shrink:1;
@@ -1229,43 +1190,11 @@ body.pv-home-native{font-size:16px;}
     font-size:13px;font-weight:700;color:var(--primary-700);flex-shrink:0;white-space:nowrap;
 }
 
-/* HOME-UX5-004 → HOME-CATBAR-2026-003 (2026-10-15, operador): la fila de
-    chips es la BARRA DE CATEGORÍAS del header — TODAS las categorías en
-    fila ÚNICA DESLIZABLE (nowrap + overflow-x auto), SIEMPRE visible (el
-    colapso al scroll de HOME-UX5-003 fue ELIMINADO: el operador reportó
-    que "las palabras que están debajo del buscador parpadean" al escrolear
-    — el toggle de estado de scroll re-disparaba la transición de
-    max-height/opacity en cada evento scroll). El fade del borde derecho lo
-    togglea initChipsFade (JS del scope HOME) con el mismo patrón
-    data-pv-scrollable/data-pv-at-end de los carruseles. Overlay blanco
-    sutil (rgba .10) mantiene el contraste AA del texto blanco sobre el
-    rojo de marca. Touch target 44px (HOME-MATRIX-FIX). */
-.pv-scope.pv-home .pv-home-header__chips{
-    display:flex;gap:6px;flex-wrap:nowrap;
-    overflow-x:auto;scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
-    scroll-snap-type:x proximity;
-    min-width:0;
-}
-.pv-scope.pv-home .pv-home-header__chips::-webkit-scrollbar{display:none;}
-.pv-scope.pv-home .pv-home-header__chips[data-pv-scrollable="1"]:not([data-pv-at-end="1"]){
-    -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
-    mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 28px),transparent 100%);
-}
-.pv-scope.pv-home .pv-home-header__chip{
-    display:inline-flex;align-items:center;
-    padding:8px 14px;border-radius:var(--r-pill);
-    background:rgba(255,255,255,.10);color:#fff;
-    font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.22);
-    text-decoration:none;cursor:pointer;
-    transition:background var(--t),color var(--t),border-color var(--t);
-    /* HOME-MATRIX-FIX: touch target 44px mínimo (brief: 44×44 con 8px de
-       separación; los chips estaban en 32px). */
-    min-height:44px;
-    scroll-snap-align:start;
-    flex-shrink:0;
-}
-.pv-scope.pv-home .pv-home-header__chip:hover{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.55);}
+/* HOME-CATBAR-2026-005 (2026-10-15, operador): la fila de chips del header
+    fue REEMPLAZADA por la barra global LTMS_Global_Catbar — el JS de
+    ltms-catbar.js la adopta DENTRO de este header sticky como última fila
+    (variante home en assets/css/ltms-catbar.css: static, sin logo, alineada
+    a --pv-maxw). Las reglas de chips de aquí abajo murieron con el markup. */
 
 .pv-scope.pv-home .pv-home-header__actions{grid-area:actions;justify-self:end;display:flex;align-items:center;gap:4px;}
 .pv-scope.pv-home .pv-home-header__action{
@@ -1865,7 +1794,9 @@ body.pv-home-native .ltms-header-access{display:none!important}
  *   1. Chips de búsqueda: el handler global del design system 
  *      ltms-plaza-viva.js (líneas 588-614, AUDIT-FE-HOME-003 FIX, commit
  *      9882789b) ya rellena el input + hace form.submit() al click en
- *      [data-pv-search-chip]. Como ese handler global se registra primero
+ *      los chips de búsqueda (attr que la home dejó de emitir en
+ *      HOME-CATBAR-2026-005, cuando la fila fue reemplazada por la barra
+ *      global). Como ese handler global se registra primero
  *      y dispara navegación síncrona (form.submit()), el listener inline
  *      registrado después al cargar el footer NUNCA tenía oportunidad de
  *      correr visible — Bulldozer code duplicado que rompía CSP sin aportar.

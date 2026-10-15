@@ -7,11 +7,12 @@
  *     12 productos c/u (popularity), track de 2 filas con scroll-snap +
  *     flechas prev/next (escritorio), "Ver más" → archivo de la categoría.
  *     REEMPLAZA la sección "Productos en tendencia" (decisión del operador).
- *   - HOME-UX5-003 → HOME-CATBAR-2026-003 (2026-10-15): header ROJO sticky
- *     con fila de chips (barra de categorías) SIEMPRE visible — el colapso
- *     al scroll (initHeaderScroll/data-pv-scrolled) fue eliminado por
- *     parpadeo + petición del operador; initChipsFade aplica el fade de
- *     la fila única deslizable (móvil Y escritorio).
+ *   - HOME-UX5-003 → HOME-CATBAR-2026-003 → HOME-CATBAR-2026-005
+ *     (2026-10-15): header ROJO sticky con la barra de categorías SIEMPRE
+ *     visible — el colapso al scroll (initHeaderScroll/data-pv-scrolled)
+ *     fue eliminado por parpadeo + petición del operador. Desde 005 la
+ *     barra es la GLOBAL (LTMS_Global_Catbar, adoptada dentro del header
+ *     sticky): la fila de chips propia e initChipsFade fueron eliminados.
  *
  * Tests PURAMENTE estructurales (file_get_contents + asserts sobre el
  * source PHP/JS): NO cargan clases del plugin ni invocan WP → deterministas
@@ -139,13 +140,14 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX5-003 → HOME-CATBAR-2026-003 (2026-10-15): JS del scope HOME —
-	 * initHeaderScroll (colapso de chips al scroll, [data-pv-scrolled]) fue
-	 * ELIMINADO (parpadeo reportado por el operador + petición de que la
-	 * barra nunca se oculte). initChipsFade aplica el fade del borde derecho
-	 * de la fila de chips (patrón data-pv-scrollable/at-end, como los
-	 * carruseles) e initCatCarousels cable las flechas + el fade por track.
-	 * Test actualizado en el mismo commit (lección #119).
+	 * HOME-UX5-003 → HOME-CATBAR-2026-003 → HOME-CATBAR-2026-005: JS del
+	 * scope HOME — initHeaderScroll (colapso al scroll, [data-pv-scrolled])
+	 * fue ELIMINADO (parpadeo reportado por el operador + petición de que la
+	 * barra nunca se oculte). Desde 005 la fila de chips fue REEMPLAZADA por
+	 * la barra global (ltms-catbar.js aplica su fade): initChipsFade fue
+	 * eliminado con su consumidor. initCatCarousels cable las flechas + el
+	 * fade por track de los carruseles. Test actualizado en el mismo commit
+	 * (lección #119).
 	 */
 	public function test_003_js_header_scroll_y_carruseles(): void {
 		$js = file_get_contents( $this->pv_js_path );
@@ -161,16 +163,18 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 			$js,
 			'HOME-CATBAR-2026-003: el toggle data-pv-scrolled fue eliminado del JS (la barra es siempre visible).'
 		);
-		// Chips: fade del borde derecho de la fila única deslizable.
-		$this->assertMatchesRegularExpression(
-			"/function initChipsFade\(scope\)/",
+		// HOME-CATBAR-2026-005: la fila de chips fue REEMPLAZADA por la barra
+		// global (ltms-catbar.js se encarga de su fade) — initChipsFade y su
+		// selector murieron con el consumidor.
+		$this->assertStringNotContainsString(
+			'function initChipsFade',
 			$js,
-			'HOME-CATBAR-2026-003: el scope HOME debe declarar initChipsFade (fade de la fila de chips).'
+			'HOME-CATBAR-2026-005: initChipsFade fue eliminado — el fade de la barra vive en ltms-catbar.js.'
 		);
-		$this->assertStringContainsString(
-			"qs('.pv-home-header__chips', scope)",
+		$this->assertStringNotContainsString(
+			'pv-home-header__chips',
 			$js,
-			'HOME-CATBAR-2026-003: initChipsFade sincroniza la fila de chips (barra de categorías del header).'
+			'HOME-CATBAR-2026-005: la fila de chips del header ya no existe (reemplazada por la barra global).'
 		);
 
 		// Carruseles: flechas + fade por track.
@@ -195,16 +199,16 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 			'HOME-UX5-001: el fade de bordes (data-pv-scrollable) se sincroniza por track de carrusel.'
 		);
 
-		// Ambos inicializadores montan en initHome.
-		$this->assertStringContainsString(
-			'initChipsFade(scope);',
-			$js,
-			'HOME-CATBAR-2026-003: initHome debe montar initChipsFade.'
-		);
+		// El inicializador de carruseles monta en initHome.
 		$this->assertStringContainsString(
 			'initCatCarousels(scope);',
 			$js,
 			'HOME-UX5-001: initHome debe montar initCatCarousels.'
+		);
+		$this->assertStringNotContainsString(
+			'initChipsFade(scope);',
+			$js,
+			'HOME-CATBAR-2026-005: initHome ya no monta initChipsFade (la barra global tiene su propio JS).'
 		);
 
 		// El fade de la barra de categorías murió con el scroll horizontal.
@@ -223,9 +227,10 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX5 infra → HOME-CATBAR-2026-003: el .min.js debe estar REGENERADO
-	 * con el código nuevo (SG Optimizer sirve el min en producción — un min
-	 * viejo dejaría los carruseles sin flechas y el fade de los chips muerto).
+	 * HOME-UX5 infra → HOME-CATBAR-2026-005: el .min.js debe estar
+	 * REGENERADO con el código nuevo (SG Optimizer sirve el min en
+	 * producción — un min viejo dejaría los carruseles sin flechas y
+	 * conservaría el initChipsFade muerto).
 	 */
 	public function test_004_min_js_regenerado(): void {
 		$min = file_get_contents( $this->pv_min_js_path );
@@ -234,13 +239,19 @@ final class HomeCatCarouselsTest extends LTMS_Unit_Test_Case {
 		$this->assertStringNotContainsString(
 			'data-pv-scrolled',
 			$min,
-			'HOME-CATBAR-2026-003: el .min.js NO debe contener el toggle data-pv-scrolled (los chips nunca se ocultan).'
+			'HOME-CATBAR-2026-003: el .min.js NO debe contener el toggle data-pv-scrolled (la barra nunca se oculta).'
 		);
-		// El fade de los chips viaja en el min (mismos atributos que los tracks).
+		// HOME-CATBAR-2026-005: el fade de los chips viajó a ltms-catbar.min.js
+		// — aquí queda el de los carruseles (mismo patrón data-pv-scrollable).
 		$this->assertStringContainsString(
 			'data-pv-scrollable',
 			$min,
-			'HOME-CATBAR-2026-003: el .min.js debe contener el fade data-pv-scrollable (chips + carruseles).'
+			'HOME-UX5-001: el .min.js debe contener el fade data-pv-scrollable (carruseles de la home).'
+		);
+		$this->assertStringNotContainsString(
+			'initChipsFade',
+			$min,
+			'HOME-CATBAR-2026-005: el .min.js no debe contener initChipsFade (muró con la fila de chips).'
 		);
 		$this->assertStringContainsString(
 			'data-pv-carousel-prev',

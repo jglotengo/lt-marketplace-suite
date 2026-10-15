@@ -3,8 +3,11 @@
    Barra sticky con logo oficial + TODAS las categorías activas en fila
    única deslizable. Rojo de marca #E80001 (brief), chips blancos (4.74:1
    AA), categoría activa en dorado primario #F7B731 con texto negro (11.8:1).
-   Los tokens (--pv-maxw, --ltms-gold) vienen de plaza-viva.css (encolado
-   global); los fallbacks cubren el caso extremo de orden de carga.
+   HOME-CATBAR-2026-005: también en la home nativa (adoptada dentro del
+   header sticky, reemplazando la fila de chips) y touch target 44px (brief
+   HOME-MATRIX-FIX). Los tokens (--pv-maxw, --ltms-gold) vienen de
+   plaza-viva.css (encolado global); los fallbacks cubren el caso extremo de
+   orden de carga.
    ============================================================================ */
 
 .ltms-catbar{
@@ -54,7 +57,7 @@
 .ltms-catbar__chip{
 	display:inline-flex;
 	align-items:center;
-	min-height:40px;
+	min-height:44px; /* HOME-CATBAR-2026-005: touch target 44px del brief (paridad con los chips de la home que reemplaza). */
 	padding:6px 14px;
 	border-radius:999px;
 	background:rgba(255,255,255,.10);
@@ -82,4 +85,23 @@
 }
 @media (max-width:767px){
 	.ltms-catbar__inner{padding:4px 14px;}
+}
+
+/* HOME-CATBAR-2026-005: en la home nativa la barra vive DENTRO del header
+   sticky (.pv-home-header la adopta el JS) como última fila — reemplaza la
+   fila de chips de HOME-CATBAR-2026-003. Hereda el "nunca se oculta" del
+   header (static, sin doble franja: el header ya es --brand), sin logo
+   duplicado (el header muestra el oficial) y alineada al contenedor
+   .pv-section (mismo --pv-maxw + padding 22/14px). El rojo del header
+   contrasta con el hero de fondo claro justo debajo. */
+.pv-scope.pv-home .ltms-catbar{
+	position:static;
+	background:transparent;
+	border-bottom:none;
+	z-index:auto;
+}
+.pv-scope.pv-home .ltms-catbar__home{display:none;}
+.pv-scope.pv-home .ltms-catbar__inner{padding:0 22px 6px;}
+@media (max-width:767px){
+	.pv-scope.pv-home .ltms-catbar__inner{padding:0 14px 4px;}
 }

@@ -92,15 +92,16 @@ final class HomeQuickViewAttrTest extends LTMS_Unit_Test_Case {
     }
 
     /**
-     * Regresión del search-chip: garantiza que el atributo data-pv-search-chip
-     * sigue presente (AUDIT-FE-HOME-003 añade listener en ltms-plaza-viva.js).
+     * HOME-CATBAR-2026-005: la home ya NO emite data-pv-search-chip — la
+     * fila de chips fue reemplazada por la barra global (ltms-catbar). El
+     * handler global de plaza-viva.js se conserva para otros templates.
      */
-    public function test_home_template_has_search_chip_attr(): void {
+    public function test_home_template_has_no_search_chip_attr(): void {
         $source = file_get_contents( self::HOME_TEMPLATE );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             'data-pv-search-chip',
             $source,
-            'home.php must keep data-pv-search-chip attr (chips populares)'
+            'HOME-CATBAR-2026-005: la home no debe emitir data-pv-search-chip (la fila de chips fue reemplazada por la barra global).'
         );
     }
 }

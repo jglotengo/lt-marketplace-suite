@@ -86,13 +86,15 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * HOME-REDESIGN-002-B → HOME-UX2-001 → HOME-UX5-003 → BRAND-2026-001 →
-	 * HOME-CATBAR-2026-003 (2026-10-15): header ROJO DE MARCA del brief —
-	 * var(--brand) (#E80001, blanco 4.74:1 AA). La fila de chips (barra de
-	 * categorías del header) es SIEMPRE visible (petición del operador:
-	 * "que esa barra no se oculte mientras se desplaza") — el colapso al
-	 * scroll de HOME-UX5-003 ([data-pv-scrolled], parpadeo reportado al
-	 * escrolear) fue ELIMINADO; la fila es única y deslizable con TODAS las
-	 * categorías. Test actualizado en el mismo commit (lección #119).
+	 * HOME-CATBAR-2026-003 → HOME-CATBAR-2026-005 (2026-10-15): header ROJO
+	 * DE MARCA del brief — var(--brand) (#E80001, blanco 4.74:1 AA). La
+	 * barra de categorías es SIEMPRE visible (petición del operador: "que
+	 * esa barra no se oculte mientras se desplaza") — el colapso al scroll
+	 * de HOME-UX5-003 ([data-pv-scrolled], parpadeo reportado al escrolear)
+	 * fue ELIMINADO. Desde HOME-CATBAR-2026-005 la barra es la GLOBAL
+	 * (LTMS_Global_Catbar, adoptada dentro de este header sticky): la fila
+	 * de chips propia fue eliminada. Test actualizado en el mismo commit
+	 * (lección #119).
 	 */
 	public function test_002_header_rojo_tokens(): void {
 		$src = file_get_contents( $this->home_path );
@@ -121,22 +123,20 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-UX5-003: el header debe seguir sticky (top:0) — se mantiene visible al hacer scroll.'
 		);
-		// HOME-CATBAR-2026-003: la fila de chips es SIEMPRE visible — el
-		// colapso al scroll fue eliminado (parpadeo reportado por el operador).
+		// HOME-CATBAR-2026-003: la barra nunca se oculta — el colapso al
+		// scroll fue eliminado (parpadeo reportado por el operador).
 		$this->assertStringNotContainsString(
 			'data-pv-scrolled',
 			$src,
 			'HOME-CATBAR-2026-003: el mecanismo de colapso [data-pv-scrolled] fue eliminado — la barra de categorías nunca se oculta.'
 		);
-		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__chips\{[^}]*flex-wrap:nowrap;/s",
+		// HOME-CATBAR-2026-005: la fila de chips fue REEMPLAZADA por la barra
+		// global LTMS_Global_Catbar (adoptada dentro del header sticky via
+		// ltms-catbar.js — su CSS/JS se validan en GlobalCatbarTest).
+		$this->assertStringNotContainsString(
+			'pv-home-header__chips',
 			$src,
-			'HOME-CATBAR-2026-003: los chips van en FILA ÚNICA (nowrap) — la barra de categorías no ocupa varias filas.'
-		);
-		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__chips\{[^}]*overflow-x:auto;/s",
-			$src,
-			'HOME-CATBAR-2026-003: la fila de chips es deslizable horizontalmente (todas las categorías accesibles).'
+			'HOME-CATBAR-2026-005: la fila de chips fue eliminada del header — la barra global la reemplaza (una sola barra en el proyecto).'
 		);
 	}
 

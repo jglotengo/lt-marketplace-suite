@@ -56,9 +56,11 @@
  *   * Sin acompañantes inline peligrosos: home.php y single-product.php NO
  *     contienen `onsubmit=`, `onload=`, `onclick=` inline event handlers.
  *
- *   * Estructura HTML preservada: home.php sigue emitiendo el scope `.pv-scope
- *     .pv-home`, el input `#pv-home-search`, los chips `data-pv-search-chip`, y
- *     `.pv-home-header`. single-product.php sigue emitiendo `.pv-scope.pv-product-page`,
+	 *   * Estructura HTML preservada: home.php sigue emitiendo el scope `.pv-scope
+	 *     .pv-home`, el input `#pv-home-search` y `.pv-home-header`. Los chips
+	 *     `data-pv-search-chip` fueron eliminados en HOME-CATBAR-2026-005
+	 *     (la fila fue reemplazada por la barra global — ver test_002).
+	 *     single-product.php sigue emitiendo `.pv-scope.pv-product-page`,
  *     la sección `.pv-bundle` con `data-pv-bundle-discount`, y todos los
  *     items/total/save/add con sus data-attrs (no se rompió la migración).
  *
@@ -204,10 +206,10 @@ final class HomeProductScopeAuditTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * Invariante: home.php sigue emitiendo el scope .pv-scope.pv-home y los
-	 * elementos HTML críticos de la home (search input, chips, header).
-	 * La migración fue del JS, no del HTML — estos elementos son los que
-	 * el handler global del design system (líneas 588-614) usa para
-	 * rellenar el input y dispatchar form.submit() al click en un chip.
+	 * elementos HTML críticos de la home (search input, header). Los chips
+	 * data-pv-search-chip fueron eliminados en HOME-CATBAR-2026-005 (la
+	 * fila fue reemplazada por la barra global) — el handler global del
+	 * design system se conserva para otros templates.
 	 */
 	public function test_002_home_php_estructura_html_preservada(): void {
 		$this->assertFileExists( $this->home_path );
@@ -227,11 +229,13 @@ final class HomeProductScopeAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-HOME-001: el input de búsqueda #pv-home-search debe seguir presente'
 		);
 
-		// (3) Chips de búsqueda presentes.
-		$this->assertStringContainsString(
+		// (3) HOME-CATBAR-2026-005: los chips de búsqueda murieron con la
+		// fila reemplazada por la barra global — data-pv-search-chip NO debe
+		// existir en la home (el handler global queda para otros templates).
+		$this->assertStringNotContainsString(
 			'data-pv-search-chip',
 			$src,
-			'AUDIT-FE-HOME-001: los chips data-pv-search-chip deben seguir presentes (el handler global del design system los lee)'
+			'HOME-CATBAR-2026-005: la home ya no emite chips data-pv-search-chip (la fila fue reemplazada por la barra global).'
 		);
 
 		// (4) Header del scope presente.

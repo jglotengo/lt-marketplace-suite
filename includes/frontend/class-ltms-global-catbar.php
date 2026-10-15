@@ -17,10 +17,8 @@
  * LTMS_Utils::get_normalized_product_categories() (dedup por fingerprint +
  * orden por # de productos), con la exclusión del artefacto 'no-aplica'.
  *
- * Dónde NO renderiza (documentado):
- *   - Home nativa: su header sticky ya tiene su propia barra de chips
- *     (HOME-CATBAR-2026-003) — una segunda sería redundante.
- *   - Checkout / order-received: protección del funnel de pago (misma
+	 * Dónde NO renderiza (documentado):
+	 *   - Checkout / order-received: protección del funnel de pago (misma
  *     filosofía de HOME-REDESIGN-007 — nada distrae del checkout).
  *   - Panel del vendedor (dashboard/wallet/orders): páginas de app, no de
  *     catálogo.
@@ -31,11 +29,21 @@
  *     position:sticky !important, nunca se oculta) y sus categorías son
  *     filtros multi-select propios del sidebar.
  *
- * Ubicación: se imprime en wp_body_open (inicio del body) y el JS
- * (assets/js/ltms-catbar.js) la reubica DEBAJO del header del tema cuando
- * existe (.elementor-location-header — verificado en producción: el header
- * del tema NO es sticky, por lo que al escrolear la barra queda sola arriba,
- * siempre visible).
+	 * HOME-CATBAR-2026-005 (2026-10-15, operador — "reemplace la barra que
+	 * existe en las páginas del proyecto por esta"): la barra ahora TAMBIÉN
+	 * renderiza en la home nativa, REEMPLAZANDO la fila de chips que su header
+	 * llevaba desde HOME-CATBAR-2026-003 — una sola barra de categorías en
+	 * todo el proyecto. En la home el JS la adopta DENTRO del header sticky
+	 * (.pv-home-header, última fila): hereda el "nunca se oculta" del header,
+	 * va sin logo duplicado (el CSS esconde .ltms-catbar__home en el scope
+	 * home) y su rojo contrasta con el hero de fondo claro justo debajo.
+	 *
+	 * Ubicación: se imprime en wp_body_open (inicio del body) y el JS
+	 * (assets/js/ltms-catbar.js) la reubica: (a) home nativa → dentro de su
+	 * header sticky; (b) demás páginas → DEBAJO del header del tema
+	 * (.elementor-location-header — verificado en producción: el header del
+	 * tema NO es sticky, por lo que al escrolear la barra queda sola arriba,
+	 * siempre visible).
  *
  * @package LTMS
  * @since   2.9.414
@@ -86,11 +94,9 @@ class LTMS_Global_Catbar {
 			return false;
 		}
 
-		// Home nativa: su header sticky ya incluye la barra de chips.
-		if ( get_option( 'ltms_home_template_enabled', 'yes' ) === 'yes'
-			&& is_front_page() && is_page() ) {
-			return false;
-		}
+		// HOME-CATBAR-2026-005: la home nativa YA NO se excluye — la barra
+		// reemplaza la fila de chips de su header (el JS la adopta dentro
+		// del header sticky como última fila).
 
 		// Checkout + order-received: protección del funnel.
 		if ( function_exists( 'is_checkout' )

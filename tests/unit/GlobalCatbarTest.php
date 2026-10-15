@@ -1,6 +1,6 @@
 <?php
 /**
- * GlobalCatbarTest — HOME-CATBAR-2026-004 (2026-10-15).
+ * GlobalCatbarTest — HOME-CATBAR-2026-004/005 (2026-10-15).
  *
  * Barra global de categorías (petición del operador: "una barra de
  * categorías para móvil y escritorio, como la de la storefront con logo,
@@ -13,8 +13,10 @@
  *   3. Las categorías: TODAS las activas vía el helper normalizado, con la
  *      exclusión del artefacto 'no-aplica' y la categoría activa resaltada
  *      (is-active + aria-current) en los archivos de categoría.
- *   4. Exclusiones documentadas: home nativa (barra propia), checkout
- *      (funnel), panel del vendedor (dashboard/wallet/orders).
+ *   4. Exclusiones documentadas: checkout (funnel), panel del vendedor
+ *      (dashboard/wallet/orders). HOME-CATBAR-2026-005: la home nativa YA
+ *      NO se excluye — la barra reemplaza la fila de chips del header (el
+ *      JS la adopta dentro del header sticky).
  *   5. Assets: CSS (sticky + fade del track) y JS (reubicación bajo el
  *      header del tema + fade) encolados, con .min.js sincronizado.
  *   6. El topbar del storefront usa el logo OFICIAL (BRAND-2026-002) — el
@@ -96,17 +98,20 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-CATBAR-2026-004-B: exclusiones documentadas — home nativa (tiene
-	 * su propia barra en el header sticky), checkout/order-received (funnel)
-	 * y panel del vendedor (dashboard/wallet/orders).
+	 * HOME-CATBAR-2026-004-B → HOME-CATBAR-2026-005: exclusiones — la home
+	 * nativa YA NO se excluye (la barra global reemplaza la fila de chips de
+	 * su header; el JS la adopta dentro del header sticky). Siguen
+	 * excluidos: checkout/order-received (funnel) y panel del vendedor
+	 * (dashboard/wallet/orders).
 	 */
 	public function test_002_exclusiones_documentadas(): void {
 		$module = $this->strip_php_comments( file_get_contents( $this->module_path ) );
 
-		$this->assertMatchesRegularExpression(
-			"/get_option\( 'ltms_home_template_enabled', 'yes' \) === 'yes'\s*\n?\s*&& is_front_page\(\) && is_page\(\)/",
+		// HOME-CATBAR-2026-005: la home nativa ya NO se excluye.
+		$this->assertStringNotContainsString(
+			'is_front_page() && is_page()',
 			$module,
-			'HOME-CATBAR-2026-004-B: la home nativa queda excluida (su header sticky ya tiene la barra de chips).'
+			'HOME-CATBAR-2026-005: la home nativa YA NO se excluye — la barra global reemplaza la fila de chips (una sola barra en el proyecto).'
 		);
 		$this->assertStringContainsString(
 			"function_exists( 'is_checkout' )",
@@ -205,6 +210,25 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$css,
 			'HOME-CATBAR-2026-004-D: la categoría activa usa el dorado primario del brief (--ltms-gold).'
 		);
+		// HOME-CATBAR-2026-005: touch target 44px del brief (paridad con los
+		// chips de la home que la barra reemplaza).
+		$this->assertStringContainsString(
+			'min-height:44px;',
+			$css,
+			'HOME-CATBAR-2026-005: los chips de la barra usan touch target 44px (brief HOME-MATRIX-FIX).'
+		);
+		// HOME-CATBAR-2026-005: variante home — la barra vive DENTRO del
+		// header sticky (static, sin doble franja, sin logo duplicado).
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.ltms-catbar\{[^}]*position:static;/s',
+			$css,
+			'HOME-CATBAR-2026-005: en la home la barra es static — hereda el sticky del header que la adopta (nunca se oculta).'
+		);
+		$this->assertStringContainsString(
+			'.pv-scope.pv-home .ltms-catbar__home{display:none;}',
+			$css,
+			'HOME-CATBAR-2026-005: sin logo duplicado en la home (el header ya muestra el oficial).'
+		);
 	}
 
 	/**
@@ -226,10 +250,34 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$js,
 			'HOME-CATBAR-2026-004-E: la barra se inserta inmediatamente después del header del tema.'
 		);
+		// HOME-CATBAR-2026-005: en la home nativa la barra se adopta DENTRO
+		// del header sticky propio (el theme header está oculto en la home).
+		$this->assertStringContainsString(
+			"qs('.pv-home-header')",
+			$js,
+			'HOME-CATBAR-2026-005: el JS detecta el header nativo de la home.'
+		);
+		$this->assertStringContainsString(
+			'homeHeader.appendChild(bar)',
+			$js,
+			'HOME-CATBAR-2026-005: en la home la barra se adopta dentro del header sticky (última fila — nunca se oculta).'
+		);
 		$this->assertStringContainsString(
 			'data-ltms-scrollable',
 			$js,
 			'HOME-CATBAR-2026-004-E: el JS sincroniza el fade del borde derecho (data-ltms-scrollable/at-end).'
+		);
+		// HOME-CATBAR-2026-005: navegabilidad — el chip de la categoría activa
+		// se centra en el track al cargar (el usuario ve su contexto).
+		$this->assertStringContainsString(
+			'.ltms-catbar__chip.is-active',
+			$js,
+			'HOME-CATBAR-2026-005: el chip de la categoría activa se localiza para centrarlo en el track.'
+		);
+		$this->assertStringContainsString(
+			"inline: 'center'",
+			$js,
+			'HOME-CATBAR-2026-005: centrado del chip activo via scrollIntoView inline:center (navegabilidad).'
 		);
 
 		// Sincronización .min.js (ltms_asset_url sirve el .min con SCRIPT_DEBUG off).
@@ -239,6 +287,11 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			'.elementor-location-header',
 			$min,
 			'HOME-CATBAR-2026-004-E: el .min.js contiene la reubicación (regenerado, no desincronizado).'
+		);
+		$this->assertStringContainsString(
+			'pv-home-header',
+			$min,
+			'HOME-CATBAR-2026-005: el .min.js contiene la adopción en el header de la home (regenerado, no desincronizado).'
 		);
 	}
 
