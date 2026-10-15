@@ -304,11 +304,17 @@ SÍNTOMA: PosGold no sincroniza automáticamente
 CÓDIGO:   LTMS_CRON_002
 DIAGNÓSTICO:
   wp cron event list | grep posgold
-  Debe aparecer ltms_posgold_sync_poller (cada 15 min).
+  Debe aparecer ltms_posgold_sync_cron (single event programado +5s al
+  pulsar "Sincronizar" — NO existe un poller periódico). Con
+  DISABLE_WP_CRON=true en wp-config.php y sin cron real del server,
+  el evento NUNCA se ejecuta (hallazgo WP-CRON-MUERTO).
 SOLUCIÓN:
-  1. Reinstalar el hook: wp eval 'LTMS_Kernel::get_instance()->register_cron();' --allow-root
-  2. Ejecutar manualmente: wp eval 'do_action("ltms_posgold_sync_poller");' --allow-root
-  3. Revisar lt_posgold_sync_log para errores detallados.
+  1. Configurar cron real del server que golpee wp-cron.php cada 5 min
+     (panel de SiteGround — decisión del operador).
+  2. Ejecutar manualmente la sync pendiente por SSH:
+     wp eval 'LTMS_PosGold_Sync::run_scheduled_sync(<vendor_id>);' --allow-root
+  3. Revisar el último resultado en el user meta del vendor
+     (_ltms_posgold_sync_last_result) o la notificación in-dashboard.
 
 ================================================================================
 11. PROBLEMAS DE RENDIMIENTO
@@ -377,8 +383,7 @@ SOLUCIÓN:
   2. Probar conexión con el botón "Probar conexión" en PosGold > Credenciales.
   3. Verificar que las categorías marcadas en PosGold > Categorías existan
      en PosGold. Si PosGold cambió los IDs, actualizar la selección.
-  4. Revisar lt_posgold_sync_log para ver el request enviado y la respuesta.
-  5. Confirmar con el admin de PosGold que la bodegaid asignada tiene stock.
+   4. Confirmar con el admin de PosGold que la bodegaid asignada tiene stock.
 
 SÍNTOMA: "Error de conexión" / cURL error 28 / HTTP 502
 CÓDIGO:   LTMS_POSGOLD_002
@@ -430,9 +435,12 @@ SÍNTOMA: Sincronización se queda en "En progreso" indefinidamente
 CÓDIGO:   LTMS_POSGOLD_005
 CAUSA:    Cron atascado o proceso PHP muerto por timeout
 SOLUCIÓN:
-  1. Verificar lt_posgold_sync_log para el último intento.
-  2. Reiniciar el estado:
-     DELETE FROM lt_posgold_sync_log WHERE status = 'in_progress' AND created_at < NOW() - INTERVAL 1 HOUR;
+   1. Verificar el último intento en el user meta del vendor
+      (_ltms_posgold_sync_last_result) o la notificación in-dashboard.
+   2. Reiniciar el estado (el flag "En progreso" es user meta
+      _ltms_posgold_sync_in_progress; se considera huérfano tras 30 min,
+      pero conviene borrarlo):
+      wp user meta delete <vendor_id> _ltms_posgold_sync_in_progress --allow-root
   3. Aumentar max_execution_time a 300 en php.ini para sync de catálogos grandes.
   4. Reintentar la sincronización desde el dashboard del vendedor.
 
@@ -476,14 +484,14 @@ SOLUCIÓN:
 
 SÍNTOMA: Los códigos de respaldo no funcionan
 CÓDIGO:   LTMS_TOTP_004
-CAUSA:    Código ya usado o tabla lt_totp_backup_codes corrupta
+CAUSA:    Código ya usado (cada código es single-use y se marca al consumirse)
 SOLUCIÓN:
   1. Verificar que el código no haya sido usado antes (cada código es single-use).
   2. Si tienes otros códigos sin usar, probar con uno diferente.
   3. Si todos fallan, el admin puede regenerar los códigos desde
      LT Marketplace > Seguridad > 2FA > Usuarios > Regenerar códigos.
-  4. Verificar que la tabla lt_totp_backup_codes exista y tenga hashes:
-     SELECT COUNT(*) FROM lt_totp_backup_codes WHERE user_id = XXXX;
+   4. Verificar los hashes guardados en el user meta del usuario:
+      wp user meta get <user_id> _ltms_2fa_backup_codes --allow-root
 
 ================================================================================
 15. POP-UP "ALGO SALIÓ MAL" (NUEVO v2.9.35)

@@ -4,6 +4,49 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-15
+
+### Fixed — `SYNC-LOG-TABLE` (docs muertas: 5 tablas que nunca existieron + hooks de cron PosGold falsos)
+
+> **Hallazgo del checkpoint del 5-Oct (colado de la sesión HOME-UX5), resuelto
+> hoy tras re-verificación de punta a punta:** `SHOW TABLES LIKE '%posgold%'`,
+> `'%totp%'`, `'%sync_log%'` → vacío en producción; cero referencias en código
+> PHP; ausente de `database_schema_full.sql`. La documentación afirmaba 5
+> tablas que nunca se implementaron — con un falso "✅ PASS" de QA (PG-008)
+> sobre una de ellas: `lt_posgold_sync_log`, `lt_posgold_vendor_credentials`,
+> `lt_totp_secrets`, `lt_totp_backup_codes`, `lt_donation_certificates`.
+> Mecanismos reales (verificados en código y documentados en el reemplazo):
+> sync status en user meta `_ltms_posgold_sync_last_result` /
+> `_ltms_posgold_sync_in_progress`; 2FA en `_ltms_2fa_secret` /
+> `_ltms_2fa_backup_codes`; credenciales PosGold en user meta
+> `ltms_posgold_{subdomain,token,empresaid,usuarioid,bodegaid}`.
+>
+> - **Docs corregidas (9 archivos):** `CLAUDE.md` (lista de tablas reales),
+>   `TROUBLESHOOTING.txt` (LTMS_CRON_002, LTMS_POSGOLD_001/005,
+>   LTMS_TOTP_004), `GUIA_ADMINISTRADOR.txt` (2FA/donaciones/cron/entrada
+>   de error imposible), `ENTERPRISE_FEATURES.md` (activity log → sync
+>   status en user meta), `DEPLOY_INSTRUCTIONS.txt` (checklist de tablas,
+>   pasos PosGold, "tablas nuevas 2.9.35"),
+>   `docs/architecture/ARCHITECTURE.md` (flujo `log_sync`/`run()` que no
+>   existen, fila de tabla, sección 9.1, cron jobs), `SETUP_NOTES.md`,
+>   `QA_REPORT.md` (PG-008/PG-009 marcados VOID, PG-010 anotado).
+> - **También:** el hook `ltms_posgold_sync_poller` (cada 15 min) y el
+>   `ltms_posgold_scheduled_sync` (diario 03:00) documentados en 6 archivos
+>   nunca existieron. El real es `ltms_posgold_sync_cron`: single event +5s
+>   por vendor al pulsar "Sincronizar" (verificado en producción,
+>   `wp cron event list`, Non-repeating). La solución documentada de
+>   "PosGold no sincroniza" ahora apunta al problema real (cron del server
+>   muerto, hallazgo WP-CRON-MUERTO) y al workaround verificado
+>   (`run_scheduled_sync()` vía SSH).
+> - Docs-only: sin cambios de runtime, sin LTMS_VERSION bump. Baseline
+>   re-validado tras el fix: suite completa 5,248 tests, 11,415 assertions,
+>   0 fallas (3 skips preexistentes).
+> - **Pendiente del operador (P0, sin cambio de código LTMS):** cron real en
+>   el panel de SiteGround cada 5 min → `wp-cron.php` (hallazgo
+>   WP-CRON-MUERTO: `DISABLE_WP_CRON=true` en wp-config.php:167, 117
+>   eventos vencidos en la cola, incl. el `ltms_posgold_sync_cron` de
+>   Juguetería Taiwan vencido desde el 26-Sep).
+
 ## [Unreleased] — 2026-10-03
 
 ### Fixed/Changed — `HOME-UX4-001` (visibilidad de la barra de categorías de la home)

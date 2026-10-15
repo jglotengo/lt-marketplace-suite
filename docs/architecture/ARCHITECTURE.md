@@ -315,7 +315,9 @@ LTMS.Dashboard.loadView("wallet")
 PosGold integration follows the standard Hexagonal pattern, with a sync engine that bridges the PosGold API client and the WooCommerce product repository:
 
 ```
-LTMS_PosGold_Sync::run($vendor_id)
+LTMS_PosGold_Sync::sync_vendor_products($vendor_id)
+(vendor pulsa "Sincronizar" → schedule_sync → WP-Cron single event
+ ltms_posgold_sync_cron +5s → run_scheduled_sync)
     ↓
   LTMS_Api_Posgold::fetch_catalog($vendor_id, $cursor)
     ↓
@@ -325,7 +327,8 @@ LTMS_PosGold_Sync::run($vendor_id)
     ↓
   wp_insert_post() / wc_get_product()->save()
     ↓
-  LTMS_PosGold_Sync::log_sync($vendor_id, $count, $errors, $duration)
+  update_user_meta($vendor_id, '_ltms_posgold_sync_last_result', [...])
+  + in-dashboard notification (lt_notifications)
 ```
 
 **Price calculator — 8 components:**
@@ -333,7 +336,7 @@ LTMS_PosGold_Sync::run($vendor_id)
 
 Each component is configurable per-vendor (markup %, rounding rule) and per-country (iva, ieps). The calculator is unit-tested independently of the sync engine.
 
-**Deduplication:** products are matched by SKU (`_sku` meta key). Existing products are updated; new products are created. The sync log table `lt_posgold_sync_log` records every batch with vendor_id, products_synced, errors, duration_ms.
+**Deduplication:** products are matched by SKU (`_sku` meta key). Existing products are updated; new products are created. Each batch result (created/updated/skipped/errors) is stored per-vendor in user meta `_ltms_posgold_sync_last_result` and surfaced in the vendor dashboard; no sync-log DB table exists.
 
 ---
 
@@ -351,7 +354,6 @@ Each component is configurable per-vendor (markup %, rounding rule) and per-coun
 | `lt_waf_blocked_ips` | WAF IP blocklist |
 | `lt_notifications` | In-app vendor notifications |
 | `lt_marketing_banners` | Marketing banner registry |
-| `lt_posgold_sync_log` (v2.9.35) | PosGold catalog sync audit log |
 
 ### 9.1 Schema Extensions in v2.9.35
 
@@ -382,20 +384,6 @@ Migration is idempotent: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. Colombian c
 | `2fa_disabled` | 2FA disabled (self or admin) |
 | `2fa_recovery_used` | Recovery code consumed |
 | `2fa_locked_out` | 5 failed attempts in 15 min → lockout |
-
-**`lt_posgold_sync_log` (new table):**
-
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | BIGINT AUTO_INCREMENT | Primary key |
-| `vendor_id` | BIGINT | FK → wp_users.ID |
-| `started_at` | DATETIME | Sync start timestamp |
-| `finished_at` | DATETIME | Sync end timestamp |
-| `duration_ms` | INT | Total duration in milliseconds |
-| `products_synced` | INT | Count of products upserted |
-| `errors_count` | INT | Count of failed product upserts |
-| `error_log` | LONGTEXT | JSON-encoded error details |
-| `trigger` | VARCHAR(20) | manual / scheduled |
 
 ---
 
@@ -431,7 +419,7 @@ In total, v2.9.35 added 35+ missing entries to the autoloader classmap (silent `
 | `ltms_weekly_tax_report` | Weekly Monday | Generate fiscal reports |
 | `ltms_hourly_waf_cleanup` | Hourly | Clean expired WAF blocks |
 | `ltms_sync_commission_rates` | Daily 06:00 | Sync rates from config |
-| `ltms_posgold_scheduled_sync` (v2.9.35) | Daily 03:00 | Sync PosGold catalog for enrolled vendors |
+| `ltms_posgold_sync_cron` (v2.9.72) | On-demand (+5s single event per vendor) | Run the vendor PosGold sync scheduled by the "Sincronizar" button; no recurring sync exists |
 | `ltms_kyc_expiry_reminder` (v2.9.61 P3-12) | Daily 09:00 | Send KYC expiry reminder emails |
 | `ltms_retention_sweep` | Daily | Clean expired transients/rate limits |
 | `ltms_daily_maintenance` | Daily | General maintenance tasks |

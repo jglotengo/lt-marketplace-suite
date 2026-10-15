@@ -362,11 +362,13 @@ Ve a PosGold > Sincronizar:
   - Si una categoría PosGold cambia de ID, debes actualizar la selección
     en PosGold > Categorías.
 
-Sincronización Automática
---------------------------
-El sistema ejecuta sincronizaciones automáticas cada 15 minutos si hay
-cambios en PosGold (cron ltms_posgold_sync_poller). No necesitas hacer
-nada manual para mantener tu catálogo actualizado.
+Sincronización
+--------------
+La sincronización se ejecuta cuando tú la pides: pulsa "Sincronizar
+ahora" en tu dashboard (PosGold) y la sync corre en background — puedes
+cerrar la pestaña y recibirás una notificación cuando termine. El
+catálogo NO se actualiza solo: si cambias productos en PosGold, vuelve
+a sincronizar.
 
 ================================================================================
 10. MARKETING — BANNERS PROMOCIONALES

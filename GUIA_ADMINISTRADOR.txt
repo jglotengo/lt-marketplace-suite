@@ -54,7 +54,7 @@ Paso 3: Activación
   3. El activador ejecuta automáticamente:
      - Creación de tablas en la DB (incluye 11 columnas SAT México)
      - Registro de roles y capacidades
-     - Configuración de cron jobs (incluye ltms_posgold_sync_poller)
+     - Configuración de cron jobs
      - Flush de reglas de reescritura
 
 Paso 4: Configuración mínima
@@ -424,20 +424,21 @@ Permite al admin:
 
 Logs de Sincronización
 -----------------------
-LT Marketplace > PosGold > Logs muestra:
-  - Fecha y hora de cada ejecución
-  - Vendedor
-  - Resultado (éxito / error)
-  - Productos insertados / actualizados / saltados
-  - Mensaje de error (si aplica)
-  - Duración de la sincronización
+NO existe una pantalla de logs de sync en el admin. Cada ejecución guarda
+su resultado en el user meta del vendedor (`_ltms_posgold_sync_last_result`,
+visible en su dashboard PosGold vía polling), crea una notificación
+in-dashboard (tabla lt_notifications) y registra un evento en el logger
+(`POSGOLD_SYNC_COMPLETE`). Diagnóstico por SSH:
+  wp user meta get <vendor_id> _ltms_posgold_sync_last_result --allow-root
 
 Cron de Sincronización
 -----------------------
-  ltms_posgold_sync_poller   Cada 15 min   Procesa la cola de sync pendiente
+  ltms_posgold_sync_cron   On-demand (+5s)   Single event por vendor, agendado
+                                            al pulsar "Sincronizar" (no hay
+                                            poller periódico ni sync diaria)
 
 Forzar sync manualmente para un vendedor:
-  wp eval 'LTMS_Business_PosGold_Sync::run_for_vendor(USER_ID);' --allow-root
+  wp eval 'LTMS_PosGold_Sync::run_scheduled_sync(USER_ID);' --allow-root
 
 ================================================================================
 12. TOTP 2FA — AUTENTICACIÓN DE DOS FACTORES
@@ -474,10 +475,10 @@ Revocar 2FA de un usuario
 ⚠️ La revocación de 2FA es un evento sensible. Siempre deja rastro
    en el log inmutable con usuario admin que ejecutó la acción, IP y motivo.
 
-Tablas relacionadas
---------------------
-  - lt_totp_secrets        Almacena el secret TOTP cifrado por usuario
-  - lt_totp_backup_codes   Hashes de códigos de respaldo (single-use)
+Datos relacionados (user meta, no tablas)
+-------------------------------------------
+  - _ltms_2fa_secret          Secret TOTP cifrado por usuario
+  - _ltms_2fa_backup_codes    Hashes de códigos de respaldo (single-use)
 
 ================================================================================
 13. MARKETING — GESTIÓN DE BANNERS
@@ -553,7 +554,6 @@ Cada certificado incluye número de transacción, fecha, monto y sello digital.
 Tablas relacionadas
 --------------------
   - lt_donations
-  - lt_donation_certificates
 
 ================================================================================
 15. CRON JOBS
@@ -565,7 +565,7 @@ El plugin registra los siguientes cron jobs en WordPress:
   ltms_weekly_tax_report        Lunes           Genera reporte fiscal semanal
   ltms_hourly_waf_cleanup       Cada hora       Limpia IPs expiradas del WAF
   ltms_sync_commission_rates    Diario 06:00    Sincroniza tasas desde config
-  ltms_posgold_sync_poller      Cada 15 min     Procesa cola de sync PosGold
+  ltms_posgold_sync_cron        On-demand       Sync PosGold agendada (single event por vendor)
   ltms_donations_daily_close    Diario 23:00    Cierra donaciones del día
 
 Verificar estado de crons:
@@ -573,7 +573,7 @@ Verificar estado de crons:
 
 Ejecutar manualmente:
   wp eval 'do_action("ltms_daily_payout_processor");' --allow-root
-  wp eval 'do_action("ltms_posgold_sync_poller");' --allow-root
+  wp eval 'LTMS_PosGold_Sync::run_scheduled_sync(<vendor_id>);' --allow-root
 
 ================================================================================
 16. SOLUCIÓN DE PROBLEMAS
@@ -584,12 +584,6 @@ Error: "Tabla lt_wallets no existe"
 Solución: Desactivar y reactivar el plugin. Esto ejecuta el activador que
 crea las tablas.
 Si persiste: Ejecutar manualmente el script SQL en database_schema_full.sql
-
-Error: "Tabla lt_posgold_sync_log no existe"
----------------------------------------------
-Solución: Forzar migración a 2.9.35:
-  wp eval 'LTMS_DB_Migrations::run();' --allow-root
-  wp option get ltms_db_version    # debe ser >= 2.9.35
 
 Error: "Función de cifrado no disponible"
 ------------------------------------------

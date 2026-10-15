@@ -4222,3 +4222,45 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (barLeft=20, primera card x=42) y 390 (x=14, fade activo). Test:
    `HomeCategoriesBarTest::test_006_visibilidad_head_contenedor_y_tinte` + pin de UX3
    actualizado en el mismo commit.
+
+### Lección #189: documentación que afirma infraestructura que NUNCA se implementó — el falso "✅ PASS" del QA sobre una tabla inexistente (SYNC-LOG-TABLE, 2026-10-15)
+
+1. **Caso real:** cinco tablas (`lt_posgold_sync_log`,
+   `lt_posgold_vendor_credentials`, `lt_totp_secrets`, `lt_totp_backup_codes`,
+   `lt_donation_certificates`) estaban documentadas como existentes en 9
+   archivos (CLAUDE.md, TROUBLESHOOTING, GUIA_ADMINISTRADOR,
+   ENTERPRISE_FEATURES, DEPLOY_INSTRUCTIONS, ARCHITECTURE, SETUP_NOTES,
+   QA_REPORT) — incluido un "✅ PASS" (PG-008) afirmando haber escrito en una
+   de ellas y procedimientos de troubleshooting con SELECTs contra tablas
+   vacías. Verificación de punta a punta (2026-10-15): `SHOW TABLES LIKE
+   '%posgold%'`, `'%totp%'`, `'%sync_log%'` → vacío en producción; cero
+   referencias en código PHP; ausente de `database_schema_full.sql`. Lo mismo
+   con los hooks de cron `ltms_posgold_sync_poller` (cada 15 min) y
+   `ltms_posgold_scheduled_sync` (diario): el único real es
+   `ltms_posgold_sync_cron` (single event on-demand +5s por vendor). Los
+   mecanismos reales viven en user meta: `_ltms_posgold_sync_last_result`,
+   `_ltms_2fa_secret`, `_ltms_2fa_backup_codes`,
+   `ltms_posgold_{subdomain,token,empresaid,usuarioid,bodegaid}`.
+
+2. **Causa raíz:** la documentación de diseño de v2.9.35 se escribió como si
+   el diseño YA estuviera implementado (o se implementó distinto y nadie
+   actualizó la doc), y ciclos posteriores copiaron la afirmación entre
+   archivos sin verificarla. El QA reportó PASS contra el fixture del test,
+   no contra el artefacto real. El costo: el operador busca una tabla y un
+   poller que no existen, y el diagnóstico real (cron del server muerto,
+   WP-CRON-MUERTO) queda oculto tras procedimientos falsos.
+
+3. **Fix:** corregir toda la doc al mecanismo real verificado (user meta),
+   marcar PG-008/PG-009 como VOID con fecha y evidencia, y reescribir la
+   solución de "PosGold no sincroniza" apuntando al problema real + al
+   workaround verificado (`LTMS_PosGold_Sync::run_scheduled_sync($vendor_id)`
+   vía SSH).
+
+4. **Regla preventiva:** NINGUNA afirmación de infraestructura (tabla,
+   endpoint, cron hook, asset) entra a la doc sin verificación de punta a
+   punta: `SHOW TABLES` / `wp cron event list` en producción + grep en
+   código + schema SQL. Un "✅ PASS" en QA_REPORT exige evidencia del
+   artefacto real en producción, no del fixture del test. Si la doc describe
+   diseño PLANEADO, debe decir "planeado" — nunca "existente". Y al auditar
+   un módulo, tratar cada afirmación de la doc como un hallazgo a verificar,
+   no como fuente de verdad (mismo espíritu que #186/#187: forma ≠ runtime).

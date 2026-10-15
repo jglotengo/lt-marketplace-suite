@@ -23,7 +23,6 @@
 - `lt_vendor_kyc`: vendor 30 (friDker) — pending
 - `lt_vendor_wallets`: 46 wallets
 - `lt_payout_requests`: 13 solicitudes
-- `lt_posgold_sync_log` (v2.9.35): vacío hasta que un vendor sincronice por primera vez
 - `lt_security_events` (v2.9.35): incluye eventos TOTP 2FA (enrollment, challenge failure, recovery code usage)
 - `lt_vendor_drivers` (v2.9.98): own-delivery fleet — vacío hasta que un vendor agregue repartidores
 - `lt_insurance_policies` (v2.9.35): XCover policies — vacío hasta que un cliente contrate seguro
@@ -88,7 +87,7 @@
 | `ltms_weekly_tax_report` | weekly Monday | Generate fiscal reports | original |
 | `ltms_hourly_waf_cleanup` | hourly | Clean expired WAF blocks | original |
 | `ltms_sync_commission_rates` | daily 06:00 | Sync rates from config | original |
-| `ltms_posgold_scheduled_sync` | daily 03:00 | Sync PosGold catalog for enrolled vendors | v2.9.35 |
+| `ltms_posgold_sync_cron` | on-demand (+5s, single event por vendor) | Ejecuta la sync PosGold agendada con el botón "Sincronizar" (no hay sync recurrente) | v2.9.72 |
 | `ltms_kyc_expiry_reminder` | daily 09:00 | Send KYC expiry reminder emails | v2.9.61 P3-12 |
 
 Verificar crons:

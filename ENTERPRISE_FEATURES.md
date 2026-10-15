@@ -200,9 +200,9 @@ Final price = `cost + markup + iva + ieps + shipping_factor + platform_fee + pay
 - **SEO templates:** per-category SEO title/description templates (filled with product data)
 - **Price rounding:** configurable rounding rule (none / .99 / .00 / next-10 / next-50)
 - **Deduplication:** matches PosGold SKU ↔ `_sku` to avoid duplicate products on re-sync
-- **Activity log:** every sync batch writes to `lt_posgold_sync_log` (vendor_id, products_synced, errors, duration)
+- **Sync status:** each batch result (created/updated/skipped/errors) is saved per-vendor in user meta `_ltms_posgold_sync_last_result` and surfaced in the vendor dashboard + in-dashboard notification — no DB log table exists
 - **Manual trigger:** vendor clicks "Sincronizar ahora" in `view-posgold.php` (AJAX `ltms_posgold_sync`)
-- **Scheduled sync:** optional WP-Cron event `ltms_posgold_scheduled_sync` (daily by default)
+- **Scheduled sync:** clicking "Sincronizar" schedules a single WP-Cron event `ltms_posgold_sync_cron` (+5s) per vendor; there is no recurring/daily scheduled sync
 
 ---
 

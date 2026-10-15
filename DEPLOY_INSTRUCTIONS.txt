@@ -82,8 +82,8 @@ PHP Extensions Requeridas
 
 5. Verificar tablas:
    phpMyAdmin > tu_base_de_datos
-   Confirmar existencia de lt_wallets, lt_commissions, lt_posgold_sync_log,
-   lt_donations, lt_marketing_banners, lt_totp_secrets, lt_totp_backup_codes
+   Confirmar existencia de lt_wallets, lt_commissions,
+   lt_donations, lt_marketing_banners
 
 6. Ejecutar migración de las 11 columnas SAT México (ver sección 8).
 
@@ -215,16 +215,15 @@ Pasos específicos para activar PosGold en producción:
 4. (Opcional) Configurar credenciales globales por defecto para empresaid,
    usuarioid y bodegaid que se usarán como fallback si un vendedor no las define.
 
-5. Verificar que el cron `ltms_posgold_sync_poller` esté registrado:
-     wp cron event list | grep posgold
+5. Verificar que los eventos `ltms_posgold_sync_cron` se programen al
+   sincronizar (single event por vendor, +5s tras pulsar "Sincronizar";
+   NO existe poller periódico ni sync diaria recurrente):
+      wp cron event list | grep posgold
 
-6. Verificar que la tabla lt_posgold_sync_log exista:
-     SHOW TABLES LIKE 'lt_posgold_sync_log';
-
-7. Activar el módulo PosGold para vendedores desde
+6. Activar el módulo PosGold para vendedores desde
    LT Marketplace > Configuración > PosGold > "Permitir sync a vendedores".
 
-8. Smoke test: pedir a un vendedor de prueba que ejecute una sincronización
+7. Smoke test: pedir a un vendedor de prueba que ejecute una sincronización
    desde su dashboard > PosGold > "Sincronizar ahora".
 
 ================================================================================
@@ -267,14 +266,12 @@ Pasos de migración:
 6. Validar exportación CSV desde LT Marketplace > Reportes Fiscales > México.
    El CSV debe contener exactamente 11 columnas + cabecera.
 
-Tablas nuevas creadas en 2.9.35:
+Tablas nuevas creadas en 2.9.35 (verificado en producción 2026-10-15;
+las tablas lt_donation_certificates, lt_totp_* y lt_posgold_* listadas
+originalmente NUNCA se implementaron — certificados, 2FA y credenciales
+PosGold viven en user meta):
   - lt_donations
-  - lt_donation_certificates
   - lt_marketing_banners
-  - lt_totp_secrets
-  - lt_totp_backup_codes
-  - lt_posgold_sync_log
-  - lt_posgold_vendor_credentials
 
 ================================================================================
 9. POST-DEPLOY VERIFICATION (ENDPOINTS AJAX)

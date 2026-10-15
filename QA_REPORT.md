@@ -682,9 +682,9 @@ Inline <script>:   0   ✅ All in external files
 | PG-005 | Deduplication — SKU already exists | Existing product updated, no duplicate created | ✅ PASS |
 | PG-006 | Category dropdown — auto-create missing category | New WC category created with PosGold name | ✅ PASS |
 | PG-007 | SEO template — per-category | Title/description rendered with product data placeholders | ✅ PASS |
-| PG-008 | Sync log — write entry | `lt_posgold_sync_log` row created with vendor_id, count, duration | ✅ PASS |
-| PG-009 | Scheduled sync (WP-Cron) | Cron event fires `ltms_posgold_scheduled_sync` daily | ✅ PASS |
-| PG-010 | Sync with broken PosGold credentials | WP_Error returned, no partial sync, log entry with error | ✅ PASS |
+| PG-008 | Sync log — write entry | `lt_posgold_sync_log` row created with vendor_id, count, duration | ❌ VOID — tabla nunca implementada (SYNC-LOG-TABLE, verificado 2026-10-15: no existe en producción ni en código) |
+| PG-009 | Scheduled sync (WP-Cron) | Cron event fires `ltms_posgold_scheduled_sync` daily | ❌ VOID — hook nunca existió; real: `ltms_posgold_sync_cron`, single event on-demand por vendor |
+| PG-010 | Sync with broken PosGold credentials | WP_Error returned, no partial sync, log entry with error | ✅ PASS (el "log" real es `LTMS_Core_Logger` + user meta, no una tabla) |
 
 ### 17.2 TOTP 2FA Tests
 
