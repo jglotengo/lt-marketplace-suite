@@ -47,6 +47,57 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   eventos vencidos en la cola, incl. el `ltms_posgold_sync_cron` de
 >   Juguetería Taiwan vencido desde el 26-Sep).
 
+### Fixed/Changed — `HOME-CATBAR-2026-005` (la barra global de categorías reemplaza la fila de chips de la home)
+
+> **Reporte del operador:** "se solicitó en su momento desarrollar la barra
+> categorías fija, que haga contraste, que no se oculte mientras se escrolea,
+> que haga contraste con el fondo de hero y que facilite la navegabilidad,
+> que reemplace la barra que existe en las páginas del proyecto por esta —
+> aplica las mejoras." La catbar global (004) ya estaba viva en todas las
+> páginas no-home (verificado live: shop con 21 chips, archivo de categoría
+> con chip `is-active` + `aria-current`); lo que faltaba del spec era la
+> home, que seguía con su fila de chips propia (003) — la única "barra que
+> existía en las páginas del proyecto".
+>
+> - **Una sola barra en todo el proyecto:** `class-ltms-global-catbar.php`
+>   ya no excluye la home del render; `ltms-catbar.js` adopta la barra
+>   DENTRO del header sticky de la home (`.pv-home-header`, última fila) —
+>   hereda el "nunca se oculta", y su rojo queda justo sobre el hero de
+>   fondo claro (contraste). En las demás páginas sigue bajo el header del
+>   tema. **Navegabilidad:** el chip de la categoría ACTIVA se centra en el
+>   track al cargar (`scrollIntoView inline:center`).
+> - **Variante home (CSS):** `position:static` (sin doble franja — el header
+>   ya es `--brand`), logo de la barra oculto (el header ya muestra el
+>   oficial), alineada a `--pv-maxw` + padding 22/14px como `.pv-section`.
+>   Chips a **44px** de touch target (brief HOME-MATRIX-FIX — paridad con
+>   los chips que reemplaza).
+> - **Limpieza (murió con el consumidor):** fila de chips completa de la
+>   home (docblock, prep + filtro `ltms_home_popular_chips`, markup, CSS)
+>   e `initChipsFade` en plaza-viva.js (el fade de la barra vive en
+>   ltms-catbar.js). `.min` regenerados; `.min.css` ajenos al cambio
+>   restaurados (gotcha ltms-checkout).
+> - `LTMS_VERSION 2.9.414 → 2.9.415` (cache-busting). Tests actualizados
+>   en el MISMO commit (lección #119): GlobalCatbarTest (002/004/005),
+>   HomeCatCarouselsTest (003/004), HomeHeaderRedesignTest (002),
+>   HomeUxV2Test (002 renombrado), HomeProductScopeAuditTest +
+>   HomeQuickViewAttrTest (canarios de `data-pv-search-chip` volteados a
+>   NotContains — el attr solo vivía en un comment, lección #141).
+>   Suite completa **5,248 tests, 11,421 assertions, 0 fallas** (3 skips
+>   preexistentes). `php -l` + `node --check` limpios.
+> - **Verificación live (deploy `fafe8cca`):** home sirviendo
+>   la barra (markup en `wp_body_open` a offset 41k, header objetivo
+>   presente, assets `ver=2.9.415`), 0 chips viejos, shop intacto
+>   (21 chips), categoría con `is-active`; OPcache reseteado, plugin
+>   recargado, caches purgados (los hizo el propio webhook), `error_log`
+>   limpio. La IP del entorno de desarrollo está bloqueada por el
+>   bot-protection de SG (403) — la verificación del DOM client-side
+>   queda para dispositivos reales del operador (la lógica de adopción es
+>   la misma reubicación ya viva en shop desde 004).
+> - **P2 detectado (ajeno al cambio, reportado al operador):** entrada
+>   muerta en el whitelist del webhook de deploy
+>   (`includes/business/class-ltms-booking-notifications.php` no existe
+>   en el repo) — produce "Done: 221 ok, 1 err" en CADA deploy.
+
 ## [Unreleased] — 2026-10-03
 
 ### Fixed/Changed — `HOME-UX4-001` (visibilidad de la barra de categorías de la home)
