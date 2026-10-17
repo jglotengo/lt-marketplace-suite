@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-17
+
+### Fixed — `HOME-CATBAR-2026-007` (la barra de categorías se superponía al header del tema en la tienda — Elementor Pro lo hace sticky)
+
+> **Reporte del operador:** "en la tienda, la storefront no se comporta
+> como la del home, se sobrepone al header" (la barra de las categorías).
+> Causa verificada: el header del tema en las páginas del catálogo es un
+> template Elementor (id 13610) con **sticky activo** (settings
+> `sticky_on`/`sticky_offset` serializados en su configuración) — Elementor
+> lo pega al top al escrolear y la barra (sticky top:0, z-index 99990) lo
+> TAPABA. La home no sufrió nunca porque su barra vive DENTRO de su propio
+> header sticky (006).
+>
+> - **Fix — pegado GEOMÉTRICO (pura geometría, cero detección de "es
+>   sticky"):** el JS actualiza el `top` de la barra en vivo (scroll/resize
+>   pasivos) al **borde inferior visible del header** — header sticky → la
+>   barra se pega DEBAJO (nunca encima, como en la home); header normal →
+>   sigue su borde mientras escrolea y lockea a 0 cuando desaparece.
+>   `top:0` queda como fallback sin-JS.
+> - +2 asserts en GlobalCatbarTest (test_005, lección #119). Suite
+>   completa **5,248 tests, 11,431 assertions, 0 fallas** (3 skips
+>   preexistentes). `LTMS_VERSION 2.9.416 → 2.9.417` (cache-busting JS).
+
 ## [Unreleased] — 2026-10-15
 
 ### Fixed — `SYNC-LOG-TABLE` (docs muertas: 5 tablas que nunca existieron + hooks de cron PosGold falsos)

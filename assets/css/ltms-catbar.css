@@ -16,6 +16,10 @@
 
 .ltms-catbar{
 	position:sticky;
+	/* top:0 es el fallback sin-JS; el JS (HOME-CATBAR-2026-007) lo actualiza
+	   en vivo al borde inferior del header del tema cuando éste es sticky
+	   (Elementor Pro) — la barra se pega DEBAJO del header, nunca encima
+	   (feedback del operador: en la tienda se superponía). */
 	top:0;
 	z-index:99990;
 	/* HOME-CATBAR-2026-006: negro del brief — banda de utilidad que

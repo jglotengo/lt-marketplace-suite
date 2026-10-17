@@ -299,6 +299,18 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$js,
 			'HOME-CATBAR-2026-006: guard closest — el JS respeta la barra inline de la home (no la reubica).'
 		);
+		// HOME-CATBAR-2026-007: pegado geométrico bajo el header del tema —
+		// la barra NUNCA se superpone al header sticky (Elementor Pro).
+		$this->assertStringContainsString(
+			'getBoundingClientRect().bottom',
+			$js,
+			'HOME-CATBAR-2026-007: el top de la barra sigue el borde inferior visible del header en cada frame (feedback del operador: en la tienda se superponía).'
+		);
+		$this->assertStringContainsString(
+			'bar.style.top',
+			$js,
+			'HOME-CATBAR-2026-007: el top se aplica en vivo via style.top (scroll/resize passivos).'
+		);
 		// HOME-CATBAR-2026-006: deslizamiento en escritorio.
 		$this->assertStringContainsString(
 			"'wheel'",

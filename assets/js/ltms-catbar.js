@@ -1,9 +1,10 @@
 /* ============================================================================
-   LTMS Global Catbar JS (HOME-CATBAR-2026-004/006) — vanilla, CSP-compliant.
-   1. Reubica la barra DEBAJO del header del tema (.elementor-location-header
-      — NO es sticky, verificado en producción, así que al escrolear la barra
-      queda sola arriba: siempre visible y usable). La home NO pasa por aquí:
-      su template renderiza la barra INLINE dentro del header sticky
+   LTMS Global Catbar JS (HOME-CATBAR-2026-004/007) — vanilla, CSP-compliant.
+   1. Reubica la barra DEBAJO del header del tema (.elementor-location-header)
+      y la pega GEOMÉTRICAMENTE bajo él (HOME-CATBAR-2026-007: Elementor Pro
+      hace sticky el header — top = borde inferior del header en vivo; la
+      barra NUNCA se superpone al header). La home NO pasa por aquí: su
+      template renderiza la barra INLINE dentro del header sticky
       (HOME-CATBAR-2026-006) — el guard closest() lo respeta.
    2. Centra el chip de la categoría ACTIVA en el track al cargar
       (navegabilidad: el usuario ve su contexto de inmediato en archivos
@@ -35,6 +36,26 @@
 			if (header && header.parentNode && header.nextElementSibling !== bar) {
 				header.parentNode.insertBefore(bar, header.nextSibling);
 			}
+
+			/* 1b. HOME-CATBAR-2026-007 (feedback del operador: "en la tienda
+			   se sobrepone al header" — Elementor Pro hace sticky el header
+			   del tema): pegado GEOMÉTRICO — top = borde inferior visible del
+			   header en cada frame. Header sticky → la barra se pega DEBAJO
+			   (como en la home, nunca encima); header normal → sigue su borde
+			   mientras escrolea y lockea a 0 cuando desaparece. Pura
+			   geometría: cero detección de "es sticky". */
+			var lastTop = -1;
+			function syncTop() {
+				if (!header) return;
+				var t = Math.max(0, Math.round(header.getBoundingClientRect().bottom));
+				if (t !== lastTop) {
+					lastTop = t;
+					bar.style.top = t + 'px';
+				}
+			}
+			window.addEventListener('scroll', syncTop, { passive: true });
+			window.addEventListener('resize', syncTop);
+			syncTop();
 		}
 
 		var track = qs('.ltms-catbar__track', bar);
