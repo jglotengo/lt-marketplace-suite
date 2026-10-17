@@ -361,13 +361,14 @@ do_action( 'ltms_before_home_plazaviva' );
     /* =====================================================================
      * HEADER — 3 zonas: logo oficial · buscador (sugerencias live + filtro
      * categoría) · acciones de cuenta. HOME-REDESIGN-002 (patrón Amazon
-     * simplificado) → UX5-003 → BRAND-2026-001 (brief 15/10/2026): fondo
-     * ROJO DE MARCA #E80001, texto blanco, logo oficial "Lo Tengo" en
-     * variante blanca, buscador protagonista con sugerencias (máx 6 — JS en
-     * el scope HOME de ltms-plaza-viva.js) y filtro opcional de categoría
-     * dentro del campo (select product_cat — apply_shop_filters() ya lo
-     * soporta en /tienda/). Móvil 2 filas, tablet 1 fila, escritorio
-     * buscador min 480px. CSP-compliant: sin <script> inline.
+     * simplificado) → UX5-003 → BRAND-2026-001 → HOME-UX-014 (17/10/2026,
+     * operador): fondo NEGRO #000000, texto blanco, logo oficial "Lo Tengo"
+     * en variante blanca, buscador protagonista con sugerencias (máx 6 — JS
+     * en el scope HOME de ltms-plaza-viva.js) y filtro opcional de
+     * categoría dentro del campo (select product_cat —
+     * apply_shop_filters() ya lo soporta en /tienda/). Móvil 2 filas,
+     * tablet 1 fila, escritorio buscador min 480px. CSP-compliant: sin
+     * <script> inline.
      * =====================================================================
      */
     ?>
@@ -376,10 +377,10 @@ do_action( 'ltms_before_home_plazaviva' );
 
             <?php /* --- Zona 1: Logo "Lo Tengo" --- */
             /* BRAND-2026-001 (brief 15/10/2026): logo OFICIAL del brief en vez del
-             * placeholder SVG map-pin del ciclo UIUX2-D17. Variante BLANCA porque
-             * el header es el rojo de marca #E80001 (el logo a color lleva "TENGO"
-             * en rojo — invisible sobre rojo). PNG 769x324 renderizado a 40px de
-             * altura = densidad 8x: nítido en cualquier DPI. */ ?>
+             * placeholder SVG map-pin del ciclo UIUX2-D17. Variante BLANCA —
+             * HOME-UX-014: el header es NEGRO #000000 (antes rojo de marca; el
+             * logo a color lleva "TENGO" en rojo). PNG 769x324 renderizado a
+             * 40px de altura = densidad 8x: nítido en cualquier DPI. */ ?>
             <a class="pv-home-header__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
                 <img class="pv-home-header__logo-img"
                      src="<?php echo esc_url( ( defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : '' ) . 'img/logo-lo-tengo-white.png' ); ?>"
@@ -1091,17 +1092,15 @@ body.pv-home-native{font-size:16px;}
    específica viene después en la cascada y gana por orden). */
 .pv-scope.pv-home .pv-btn{border-radius:12px;}
 
-/* ── HEADER (HOME-UX5-003 → BRAND-2026-001 → HOME-CATBAR-2026-003) ────────────
-    ROJO DE MARCA del brief (#E80001, token --brand) — reemplaza el rojo del
-    design system (--danger-700 #b73a3e) que el ciclo UX5-003 usaba como
-    aproximación. El brief (inconsistencia #2) exige unificar TODOS los rojos
-    de la home en #E80001. Contraste blanco sobre #E80001 = 4.74:1 → AA para
-    texto normal (la aproximación anterior era 5.7:1; la marca real sigue
-    pasando AA). Hover/borde: --brand-600 (#C70001, rojo marca hover del
-    brief, 6.2:1). Sticky conservado: la zona de búsqueda+acciones permanece
-    fija al desplazarse en TODOS los tamaños; los chips (palabras bajo el
-    buscador) son la barra de categorías SIEMPRE visible (HOME-CATBAR-2026-003
-    — el colapso al scroll fue eliminado; fade con initChipsFade).
+    /* HOME-UX5-003 → BRAND-2026-001 → HOME-CATBAR-2026-003 → HOME-UX-014:
+    header NEGRO #000000 (operador 17/10/2026 — mismo chrome que la franja
+    de Elementor del resto del sitio; la catbar roja de categorías queda
+    como banda bajo el header). Contraste blanco sobre #000000 = 21:1
+    (AAA). El botón Buscar mantiene el rojo de marca (viaja DENTRO del
+    campo blanco, 4.74:1 AA) con hover --brand-600. Sticky conservado: la
+    zona de búsqueda+acciones permanece fija al desplazarse en TODOS los
+    tamaños; la barra global de categorías (HOME-CATBAR-2026-009) es
+    SIEMPRE visible bajo el header.
     Mobile-first (heredado del ciclo UX2):
     - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
     - ≥480: filtro de categoría dentro del campo.
@@ -1109,8 +1108,13 @@ body.pv-home-native{font-size:16px;}
     - ≥1024: buscador central min 480px. */
 .pv-scope.pv-home .pv-home-header{
     position:sticky;top:0;z-index:50;
-    background:var(--brand);
-    border-bottom:1px solid var(--brand-600);
+    /* HOME-UX-014 (2026-10-17, operador: "en el header donde está el
+       buscador, logo, carrito y demás del home cambia el fondo de ese
+       header a negro"): header NEGRO #000000 — mismo chrome que la franja
+       de Elementor del resto del sitio; la catbar roja (009) queda como
+       banda de categorías bajo el header. Texto blanco 21:1 (AAA). */
+    background:#000000;
+    border-bottom:1px solid rgba(255,255,255,.10);
     padding-top:calc(env(safe-area-inset-top, 0px) + 8px);
 }
 .pv-scope.pv-home .pv-home-header__inner{
@@ -1222,7 +1226,9 @@ body.pv-home-native{font-size:16px;}
     display:flex;align-items:center;justify-content:center;
     background:var(--ltms-gold);color:var(--text);
     border-radius:var(--r-pill);font-size:10.5px;font-weight:700;
-    border:2px solid var(--brand);
+    /* HOME-UX-014: el borde "recorta" el badge dorado contra el header
+       NEGRO (antes lo recortaba contra el rojo de marca). */
+    border:2px solid #000000;
 }
 .pv-scope.pv-home .pv-home-header__badge--accent{background:var(--ltms-gold);}
 /* HOME-UX3-001: badge de favoritos vacío (count 0) se oculta — el elemento

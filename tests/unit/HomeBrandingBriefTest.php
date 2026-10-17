@@ -139,18 +139,20 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * BRAND-2026-001-D: header de la home con el ROJO DE MARCA del brief —
-	 * var(--brand) #E80001 (inconsistencia #2: unificar los rojos), botón
-	 * Buscar var(--brand) con hover --brand-600, badge de contador dorado
-	 * primario --ltms-gold con borde rojo de marca.
+	 * BRAND-2026-001-D → HOME-UX-014: header de la home NEGRO #000000
+	 * (operador 17/10/2026: "cambia el fondo de ese header a negro" — mismo
+	 * chrome que la franja de Elementor del resto del sitio; la catbar roja
+	 * queda como banda bajo el header). Botón Buscar var(--brand) con hover
+	 * --brand-600 (viaja DENTRO del campo blanco), badge de contador dorado
+	 * primario --ltms-gold con borde NEGRO (recorte contra el header).
 	 */
 	public function test_004_header_rojo_de_marca(): void {
 		$src = file_get_contents( $this->home_path );
 
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--brand\);[^}]*border-bottom:1px solid var\(--brand-600\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:#000000;[^}]*border-bottom:1px solid rgba\(255,255,255,\.10\);/s",
 			$src,
-			'BRAND-2026-001-D: el header debe ser var(--brand) #E80001 con borde --brand-600 (rojo de marca del brief).'
+			'HOME-UX-014: el header debe ser NEGRO #000000 con hairline rgba(255,255,255,.10) (operador: "cambia el fondo de ese header a negro").'
 		);
 		$this->assertMatchesRegularExpression(
 			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*background:var\(--brand\);/s",
@@ -163,9 +165,9 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 			'BRAND-2026-001-D: hover del botón Buscar = --brand-600 (hover oficial del brief).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__badge\{[^}]*background:var\(--ltms-gold\);[^}]*border:2px solid var\(--brand\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header__badge\{[^}]*background:var\(--ltms-gold\);[^}]*border:2px solid #000000;/s",
 			$src,
-			'BRAND-2026-001-D: el badge del contador debe ser --ltms-gold con borde --brand (dorado + rojo de marca).'
+			'HOME-UX-014: el badge del contador debe ser --ltms-gold con borde NEGRO (recorte contra el header negro).'
 		);
 	}
 

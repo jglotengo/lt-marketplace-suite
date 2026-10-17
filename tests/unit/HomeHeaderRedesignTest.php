@@ -86,12 +86,15 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * HOME-REDESIGN-002-B → HOME-UX2-001 → HOME-UX5-003 → BRAND-2026-001 →
-	 * HOME-CATBAR-2026-003 → HOME-CATBAR-2026-005 (2026-10-15): header ROJO
-	 * DE MARCA del brief — var(--brand) (#E80001, blanco 4.74:1 AA). La
-	 * barra de categorías es SIEMPRE visible (petición del operador: "que
-	 * esa barra no se oculte mientras se desplaza") — el colapso al scroll
-	 * de HOME-UX5-003 ([data-pv-scrolled], parpadeo reportado al escrolear)
-	 * fue ELIMINADO. Desde HOME-CATBAR-2026-005 la barra es la GLOBAL
+	 * HOME-CATBAR-2026-003 → HOME-CATBAR-2026-005 → HOME-UX-014
+	 * (2026-10-17): header NEGRO #000000 (operador: "cambia el fondo de ese
+	 * header a negro" — mismo chrome que la franja de Elementor del resto
+	 * del sitio; la catbar roja queda como banda de categorías bajo el
+	 * header; texto blanco 21:1 AAA). La barra de categorías es SIEMPRE
+	 * visible (petición del operador: "que esa barra no se oculte mientras
+	 * se desplaza") — el colapso al scroll de HOME-UX5-003
+	 * ([data-pv-scrolled], parpadeo reportado al escrolear) fue ELIMINADO.
+	 * Desde HOME-CATBAR-2026-005 la barra es la GLOBAL
 	 * (LTMS_Global_Catbar, adoptada dentro de este header sticky): la fila
 	 * de chips propia fue eliminada. Test actualizado en el mismo commit
 	 * (lección #119).
@@ -99,17 +102,17 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	public function test_002_header_rojo_tokens(): void {
 		$src = file_get_contents( $this->home_path );
 
-		// Fondo rojo de marca del brief (token --brand, AA).
+		// Fondo NEGRO (HOME-UX-014 — antes rojo de marca #E80001).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--brand\);/s",
+			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:#000000;/s",
 			$src,
-			'BRAND-2026-001: el header debe tener fondo var(--brand) (#E80001, rojo de marca del brief, blanco 4.74:1 AA).'
+			'HOME-UX-014: el header debe tener fondo NEGRO #000000 (operador: "cambia el fondo de ese header a negro" — texto blanco 21:1 AAA).'
 		);
-		// Logo blanco sobre rojo.
+		// Logo blanco sobre negro.
 		$this->assertMatchesRegularExpression(
 			"/\.pv-scope\.pv-home \.pv-home-header__logo\{[^}]*color:#fff;/s",
 			$src,
-			'HOME-UX5-003: el logo del header debe usar blanco sobre el fondo rojo.'
+			'HOME-UX5-003: el logo del header debe usar blanco sobre el fondo negro.'
 		);
 		// Safe-area en el header sticky.
 		$this->assertStringContainsString(

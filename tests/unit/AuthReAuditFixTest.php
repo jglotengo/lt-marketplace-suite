@@ -486,4 +486,48 @@ class AuthReAuditFixTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'ON DUPLICATE KEY UPDATE option_value = CAST(option_value AS UNSIGNED) + 1', $body,
 			'No-regresión: login throttle debe seguir usando INSERT...ON DUPLICATE KEY atomic (no regresar a get_transient).' );
 	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// AUTH-LOGO-001 — logo oficial del branding engine en TODOS los
+	// formularios del funnel de vendedor (operador 17/10/2026).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	/**
+	 * AUTH-LOGO-001: los 3 formularios del funnel de vendedor (registro,
+	 * login, recuperación de contraseña) muestran el logo OFICIAL del
+	 * branding engine (get_logo_url('white') = variante a color para
+	 * superficies claras) con fallback al theme mod → nombre del sitio.
+	 * Antes solo usaban get_theme_mod('custom_logo') — la "bandera"
+	 * (inconsistencia #8, mismo criterio que BRAND-2026-002).
+	 */
+	public function test_auth_logo_001_branding_engine_logo_in_all_auth_forms(): void {
+		$forms = [
+			'includes/frontend/views/vendor-parts/form-register.php',
+			'includes/frontend/views/vendor-parts/form-login.php',
+			'includes/frontend/views/vendor-parts/form-lost-password.php',
+		];
+
+		foreach ( $forms as $form ) {
+			$file = $this->plugin_path( $form );
+			if ( ! file_exists( $file ) ) {
+				$this->markTestSkipped( basename( $form ) . ' no disponible.' );
+			}
+			$src = file_get_contents( $file );
+
+			$this->assertStringContainsString( 'AUTH-LOGO-001', $src,
+				basename( $form ) . ': la traza del fix AUTH-LOGO-001 debe estar presente.' );
+			$this->assertStringContainsString( "LTMS_Branding_Engine::get_logo_url( 'white' )", $src,
+				basename( $form ) . ': el logo usa el branding engine (variante a color para fondos claros, no el theme mod "bandera").' );
+			$this->assertStringContainsString( "class_exists( 'LTMS_Branding_Engine' )", $src,
+				basename( $form ) . ': guard class_exists antes de llamar al branding engine (patrón del kernel).' );
+			$this->assertStringContainsString( 'get_theme_mod( \'custom_logo\' )', $src,
+				basename( $form ) . ': fallback al theme logo conservado (degradación).' );
+			$this->assertStringContainsString( 'ltms-auth-site-name', $src,
+				basename( $form ) . ': fallback final al nombre del sitio conservado.' );
+			$this->assertStringContainsString( 'width="180" height="76"', $src,
+				basename( $form ) . ': width/height explícitos en el <img> (sin CLS; 769x324 → 180x76).' );
+			$this->assertStringContainsString( 'class="ltms-auth-logo-img"', $src,
+				basename( $form ) . ': la clase ltms-auth-logo-img viaja al <img> del branding engine (el CSS .ltms-auth-logo img{height:48px} la consume).' );
+		}
+	}
 }

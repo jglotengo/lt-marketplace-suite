@@ -93,13 +93,14 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 			$src,
 			'BRAND-2026-001: el botón Buscar usa var(--brand) — rojo de marca del brief, blanco 4.74:1 AA.'
 		);
-		// BRAND-2026-001: el header es el ROJO DE MARCA (var(--brand) #E80001) —
-		// el brief reemplaza la aproximación --danger-700 del ciclo UX5-003.
-		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:var\(--brand\);/s",
-			$src,
-			'BRAND-2026-001: el header de la home es el rojo de marca var(--brand) (#E80001, brief 15/10/2026).'
-		);
+	// HOME-UX-014 (17/10/2026, operador): el header pasó a NEGRO #000000
+	// — mismo chrome que la franja de Elementor del resto del sitio; la
+	// catbar roja (009) queda como banda de categorías bajo el header.
+	$this->assertMatchesRegularExpression(
+		"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:#000000;/s",
+		$src,
+		'HOME-UX-014: el header de la home es NEGRO #000000 (operador; texto blanco 21:1 AAA).'
+	);
 		// BRAND-2026-001: la franja Vende usa el gradiente ROJO de marca del
 		// brief (--brand → --brand-600) — el azul queda para enlaces/interactivo.
 		$this->assertMatchesRegularExpression(

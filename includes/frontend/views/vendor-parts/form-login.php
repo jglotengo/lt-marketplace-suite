@@ -118,14 +118,28 @@ if ( current_user_can( 'manage_options' ) && class_exists( 'LTMS_Google_OAuth' )
 <div class="ltms-auth-card ltms-login-card" id="ltms-login-wrap">
 
     <div class="ltms-auth-logo">
-        <?php
-        $logo_id = get_theme_mod( 'custom_logo' );
-        if ( $logo_id ) {
-            echo wp_get_attachment_image( $logo_id, 'medium', false, [ 'class' => 'ltms-auth-logo-img', 'alt' => get_bloginfo( 'name' ) ] );
-        } else {
-            echo '<span class="ltms-auth-site-name">' . esc_html( get_bloginfo( 'name' ) ) . '</span>';
-        }
-        ?>
+        <?php /* AUTH-LOGO-001 (2026-10-17, operador: "agrega el logo a los
+             * formularios de registro de vendedor, iniciar sesión,
+             * recuperación de contraseña y demás"): logo OFICIAL del
+             * branding engine — el theme mod custom_logo era "la bandera"
+             * (inconsistencia #8, mismo criterio que BRAND-2026-002 en el
+             * storefront) y sin él la card solo mostraba el nombre del
+             * sitio en texto. Fallback: theme logo → nombre. */ ?>
+        <?php $auth_logo_url = class_exists( 'LTMS_Branding_Engine' ) ? LTMS_Branding_Engine::get_logo_url( 'white' ) : ''; ?>
+        <?php if ( '' !== $auth_logo_url ) : ?>
+            <a href="<?php echo esc_url( home_url( '/' ) ); ?>" aria-label="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
+                <img src="<?php echo esc_url( $auth_logo_url ); ?>" alt="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>" class="ltms-auth-logo-img" width="180" height="76" />
+            </a>
+        <?php else : ?>
+            <?php
+            $logo_id = get_theme_mod( 'custom_logo' );
+            if ( $logo_id ) {
+                echo wp_get_attachment_image( $logo_id, 'medium', false, [ 'class' => 'ltms-auth-logo-img', 'alt' => get_bloginfo( 'name' ) ] );
+            } else {
+                echo '<span class="ltms-auth-site-name">' . esc_html( get_bloginfo( 'name' ) ) . '</span>';
+            }
+            ?>
+        <?php endif; ?>
     </div>
 
     <h2 class="ltms-auth-title"><?php esc_html_e( 'Panel de Vendedor', 'ltms' ); ?></h2>

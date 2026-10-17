@@ -4,7 +4,35 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-10-17 (2)
+## [Unreleased] — 2026-10-17 (3)
+
+### Changed — `HOME-UX-014` (header de la home a NEGRO) + `AUTH-LOGO-001` (logo oficial en los formularios del funnel de vendedor)
+
+> **Reporte del operador:** "en el header donde está el buscador, logo,
+> carrito y demás del home cambia el fondo de ese header a negro. Por otra
+> parte agrega el logo a los formularios de registro de vendedor, iniciar
+> sesión, recuperación de contraseña y demás".
+>
+> - **HOME-UX-014 — header NEGRO `#000000`** (antes rojo de marca
+>   #E80001): mismo chrome que la franja de Elementor del resto del sitio
+>   — la catbar roja (009) queda como banda de categorías bajo el header.
+>   Texto blanco **21:1 (AAA)**; logo blanco intacto; botón Buscar
+>   mantiene el rojo de marca (viaja DENTRO del campo blanco); hairline
+>   `rgba(255,255,255,.10)`; badge dorado con borde negro (recorte).
+> - **AUTH-LOGO-001 — logo oficial en los formularios del funnel**:
+>   registro, login y recuperación muestran el logo OFICIAL del branding
+>   engine (`get_logo_url('white')` = variante a color para fondos
+>   claros) con fallback al theme mod → nombre del sitio. **Causa:** solo
+>   usaban `get_theme_mod('custom_logo')` — la "bandera" (inconsistencia
+>   #8, mismo criterio que BRAND-2026-002) — y el operador no veía logo
+>   en esas páginas. `<img>` con width/height explícitos (180×76, sin
+>   CLS) + enlace a la home.
+> - Tests actualizados en el MISMO commit (lección #119):
+>   HomeHeaderRedesignTest, HomeBrandingBriefTest, HomeUxV2Test (header
+>   negro + badge) + **+1 test** AuthReAuditFixTest (AUTH-LOGO-001 con 21
+>   asserts sobre los 3 formularios). Suite completa
+>   **5,251 tests, 11,496 assertions, 0 fallas** (3 skips preexistentes).
+>   `LTMS_VERSION 2.9.423 → 2.9.424`.
 
 ### Fixed — `CART-UX-013b` (la barra sticky "Añadir al carrito" del móvil también lleva directo al carrito)
 
