@@ -94,6 +94,40 @@ final class CartDrawerNextTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
+	/**
+	 * CART-UX-013b: la barra sticky ATC de la ficha de producto redirige
+	 * directo al carrito (misma conducta que el formulario clásico, CART-UX-013)
+	 * — un solo comportamiento mental en la misma página. El resto de adds
+	 * (cards de home/vitrina) conserva el flujo fly + toast.
+	 */
+	public function test_cart_ux_013b_sticky_atc_redirects_to_cart(): void {
+		$js = file_get_contents( __DIR__ . '/../../assets/js/ltms-plaza-viva.js' );
+
+		$this->assertStringContainsString(
+			"atc.closest('[data-pv-sticky-atc]')",
+			$js,
+			'CART-UX-013b: el handler delegado detecta la barra sticky ATC de la ficha ([data-pv-sticky-atc]).'
+		);
+		$this->assertStringContainsString(
+			'window.ltms_data.cart_url',
+			$js,
+			'CART-UX-013b: el redirect usa ltms_data.cart_url (la URL canónica del carrito expuesta por wp_localize_script).'
+		);
+		// El fly + toast siguen vivos para el resto de adds (cards).
+		$this->assertStringContainsString(
+			'PV.flyToCart(atc',
+			$js,
+			'CART-UX-013b: el flujo fly + toast se conserva para los adds que NO son de la sticky bar.'
+		);
+		// El .min.js sincronizado (SG sirve el min).
+		$min = file_get_contents( __DIR__ . '/../../assets/js/ltms-plaza-viva.min.js' );
+		$this->assertStringContainsString(
+			'data-pv-sticky-atc',
+			$min,
+			'CART-UX-013b: el .min.js debe contener el selector de la sticky bar (regenerado, no desincronizado).'
+		);
+	}
+
 	public function test_render_uses_minicart_namespace_no_legacy_class(): void {
 		$src = file_get_contents( self::PHP_PATH );
 

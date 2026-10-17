@@ -715,6 +715,16 @@
         .then(function (res) {
           atc.classList.remove('pv-btn--loading');
           if (res && res.success) {
+            /* CART-UX-013b (2026-10-17, operador): la barra sticky ATC de la
+               ficha de producto redirige DIRECTO al carrito — misma conducta
+               que el formulario clásico de la ficha (CART-UX-013): un solo
+               comportamiento mental en la misma página. El resto de adds
+               (cards de home/vitrina, quick-add de wishlist) conserva el
+               flujo fly + toast. */
+            if (atc.closest('[data-pv-sticky-atc]')) {
+              window.location.href = (window.ltms_data && window.ltms_data.cart_url) || '/carrito/';
+              return;
+            }
             PV.flyToCart(atc, qs(PV.config.cartIconSelector) || atc);
             PV.Shopping.increment(res.data && res.data.count_delta || 1);
             PV.toast(PV.i18n.added_to_cart, { type: 'success', duration: 2200 });

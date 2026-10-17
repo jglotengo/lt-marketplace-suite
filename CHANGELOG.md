@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-10-17 (2)
 
+### Fixed — `CART-UX-013b` (la barra sticky "Añadir al carrito" del móvil también lleva directo al carrito)
+
+> **Contexto:** tras CART-UX-013, el operador delegó la decisión de extender
+> el redirect a la barra sticky de la ficha ("si consideras que es
+> apropiado hazlo, si no no"). **Decisión: SÍ** — por consistencia: en la
+> misma página (la ficha de producto), todos los botones de añadir deben
+> comportarse igual; en móvil la sticky bar es el botón natural y dejarla
+> con el flujo viejo (toast) habría sido reportado como bug.
+>
+> - **Fix:** en el handler delegado del design system
+>   (`ltms-plaza-viva.js`), el success del add de un botón dentro de
+>   `[data-pv-sticky-atc]` navega a `ltms_data.cart_url` (expuesta por
+>   `wp_localize_script` desde siempre) — redirige directo a /carrito/.
+>   Los adds de cards (home/vitrina/quick-add) **conservan** fly + toast.
+>   El bundle add-to-cart de la ficha mantiene su flujo (add opcional
+>   mientras se compra el principal).
+> - +1 test (CartDrawerNextTest `test_cart_ux_013b...` con asserts también
+>   sobre el .min.js sincronizado, lección #119). Suite completa
+>   **5,250 tests, 11,475 assertions, 0 fallas**. `LTMS_VERSION
+>   2.9.422 → 2.9.423`.
+
 ### Fixed — `HOME-CATBAR-2026-012` (la barra aparecía en el funnel de registro/login del vendedor)
 
 > **Reporte del operador:** "lo mismo que sucedía con la barra roja de las
