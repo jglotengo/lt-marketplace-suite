@@ -180,6 +180,29 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$module,
 			'HOME-CATBAR-2026-011: panel_body_class añade ltms-panel-view (el CSS oculta el header del tema en esa vista).'
 		);
+		// HOME-CATBAR-2026-012: el funnel de registro/login del vendedor
+		// también queda excluido ("que solo se vea en las páginas públicas
+		// apropiadas" — operador), por ID y slug, SIN panel-view (el header
+		// del tema se conserva ahí).
+		$this->assertStringContainsString(
+			'private static function is_vendor_auth_page()',
+			$module,
+			'HOME-CATBAR-2026-012: el helper is_vendor_auth_page excluye el funnel de registro/login.'
+		);
+		foreach ( array( 'ltms-vendor-register', 'ltms-register', 'ltms-login', 'ltms-lost-password' ) as $auth_key ) {
+			$this->assertStringContainsString(
+				"'{$auth_key}'",
+				$module,
+				"HOME-CATBAR-2026-012: la página de auth '{$auth_key}' queda excluida por la opción."
+			);
+		}
+		foreach ( array( 'registro-vendedor', 'ltms-register', 'login-vendedor', 'recuperar-contrasena' ) as $auth_slug ) {
+			$this->assertStringContainsString(
+				"'{$auth_slug}'",
+				$module,
+				"HOME-CATBAR-2026-012: el slug de auth '{$auth_slug}' queda cubierto (incluye la duplicada /ltms-register/)."
+			);
+		}
 	}
 
 	/**

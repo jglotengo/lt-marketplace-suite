@@ -4,6 +4,48 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-17 (2)
+
+### Fixed — `HOME-CATBAR-2026-012` (la barra aparecía en el funnel de registro/login del vendedor)
+
+> **Reporte del operador:** "lo mismo que sucedía con la barra roja de las
+> categorías que se veía en el panel ahora sucede con las demás páginas —
+> con la página de registro de vendedores; revisa y ocúltala que solo se
+> vea en las páginas públicas apropiadas".
+>
+> - **Fix:** nuevo helper `is_vendor_auth_page()` excluye la barra de las
+>   páginas del funnel de vendedor por ID (opción: `ltms-vendor-register`,
+>   `ltms-register`, `ltms-login`, `ltms-lost-password`) **Y por slug**
+>   (`registro-vendedor`, `ltms-register` — ¡otra duplicada! —,
+>   `login-vendedor`, `recuperar-contrasena`). El header del tema **se
+>   conserva** en estas páginas (NO llevan `ltms-panel-view`) — solo la
+>   barra de categorías desaparece. Las páginas genuinamente públicas
+>   (tienda, categorías, fichas, carrito, mi cuenta, vendedores, legal)
+>   siguen mostrándola.
+> - +11 asserts en GlobalCatbarTest (test_002, lección #119).
+
+### Fixed — `CART-UX-013` ("Añadir al carrito" en la ficha de producto no llevaba al carrito)
+
+> **Reporte del operador:** "en la página del producto cuando le das
+> añadir a carrito no te lleva a la página donde se selecciona el pedido;
+> en la parte superior sale un mensaje de que se añadió y que si deseas
+> ver el carrito le des clic a ese botón — oculta eso y lleva a la
+> página correcta".
+>
+> - **Causa:** el redirect a /cart se desactivó en v2.9.208 (comment en
+>   `class-ltms-cart-drawer.php:374`) y el setting nativo de WC
+>   `cart_redirect_after_add=no` deja al usuario en la ficha con el aviso.
+> - **Fix:** (1) `woocommerce_add_to_cart_redirect` → `wc_get_cart_url()`
+>   para el **submit clásico del formulario de la ficha** (POST
+>   `add-to-cart`) — aterriza directo en /carrito/ (la página del plugin
+>   donde se confirma el pedido); (2) `wc_add_to_cart_message_html` → `''`
+>   en el mismo contexto — el aviso "producto añadido — Ver carrito"
+>   desaparece. Los adds rápidos de cards (home/vitrina, GET/AJAX)
+>   **conservan** el flujo actual del drawer.
+> - +1 test (CartDrawerNextTest `test_cart_ux_013...`, lección #119).
+> - Suite completa **5,249 tests, 11,471 assertions, 0 fallas** (3 skips
+>   preexistentes). `LTMS_VERSION 2.9.421 → 2.9.422`.
+
 ## [Unreleased] — 2026-10-17
 
 ### Fixed — `HOME-CATBAR-2026-011` (el panel de vendedor mostraba la barra de categorías y el header del tema)

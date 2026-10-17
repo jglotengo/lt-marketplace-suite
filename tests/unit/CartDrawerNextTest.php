@@ -57,6 +57,43 @@ final class CartDrawerNextTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
+	/**
+	 * CART-UX-013 (2026-10-17, operador): desde la ficha de producto,
+	 * "Añadir al carrito" redirige directo al carrito y el aviso
+	 * "producto añadido — Ver carrito" se suprime. Scope: SOLO el submit
+	 * clásico del form (POST add-to-cart) — los adds de cards conservan
+	 * el flujo del drawer.
+	 */
+	public function test_cart_ux_013_single_product_redirect_and_message(): void {
+		$src = file_get_contents( self::PHP_PATH );
+
+		$this->assertStringContainsString(
+			"add_filter( 'woocommerce_add_to_cart_redirect', [ __CLASS__, 'single_product_add_to_cart_redirect' ] )",
+			$src,
+			'CART-UX-013: init() engancha el redirect al carrito tras el add de la ficha ("no te lleva a la página donde se selecciona el pedido" — operador).'
+		);
+		$this->assertStringContainsString(
+			"add_filter( 'wc_add_to_cart_message_html', [ __CLASS__, 'single_product_add_to_cart_message' ], 10, 2 )",
+			$src,
+			'CART-UX-013: init() engancha la supresión del aviso "producto añadido — Ver carrito" ("oculto eso" — operador).'
+		);
+		$this->assertStringContainsString(
+			"isset( \$_POST['add-to-cart'] )",
+			$src,
+			'CART-UX-013: el scope es el submit clásico de la ficha (POST add-to-cart) — los adds de cards (GET/AJAX) conservan el drawer.'
+		);
+		$this->assertStringContainsString(
+			'wc_get_cart_url()',
+			$src,
+			'CART-UX-013: el redirect usa la URL canónica del carrito (wc_get_cart_url, respeta la página del plugin).'
+		);
+		$this->assertStringContainsString(
+			'CART-UX-013',
+			$src,
+			'CART-UX-013: la traza del fix debe estar presente en class-ltms-cart-drawer.php.'
+		);
+	}
+
 	public function test_render_uses_minicart_namespace_no_legacy_class(): void {
 		$src = file_get_contents( self::PHP_PATH );
 

@@ -51,6 +51,16 @@ class LTMS_Cart_Drawer {
         // CART-UX-NEXT (2026-09-10): renderizar skeleton + assets del drawer.
         add_action( 'wp_footer', [ __CLASS__, 'render_drawer_html' ], 30 );
         add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+
+        // CART-UX-013 (2026-10-17, operador): desde la FICHA de producto,
+        // "Añadir al carrito" lleva directo al carrito (la página donde se
+        // confirma el pedido) y el aviso "producto añadido — Ver carrito"
+        // NO se muestra. Scope: SOLO el submit clásico del formulario de
+        // la ficha (POST add-to-cart) — los adds rápidos de cards
+        // (GET ?add-to-cart= / data-pv-add-to-cart AJAX de home/vitrina)
+        // mantienen el flujo actual (drawer + fragments).
+        add_filter( 'woocommerce_add_to_cart_redirect', [ __CLASS__, 'single_product_add_to_cart_redirect' ] );
+        add_filter( 'wc_add_to_cart_message_html', [ __CLASS__, 'single_product_add_to_cart_message' ], 10, 2 );
     }
 
     /**
@@ -385,6 +395,41 @@ JS;
      */
     public static function disable_cart_redirect(): bool {
         return false;
+    }
+
+    /**
+     * CART-UX-013 (operador: "cuando le das añadir a carrito no te lleva a
+     * la página donde se selecciona el pedido"): el submit clásico del
+     * formulario de la ficha de producto redirige DIRECTO al carrito.
+     * Solo ese contexto (POST add-to-cart del form de la ficha) — el resto
+     * de adds (cards AJAX, enlaces rápidos GET de wishlist/quick-view)
+     * conservan el flujo del drawer.
+     *
+     * @param string $url URL de destino del redirect de WC.
+     * @return string
+     */
+    public static function single_product_add_to_cart_redirect( $url ) {
+        if ( isset( $_POST['add-to-cart'] ) && is_numeric( wp_unslash( $_POST['add-to-cart'] ) ) ) {
+            return function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : $url;
+        }
+        return $url;
+    }
+
+    /**
+     * CART-UX-013 (operador: "oculto eso" — el aviso "producto añadido —
+     * Ver carrito"): suprimido SOLO en el mismo contexto del redirect
+     * (submit de la ficha) — el usuario aterriza en el carrito sin doble
+     * confirmación. Los demás adds conservan su aviso.
+     *
+     * @param string $message HTML del aviso.
+     * @param array  $products Productos añadidos.
+     * @return string
+     */
+    public static function single_product_add_to_cart_message( $message, $products ) {
+        if ( isset( $_POST['add-to-cart'] ) && is_numeric( wp_unslash( $_POST['add-to-cart'] ) ) ) {
+            return '';
+        }
+        return $message;
     }
 
     /**

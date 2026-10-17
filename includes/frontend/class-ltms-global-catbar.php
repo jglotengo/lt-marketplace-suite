@@ -34,6 +34,11 @@
 	 *     a /panel-vendedor/ pero el operador usa /ltms-dashboard/). En esa
 	 *     vista el body class ltms-panel-view oculta además el header del
 	 *     tema (el "hero" con el buscador) — petición del operador.
+	 *   - Funnel de registro/login del vendedor (HOME-CATBAR-2026-012):
+	 *     registro (y su duplicada /ltms-register/), login y recuperación
+	 *     de contraseña — formularios de app; la barra "solo se ve en las
+	 *     páginas públicas apropiadas" (operador). El header del tema se
+	 *     conserva en estas páginas.
 	 *   - Checkout / order-received: protección del funnel de pago (misma
  *     filosofía de HOME-REDESIGN-007 — nada distrae del checkout).
  *   - Panel del vendedor (dashboard/wallet/orders): páginas de app, no de
@@ -151,7 +156,49 @@ class LTMS_Global_Catbar {
 			return false;
 		}
 
+		// Funnel de registro/login del vendedor: formularios de app, no
+		// páginas públicas de catálogo (HOME-CATBAR-2026-012 — el operador
+		// vio la barra en la página de registro de vendedores: "que solo
+		// se vea en las páginas públicas apropiadas"). Por ID y por slug.
+		if ( self::is_vendor_auth_page() ) {
+			return false;
+		}
+
 		return true;
+	}
+
+	/**
+	 * ¿Es una página del funnel de autenticación del vendedor?
+	 *
+	 * HOME-CATBAR-2026-012: registro, login y recuperación de contraseña
+	 * son formularios de app — la barra "solo se ve en las páginas
+	 * públicas apropiadas" (operador). Por ID (opción) Y por slug
+	 * (cubriendo duplicadas: la opción ltms-register apunta a
+	 * /registro-vendedor/ pero además existe la página /ltms-register/).
+	 * NO añade el body class ltms-panel-view: el header del tema se
+	 * conserva en estas páginas.
+	 *
+	 * @return bool
+	 */
+	private static function is_vendor_auth_page(): bool {
+		$pages = get_option( 'ltms_installed_pages', [] );
+		if ( is_array( $pages ) ) {
+			foreach ( array(
+				'ltms-vendor-register', 'ltms-register', 'ltms-login', 'ltms-lost-password',
+			) as $key ) {
+				if ( ! empty( $pages[ $key ] ) && is_page( (int) $pages[ $key ] ) ) {
+					return true;
+				}
+			}
+		}
+		foreach ( array(
+			'registro-vendedor', 'ltms-register', 'login-vendedor', 'recuperar-contrasena',
+		) as $auth_slug ) {
+			if ( is_page( $auth_slug ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
