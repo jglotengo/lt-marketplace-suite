@@ -776,6 +776,8 @@ $files = [
     // password en complete_profile) + tests AuthAuditFixTest (test_04b actualizado
     // al nuevo diseño de sesión) y RegisterAuditE2ETest (ciclo nuevo).
     'includes/frontend/views/vendor-parts/form-register.php',
+    'includes/frontend/views/vendor-parts/form-login.php',
+    'includes/frontend/views/vendor-parts/form-lost-password.php',
     'tests/unit/AuthAuditFixTest.php',
     'tests/unit/RegisterAuditE2ETest.php',
     // PANEL-E2E v2.9.322 — minificación de assets desacoplada de LTMS_ENVIRONMENT:

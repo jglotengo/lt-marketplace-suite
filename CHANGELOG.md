@@ -4,6 +4,31 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-17 (4)
+
+### Fixed — `AUTH-LOGO-001b` (form-login y form-lost-password nunca se sincronizaron) + header oculto en recuperar-contrasena
+
+> **Reporte del operador:** "el formulario de iniciar sesión no tiene logo.
+> El formulario de recuperar contraseña no tiene logo y no oculta el
+> header donde está el buscador".
+>
+> - **Causa raíz (1):** solo `form-register.php` estaba en el whitelist del
+>   webhook de deploy — `form-login.php` y `form-lost-password.php` se
+>   editaron en el commit 73f3255b pero **nunca se sincronizaron al
+>   server** (el server seguía con las versiones viejas que usaban el
+>   theme mod "bandera" → sin logo visible).
+> - **Causa raíz (2):** el CSS de `ltms-login-register.css` oculta el
+>   header por page-IDs hardcodeados (14342/14343/14444) — el página de
+>   recuperación (ID 20790) NO estaba cubierta.
+> - **Fix (1):** `form-login.php` + `form-lost-password.php` agregados al
+>   whitelist del webhook.
+> - **Fix (2):** `panel_body_class` ahora añade `ltms-panel-view` en las
+>   páginas auth también (registro, login, recuperación) — la regla CSS
+>   `body.ltms-panel-view .elementor-location-header{display:none}`
+>   (HOME-CATBAR-2026-011) cubre TODO el funnel sin page-IDs frágiles.
+>   Las reglas hardcoded en ltms-login-register.css quedan redundantes.
+> - `LTMS_VERSION 2.9.424 → 2.9.425`.
+
 ## [Unreleased] — 2026-10-17 (3)
 
 ### Changed — `HOME-UX-014` (header de la home a NEGRO) + `AUTH-LOGO-001` (logo oficial en los formularios del funnel de vendedor)

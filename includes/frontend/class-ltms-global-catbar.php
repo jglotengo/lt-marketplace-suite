@@ -236,18 +236,21 @@ class LTMS_Global_Catbar {
 	}
 
 	/**
-	 * HOME-CATBAR-2026-011: clase body para la vista del panel del
-	 * vendedor. El CSS de la barra (ltms-catbar.css) oculta el header del
-	 * tema (el "hero" con el buscador FiboSearch, logo y carrito) en esa
-	 * vista — petición del operador: en el panel, desde PC o móvil, se
-	 * veían la barra de categorías y el hero del navegador; la vista
-	 * queda como app limpia con su propia navegación interna.
+	 * HOME-CATBAR-2026-011 + AUTH-LOGO-001 (2026-10-17): clase body para la
+	 * vista del panel del vendedor Y el funnel de auth (registro, login,
+	 * recuperación de contraseña). El CSS de la barra
+	 * (body.ltms-panel-view .elementor-location-header{display:none})
+	 * oculta el header del tema en TODAS esas vistas — petición del
+	 * operador: en el panel y en el funnel solo se ve la app/formulario.
+	 * NOTA: las reglas hardcoded por page-id en ltms-login-register.css
+	 * (14342/14343/14344) quedan redundantes — este enfoque por body class
+	 * es inmune a páginas duplicadas/heredadas y cubre 20790 (recuperar).
 	 *
 	 * @param array $classes Clases body.
 	 * @return array
 	 */
 	public static function panel_body_class( array $classes ): array {
-		if ( self::is_vendor_panel_page() ) {
+		if ( self::is_vendor_panel_page() || self::is_vendor_auth_page() ) {
 			$classes[] = 'ltms-panel-view';
 		}
 		return $classes;
