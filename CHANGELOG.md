@@ -136,6 +136,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   negro + drag CSS, 005 guard + rueda/drag). Suite completa
 >   **5,248 tests, 11,428 assertions, 0 fallas** (3 skips preexistentes).
 
+### Fixed — `HOME-CATBAR-2026-006b` (la barra se duplicaba en la home: el string vacío que `do_action` pasa como primer argumento)
+
+> **Hallazgo live al verificar 006:** la home servía DOS barras (una vía
+> `wp_body_open` + la inline del header). Diagnóstico por instrumentación
+> (mu-plugin temporal de probe + backtrace en `render_bar`): el callback
+> llegaba con `$context=''` desde el hook — `do_action()` SIEMPRE antepone
+> el "filter value" vacío de las actions como primer argumento a los
+> callbacks con `accepted_args>=1` (el default de `add_action`), así que
+> el default `'wp_body_open'` del parámetro NUNCA aplicaba por la vía del
+> hook y la exclusión de la home (`'wp_body_open' === $context`) no
+> matcheaba. En 005 el callback no tenía parámetros (el `''` extra se
+> ignoraba) — el bug lo introdujo el refactor del parámetro en 006.
+>
+> - **Fix de doble capa:** (1) `add_action( 'wp_body_open', ..., 10, 0 )`
+>   — accepted_args explícito en 0 → el callback no recibe el dummy;
+>   (2) normalización interna de `render_bar`: todo `$context !==
+>   'home_header'` se trata como `wp_body_open`. +2 asserts en
+>   GlobalCatbarTest (test_001/test_002, lección #119).
+> - **Diagnóstico desmontado del server:** mu-plugin temporal de
+>   probe/reset eliminado, instrumentación del class revertida (backup
+>   verificado con `php -l`), logs temporales limpiados.
+> - **Lección #190 nueva** (do_action antepone un `''` invisible — nunca
+>   confiar en defaults de parámetros en callbacks de hook). Suite
+>   completa **5,248 tests, 11,429 assertions, 0 fallas**.
+
 ## [Unreleased] — 2026-10-03
 
 ### Fixed/Changed — `HOME-UX4-001` (visibilidad de la barra de categorías de la home)

@@ -4264,3 +4264,36 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    diseño PLANEADO, debe decir "planeado" — nunca "existente". Y al auditar
    un módulo, tratar cada afirmación de la doc como un hallazgo a verificar,
    no como fuente de verdad (mismo espíritu que #186/#187: forma ≠ runtime).
+
+### Lección #190: do_action() antepone un string vacío (dummy) como primer argumento a los callbacks con accepted_args>=1 — un parámetro con valor default en un callback de hook NUNCA recibe el default por la vía del hook (HOME-CATBAR-2026-006b, 2026-10-15)
+
+1. **Caso real:** la barra global de categorías se duplicaba en la home
+   (una vía wp_body_open + la inline del header). El refactor 006 añadió
+   un parámetro con default a `render_bar( string $context =
+   'wp_body_open' )` confiando en el default — pero `do_action()` en
+   WordPress SIEMPRE antepone el "filter value" (string vacío) de las
+   actions como primer argumento cuando accepted_args>=1 (el default de
+   add_action): el callback recibía `''`, el default jamás aplicaba, y con
+   `''` la exclusión de la home (`'wp_body_open' === $context`) no
+   matcheaba. La versión 005 funcionaba por accidente: su firma no tenía
+   parámetros y el `''` extra se ignoraba silenciosamente (PHP ignora
+   args extra en funciones userland).
+
+2. **Diagnóstico (el "imposible")**: un probe que llamaba
+   `should_render('wp_body_open')` directo devolvía false, pero el hook
+   igual renderizaba — teorías de opcache stale y workers mixtos cayeron
+   con reset real (`opcache_reset()` vía mu-plugin en contexto web) y
+   renders deterministas. Lo resolvió la instrumentación del punto
+   exacto: `debug_backtrace` al inicio de render_bar (edición temporal
+   del class en el server + mu-plugin con opcache_reset para compilar)
+   — `ctx=''` desde class-wp-hook/plugin.php/general-template.php: el
+   mecanismo del dummy de WP_Hook::apply_filters
+   (`array_merge([ $value='' ], $args)`).
+
+3. **Regla preventiva:** (1) Todo `add_action` cuyo callback declara
+   parámetros con default debe declarar `accepted_args=0` EXPLÍCITO. (2)
+   Mejor aún: los callbacks de hook NUNCA confían en defaults — aceptan
+   el contrato del hook o normalizan internamente ("todo valor distinto
+   del esperado se trata como X"). (3) Un "imposible" runtime (probe
+   dice A, el hook hace B) se resuelve con backtrace del punto exacto,
+   no con más teoría.

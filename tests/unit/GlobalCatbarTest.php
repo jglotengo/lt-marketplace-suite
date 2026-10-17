@@ -77,9 +77,9 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 
 		$module = $this->strip_php_comments( file_get_contents( $this->module_path ) );
 		$this->assertStringContainsString(
-			"add_action( 'wp_body_open', [ __CLASS__, 'render_bar' ], 10 );",
+			"add_action( 'wp_body_open', [ __CLASS__, 'render_bar' ], 10, 0 );",
 			$module,
-			'HOME-CATBAR-2026-004-A: el render debe engancharse a wp_body_open (toda página estándar del tema).'
+			'HOME-CATBAR-2026-006b: el hook declara accepted_args=0 — do_action antepone un string vacio (dummy) como primer argumento a los callbacks con accepted_args>=1 y el default de $context NUNCA aplicaba (la barra se duplicaba en la home).'
 		);
 		$this->assertStringContainsString(
 			"add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );",
@@ -122,6 +122,14 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			"LTMS_Global_Catbar::render_bar( 'home_header' );",
 			$home,
 			'HOME-CATBAR-2026-006: home.php renderiza la barra INLINE dentro del header sticky (server-side, sin JS de reubicación).'
+		);
+		// HOME-CATBAR-2026-006b: normalización del contexto — cinturón y
+		// tirantes frente al '' dummy de do_action (hallazgo live: la barra
+		// se duplicaba en la home porque '' no matcheaba la exclusión).
+		$this->assertStringContainsString(
+			"'home_header' !== \$context",
+			$module,
+			'HOME-CATBAR-2026-006b: render_bar normaliza el contexto — todo valor != home_header se trata como wp_body_open.'
 		);
 		$this->assertStringContainsString(
 			"function_exists( 'is_checkout' )",

@@ -70,7 +70,14 @@ class LTMS_Global_Catbar {
 	 * Init: hooks de render + assets.
 	 */
 	public static function init(): void {
-		add_action( 'wp_body_open', [ __CLASS__, 'render_bar' ], 10 );
+		/* HOME-CATBAR-2026-006b: accepted_args EXPLÍCITO en 0. do_action()
+		 * antepone un '' dummy como primer argumento a todo callback con
+		 * accepted_args>=1 (WP_Hook::apply_filters hace array_merge con el
+		 * $value vacío de las actions) — verificado live: render_bar llegaba
+		 * con $context='' desde el hook, el default 'wp_body_open' NUNCA
+		 * aplicaba, la exclusión de la home no matcheaba y la barra se
+		 * duplicaba sobre la inline del header. */
+		add_action( 'wp_body_open', [ __CLASS__, 'render_bar' ], 10, 0 );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
 	}
 
@@ -146,6 +153,14 @@ class LTMS_Global_Catbar {
 	 *                        (render INLINE desde home.php).
 	 */
 	public static function render_bar( string $context = 'wp_body_open' ): void {
+		/* HOME-CATBAR-2026-006b (hallazgo live): normalizar el contexto —
+		 * todo valor que no sea 'home_header' se trata como wp_body_open.
+		 * Cinturón y tirantes frente al '' dummy que do_action pasa como
+		 * primer argumento (ver accepted_args=0 en init()). */
+		if ( 'home_header' !== $context ) {
+			$context = 'wp_body_open';
+		}
+
 		if ( ! self::should_render( $context ) ) {
 			return;
 		}
