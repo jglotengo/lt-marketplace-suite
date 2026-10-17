@@ -1,17 +1,18 @@
 /* ============================================================================
-   LTMS Global Catbar — barra global de categorías (HOME-CATBAR-2026-006).
+   LTMS Global Catbar — barra global de categorías (HOME-CATBAR-2026-009).
    Barra sticky con TODAS las categorías activas en fila única deslizable.
-   Fondo NEGRO #000000 (el "footer negro" del brief — feedback del operador:
-   contrasta con el header rojo de la home y con el hero de fondo claro).
-   Contrastes de letras verificados (WCAG): blanco #FFF sobre negro 21:1
-   (AAA); blanco sobre chip rgba(255,255,255,.10) sobre negro ≈ 18.1:1
-   (AAA); chip activo dorado #F7B731 con texto negro 11.8:1 (AAA); hover
-   rgba(255,255,255,.22) sobre negro ≈ 11.7:1 (AAA). SIN logo ("cada página
-   ya tiene su logo, es redundante" — operador). Touch target 44px (brief
-   HOME-MATRIX-FIX). En escritorio la fila se desliza con rueda del mouse y
-   arrastre (JS + cursor grab). Los tokens (--pv-maxw, --ltms-gold) vienen
-   de plaza-viva.css (encolado global); los fallbacks cubren el caso
-   extremo de orden de carga.
+   HOME-CATBAR-2026-009 (feedback del operador: "cambia solo la parte del
+   fondo a color rojo y mejora el contraste de las formas que contienen el
+   texto — que sean de otro color y amigable a la vista"): fondo ROJO DE
+   MARCA #E80001 + chips BLANCOS con texto #222. Contrastes verificados
+   (WCAG): texto #222 sobre blanco 15.9:1 (AAA); chip blanco sobre rojo
+   4.7:1 (≥3:1 componentes UI); hover #F6F5F8 ≈ 14.8:1 (AAA); chip activo
+   dorado #F7B731 con texto negro 11.8:1 (AAA) — se distingue de los chips
+   blancos inactivos. SIN logo ("cada página ya tiene su logo" — operador).
+   Touch target 44px (brief HOME-MATRIX-FIX). En escritorio la fila se
+   desliza con rueda del mouse y arrastre (JS + cursor grab). Los tokens
+   (--pv-maxw, --ltms-gold, --text) vienen de plaza-viva.css (encolado
+   global); los fallbacks cubren el caso extremo de orden de carga.
    ============================================================================ */
 
 .ltms-catbar{
@@ -22,11 +23,10 @@
 	   (feedback del operador: en la tienda se superponía). */
 	top:0;
 	z-index:99990;
-	/* HOME-CATBAR-2026-006: negro del brief — banda de utilidad que
-	   contrasta con el header rojo de la home (arriba) y el fondo claro
-	   de las páginas (abajo). */
-	background:#000000;
-	border-bottom:1px solid rgba(255,255,255,.10);
+	/* HOME-CATBAR-2026-009: rojo de marca ("cambia solo la parte del fondo
+	   a color rojo" — operador). */
+	background:#E80001;
+	border-bottom:1px solid rgba(0,0,0,.14);
 }
 .ltms-catbar__inner{
 	display:flex;
@@ -71,9 +71,13 @@
 	min-height:44px; /* HOME-CATBAR-2026-005: touch target 44px del brief (paridad con los chips de la home que reemplaza). */
 	padding:6px 14px;
 	border-radius:999px;
-	background:rgba(255,255,255,.10);
-	border:1px solid rgba(255,255,255,.22);
-	color:#fff;
+	/* HOME-CATBAR-2026-009 (operador: "mejora el contraste de las formas
+	   que contienen el texto... que sean de otro color y amigable a la
+	   vista"): píldora BLANCA con texto #222 — 15.9:1 (AAA) y el chip
+	   destaca sobre el rojo (4.7:1 ≥ 3:1 componentes UI). */
+	background:#FFFFFF;
+	border:1px solid rgba(0,0,0,.10);
+	color:var(--text,#222222);
 	font-family:var(--body,'Inter'),system-ui,sans-serif;
 	font-size:12px;
 	font-weight:600;
@@ -84,9 +88,9 @@
 	transition:background .18s cubic-bezier(.4,0,.2,1),color .18s cubic-bezier(.4,0,.2,1),border-color .18s cubic-bezier(.4,0,.2,1);
 }
 .ltms-catbar__chip:hover{
-	background:rgba(255,255,255,.22);
-	color:#fff;
-	border-color:rgba(255,255,255,.55);
+	background:#F6F5F8;
+	color:#222222;
+	border-color:rgba(0,0,0,.16);
 }
 /* Categoría activa (archivo de categoría): dorado primario del brief. */
 .ltms-catbar__chip.is-active{
@@ -98,11 +102,12 @@
 	.ltms-catbar__inner{padding:4px 14px;}
 }
 
-/* HOME-CATBAR-2026-006: en la home nativa la barra se renderiza SERVER-SIDE
-   dentro del header sticky (render_bar('home_header') desde home.php) como
-   última fila — sin JS de reubicación ni flash. Fondo NEGRO heredado de la
-   base: banda de contraste bajo el header rojo, sobre el hero de fondo
-   claro. position:static — hereda el sticky del header (nunca se oculta). */
+/* HOME-CATBAR-2026-006/009: en la home nativa la barra se renderiza
+   SERVER-SIDE dentro del header sticky (render_bar('home_header') desde
+   home.php) como última fila — sin JS de reubicación ni flash. El fondo
+   rojo heredado de la base (009) se funde con el header rojo (chrome
+   continuo); la fila la llevan los chips blancos. position:static —
+   hereda el sticky del header (nunca se oculta). */
 .pv-scope.pv-home .ltms-catbar{
 	position:static;
 	z-index:auto;

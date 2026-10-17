@@ -11,13 +11,13 @@
  *
 	 * Barra sticky (position:sticky top:0 — nunca se oculta al escrolear)
 	 * con TODAS las categorías activas como chips en fila única deslizable.
-	 * Fondo NEGRO #000000 desde HOME-CATBAR-2026-006 (feedback del operador:
-	 * "revisa si es mejor que el fondo de esa barra sea negro" — es el
-	 * "footer negro" del brief y contrasta con el header rojo de la home y
-	 * con el hero de fondo claro). SIN logo: "cada página ya tiene su logo,
-	 * es redundante" (operador). La categoría activa se resalta (is-active +
-	 * aria-current) en los archivos de categoría. Misma fuente de datos que
-	 * la home:
+	 * Fondo ROJO DE MARCA #E80001 con chips BLANCOS y texto #222 desde
+	 * HOME-CATBAR-2026-009 (feedback del operador: "cambia solo la parte
+	 * del fondo a color rojo y mejora el contraste de las formas que
+	 * contienen el texto — que sean de otro color y amigable a la vista").
+	 * SIN logo: "cada página ya tiene su logo, es redundante" (operador).
+	 * La categoría activa se resalta (is-active + aria-current) en los
+	 * archivos de categoría. Misma fuente de datos que la home:
  * LTMS_Utils::get_normalized_product_categories() (dedup por fingerprint +
  * orden por # de productos), con la exclusión del artefacto 'no-aplica'.
  *
@@ -38,10 +38,11 @@
  *     position:sticky !important, nunca se oculta) y sus categorías son
  *     filtros multi-select propios del sidebar.
  *
-	 * HOME-CATBAR-2026-006 (2026-10-15, feedback del operador sobre 005):
-	 * (1) Fondo NEGRO #000000 (el "footer negro" del brief) — contrasta con
-	 * el header rojo de la home arriba y con el hero de fondo claro debajo;
-	 * texto blanco 21:1 (AAA), chip activo dorado #F7B731 con texto negro
+	 * HOME-CATBAR-2026-006/009 (feedback del operador):
+	 * (1) Fondo ROJO DE MARCA #E80001 (009: "cambia solo la parte del fondo
+	 * a color rojo") + chips BLANCOS con texto #222 (009: "mejora el
+	 * contraste de las formas... amigable a la vista" — texto 15.9:1 AAA,
+	 * chip sobre rojo 4.7:1); chip activo dorado #F7B731 con texto negro
 	 * 11.8:1 (AAA). (2) SIN logo — "cada página ya tiene su logo, es
 	 * redundante": eliminado de la barra en todas las páginas. (3) La fila
 	 * se desliza también en ESCRITORIO: rueda del mouse → scroll horizontal

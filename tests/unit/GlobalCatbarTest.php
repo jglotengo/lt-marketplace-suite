@@ -9,9 +9,10 @@
  *
  * Valida ESTRUCTURALMENTE:
  *   1. El módulo existe, se inicializa desde el kernel y engancha wp_body_open.
- *   2. La barra es sticky (nunca se oculta al escrolear) y usa fondo NEGRO
- *      #000000 (HOME-CATBAR-2026-006, feedback del operador) SIN logo
- *      ("cada página ya tiene su logo, es redundante").
+	 *   2. La barra es sticky (nunca se oculta al escrolear) y usa fondo ROJO
+	 *      de marca #E80001 con chips BLANCOS y texto #222
+	 *      (HOME-CATBAR-2026-009, feedback del operador) SIN logo ("cada
+	 *      página ya tiene su logo, es redundante").
  *   3. Las categorías: TODAS las activas vía el helper normalizado, con la
  *      exclusión del artefacto 'no-aplica' y la categoría activa resaltada
  *      (is-active + aria-current) en los archivos de categoría.
@@ -218,9 +219,22 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			'HOME-CATBAR-2026-004-D: la barra es sticky — nunca se oculta mientras se desplaza (petición del operador).'
 		);
 		$this->assertStringContainsString(
-			'background:#000000;',
+			'background:#E80001;',
 			$css,
-			'HOME-CATBAR-2026-006: la barra usa fondo NEGRO #000000 — contrasta con el header rojo (home) y el fondo claro de las páginas (feedback del operador).'
+			'HOME-CATBAR-2026-009: la barra usa el ROJO de marca #E80001 ("cambia solo la parte del fondo a color rojo" — operador).'
+		);
+		// HOME-CATBAR-2026-009: chips BLANCOS con texto #222 ("mejora el
+		// contraste de las formas que contienen el texto... amigable a la
+		// vista" — operador).
+		$this->assertStringContainsString(
+			'background:#FFFFFF;',
+			$css,
+			'HOME-CATBAR-2026-009: los chips son BLANCOS — píldora suave sobre el rojo (4.7:1 ≥ 3:1 UI; texto 15.9:1 AAA).'
+		);
+		$this->assertStringContainsString(
+			'color:var(--text,#222222);',
+			$css,
+			'HOME-CATBAR-2026-009: texto de los chips en #222 sobre blanco — 15.9:1 (AAA).'
 		);
 		$this->assertStringNotContainsString(
 			'ltms-catbar__home',

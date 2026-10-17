@@ -6,6 +6,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-10-17
 
+### Fixed/Changed — `HOME-CATBAR-2026-009` (la barra vuelve al rojo de marca + chips blancos amigables)
+
+> **Reporte del operador:** "la barra de las categorías que creamos cambia
+> solo la parte del fondo a color rojo y mejora el contraste de las formas
+> que contienen el texto de las categorías, que sean de otro color y
+> amigable a la vista".
+>
+> - **Fondo: ROJO DE MARCA `#E80001`** (regresa del negro del 006 por
+>   decisión del operador). En la home se funde con el header rojo (chrome
+>   continuo); en las demás páginas contrasta con la franja negra de
+>   Elementor (logo/búsqueda/carrito) que la precede.
+> - **Chips: píldoras BLANCAS con texto `#222`** (antes vidrio oscuro) —
+>   "otro color y amigable a la vista". Contrastes verificados (WCAG):
+>   texto sobre blanco **15.9:1 (AAA)**; chip blanco sobre rojo **4.7:1**
+>   (≥3:1 componentes UI); hover `#F6F5F8` ≈ **14.8:1 (AAA)**; chip activo
+>   **dorado `#F7B731` con texto negro 11.8:1 (AAA)** — se distingue con
+>   claridad de los chips blancos inactivos. Bordes suaves
+>   `rgba(0,0,0,.10)`.
+> - Docblocks + tests actualizados en el mismo commit (lección #119):
+>   GlobalCatbarTest test_004 (fondo #E80001 + chips blancos + texto #222).
+>   Suite completa **5,248 tests, 11,434 assertions, 0 fallas** (3 skips
+>   preexistentes). `LTMS_VERSION 2.9.418 → 2.9.419`.
+
 ### Fixed — `HOME-CATBAR-2026-008` (la barra roja del storefront eliminada)
 
 > **Reporte del operador:** "la barra roja del storefront eliminala".
