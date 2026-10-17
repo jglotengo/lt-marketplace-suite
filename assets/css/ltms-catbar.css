@@ -10,7 +10,12 @@
    dorado #F7B731 con texto negro 11.8:1 (AAA) — se distingue de los chips
    blancos inactivos. SIN logo ("cada página ya tiene su logo" — operador).
    Touch target 44px (brief HOME-MATRIX-FIX). En escritorio la fila se
-   desliza con rueda del mouse y arrastre (JS + cursor grab). Los tokens
+   desliza con rueda del mouse y arrastre (JS + cursor grab).
+   HOME-CATBAR-2026-010 (pulido profesional aprobado por el operador):
+   chips radius 8px, tipografía 12.5px/500 con letter-spacing -0.01em,
+   sombra de capa en la barra, gap 8px y "Ver todas →" al final (patrón
+   Amazon "Ver todo"). La barra sigue FIJA (sticky) — el comportamiento
+   no cambia. Los tokens
    (--pv-maxw, --ltms-gold, --text) vienen de plaza-viva.css (encolado
    global); los fallbacks cubren el caso extremo de orden de carga.
    ============================================================================ */
@@ -27,6 +32,9 @@
 	   a color rojo" — operador). */
 	background:#E80001;
 	border-bottom:1px solid rgba(0,0,0,.14);
+	/* HOME-CATBAR-2026-010: sombra de capa — "eleva" la barra del
+	   contenido (patrón de navs profesionales). */
+	box-shadow:0 1px 6px rgba(0,0,0,.14);
 }
 .ltms-catbar__inner{
 	display:flex;
@@ -34,12 +42,12 @@
 	gap:10px;
 	max-width:var(--pv-maxw,1400px);
 	margin:0 auto;
-	padding:5px 14px;
+	padding:6px 14px; /* HOME-CATBAR-2026-010: respiración vertical (era 5px). */
 }
 .ltms-catbar__track{
 	display:flex;
 	align-items:center;
-	gap:6px;
+	gap:8px; /* HOME-CATBAR-2026-010: respiración — chips con aire (era 6px). */
 	overflow-x:auto;
 	scrollbar-width:none;
 	-webkit-overflow-scrolling:touch;
@@ -69,8 +77,12 @@
 	display:inline-flex;
 	align-items:center;
 	min-height:44px; /* HOME-CATBAR-2026-005: touch target 44px del brief (paridad con los chips de la home que reemplaza). */
-	padding:6px 14px;
-	border-radius:999px;
+	/* HOME-CATBAR-2026-010 (pulido profesional): radius 8px (la píldora
+	   999px leía "app casual"; el radio suave lee retail corporativo),
+	   tipografía 12.5px/500 con letter-spacing -0.01em (más fina y
+	   aireada) y padding horizontal 12px. */
+	padding:6px 12px;
+	border-radius:8px;
 	/* HOME-CATBAR-2026-009 (operador: "mejora el contraste de las formas
 	   que contienen el texto... que sean de otro color y amigable a la
 	   vista"): píldora BLANCA con texto #222 — 15.9:1 (AAA) y el chip
@@ -79,8 +91,9 @@
 	border:1px solid rgba(0,0,0,.10);
 	color:var(--text,#222222);
 	font-family:var(--body,'Inter'),system-ui,sans-serif;
-	font-size:12px;
-	font-weight:600;
+	font-size:12.5px;
+	font-weight:500;
+	letter-spacing:-0.01em;
 	white-space:nowrap;
 	text-decoration:none;
 	scroll-snap-align:start;
@@ -97,9 +110,26 @@
 	background:var(--ltms-gold,#F7B731);
 	color:#000;
 	border-color:rgba(0,0,0,.2);
+	/* HOME-CATBAR-2026-010: peso 600 — la activa lee un grado más de
+	   jerarquía sobre los chips blancos inactivos (peso 500). */
+	font-weight:600;
+}
+/* HOME-CATBAR-2026-010: affordance de cierre — "Ver todas →" al final de
+   la fila (patrón Amazon "Ver todo"). Chip FANTASMA: contorno blanco
+   sobre el rojo, texto blanco 4.74:1 (AA) — se distingue como ACCIÓN de
+   los chips de categoría (blancos = navegación). */
+.ltms-catbar__chip--all{
+	background:transparent;
+	border:1px solid rgba(255,255,255,.55);
+	color:#fff;
+}
+.ltms-catbar__chip--all:hover{
+	background:rgba(255,255,255,.14);
+	color:#fff;
+	border-color:rgba(255,255,255,.85);
 }
 @media (max-width:767px){
-	.ltms-catbar__inner{padding:4px 14px;}
+	.ltms-catbar__inner{padding:5px 14px;}
 }
 
 /* HOME-CATBAR-2026-006/009: en la home nativa la barra se renderiza

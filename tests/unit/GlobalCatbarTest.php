@@ -190,6 +190,18 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$module,
 			'HOME-CATBAR-2026-004-C: la categoría activa se detecta con is_product_category().'
 		);
+		// HOME-CATBAR-2026-010: "Ver todas →" al final de la fila (patrón
+		// Amazon "Ver todo") — chip fantasma con la URL de la tienda.
+		$this->assertStringContainsString(
+			'ltms-catbar__chip--all',
+			$module,
+			'HOME-CATBAR-2026-010: la barra cierra con el affordance "Ver todas →" (pulido profesional aprobado por el operador).'
+		);
+		$this->assertStringContainsString(
+			"wc_get_page_id( 'shop' )",
+			$module,
+			'HOME-CATBAR-2026-010: la URL de "Ver todas" usa la misma fuente que el resto del plugin (wc_get_page_id shop).'
+		);
 		$this->assertStringContainsString(
 			"' is-active'",
 			$module,
@@ -235,6 +247,34 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			'color:var(--text,#222222);',
 			$css,
 			'HOME-CATBAR-2026-009: texto de los chips en #222 sobre blanco — 15.9:1 (AAA).'
+		);
+		// HOME-CATBAR-2026-010 (pulido profesional aprobado por el operador):
+		// radius 8px, tipografía 12.5px/500 con letter-spacing, sombra de
+		// capa y chip fantasma "Ver todas".
+		$this->assertStringContainsString(
+			'border-radius:8px;',
+			$css,
+			'HOME-CATBAR-2026-010: chips con radius 8px — la píldora 999px leía "app casual"; el radio suave lee retail corporativo.'
+		);
+		$this->assertStringContainsString(
+			'font-size:12.5px;',
+			$css,
+			'HOME-CATBAR-2026-010: tipografía de los chips en 12.5px/500 (más fina y aireada).'
+		);
+		$this->assertStringContainsString(
+			'letter-spacing:-0.01em;',
+			$css,
+			'HOME-CATBAR-2026-010: letter-spacing -0.01em (refinamiento tipográfico).'
+		);
+		$this->assertStringContainsString(
+			'box-shadow:0 1px 6px rgba(0,0,0,.14);',
+			$css,
+			'HOME-CATBAR-2026-010: sombra de capa — la barra se "eleva" del contenido (patrón de navs profesionales).'
+		);
+		$this->assertStringContainsString(
+			'.ltms-catbar__chip--all{',
+			$css,
+			'HOME-CATBAR-2026-010: el chip fantasma "Ver todas →" existe en el CSS (contorno blanco sobre rojo, texto 4.74:1 AA).'
 		);
 		$this->assertStringNotContainsString(
 			'ltms-catbar__home',

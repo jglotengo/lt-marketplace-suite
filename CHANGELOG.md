@@ -6,6 +6,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-10-17
 
+### Changed — `HOME-CATBAR-2026-010` (pulido profesional de la barra fija — aprobado por el operador)
+
+> **Consulta del operador:** "consideras que se puede mejorar que se vea
+> más profesional" → propuesta de 5 refinamientos contra los patrones de
+> marketplaces profesionales (Amazon, Mercado Libre, Falabella) — **los 5
+> aprobados**. La barra sigue FIJA (sticky); el comportamiento no cambia.
+>
+> 1. **Chips radius 8px** (antes píldora 999px): la píldora leía "app
+>    casual"; el radio suave lee retail corporativo.
+> 2. **Tipografía 12.5px / peso 500 + `letter-spacing -0.01em`** (antes
+>    12px/600): letra más fina y aireada; la categoría ACTIVA sube a peso
+>    600 — un grado más de jerarquía sobre los chips blancos inactivos.
+> 3. **Sombra de capa** `0 1px 6px rgba(0,0,0,.14)` en la barra: la
+>    "eleva" del contenido — el patrón de navs profesionales.
+> 4. **Respiración**: gap entre chips 6→8px, padding vertical 5→6px
+>    (móvil 4→5px).
+> 5. **"Ver todas →" al final de la fila** (patrón Amazon "Ver todo"):
+>    chip FANTASMA (contorno blanco sobre rojo, texto blanco 4.74:1 AA)
+>    que se distingue como ACCIÓN de los chips de categoría (blancos =
+>    navegación). URL de la tienda con la misma fuente del resto del
+>    plugin (`wc_get_page_id('shop')` con guard) + filtro
+>    `ltms_catbar_view_all_url`.
+>
+> - +7 asserts en GlobalCatbarTest (test_003/test_004, lección #119).
+>   Suite completa **5,248 tests, 11,441 assertions, 0 fallas** (3 skips
+>   preexistentes). `LTMS_VERSION 2.9.419 → 2.9.420`.
+
 ### Fixed/Changed — `HOME-CATBAR-2026-009` (la barra vuelve al rojo de marca + chips blancos amigables)
 
 > **Reporte del operador:** "la barra de las categorías que creamos cambia

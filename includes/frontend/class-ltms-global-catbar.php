@@ -196,6 +196,26 @@ class LTMS_Global_Catbar {
 			</a>
 			<?php
 		}
+
+		/* HOME-CATBAR-2026-010: affordance profesional de cierre —
+		 * "Ver todas →" al final de la fila (patrón Amazon "Ver todo").
+		 * La URL de la tienda usa la MISMA fuente que el resto del plugin
+		 * (wc_get_page_id('shop') con guard, ver home.php) y es filtrable
+		 * via ltms_catbar_view_all_url. */
+		$shop_url = function_exists( 'wc_get_page_id' )
+			? (string) get_permalink( wc_get_page_id( 'shop' ) )
+			: '';
+		if ( '' === $shop_url ) {
+			$shop_url = (string) home_url( '/' );
+		}
+		$view_all_url = apply_filters( 'ltms_catbar_view_all_url', $shop_url );
+		?>
+		<a role="listitem"
+		   class="ltms-catbar__chip ltms-catbar__chip--all"
+		   href="<?php echo esc_url( $view_all_url ); ?>">
+			<?php esc_html_e( 'Ver todas →', 'ltms' ); ?>
+		</a>
+		<?php
 		echo '</div>';
 
 		echo '</div>';

@@ -87,7 +87,7 @@ define( 'LTMS_LOADED', true );
 // CSS inline de la home (grid categorías minmax 3-col, banner natural, chips
 // fila única), plaza-viva.js regenerado (initChipsFade) y assets nuevos de la
 // barra global de categorías (ltms-catbar.css/js).
-define( 'LTMS_VERSION', '2.9.419' );
+define( 'LTMS_VERSION', '2.9.420' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
