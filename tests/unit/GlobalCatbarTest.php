@@ -87,6 +87,11 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$module,
 			'HOME-CATBAR-2026-004-A: los assets se encolan vía wp_enqueue_scripts.'
 		);
+		$this->assertStringContainsString(
+			"add_filter( 'body_class', [ __CLASS__, 'panel_body_class' ] );",
+			$module,
+			'HOME-CATBAR-2026-011: el módulo engancha body_class para marcar la vista del panel (ltms-panel-view).'
+		);
 
 		$kernel = $this->strip_php_comments( file_get_contents( $this->kernel_path ) );
 		$this->assertStringContainsString(
@@ -142,13 +147,39 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$module,
 			'HOME-CATBAR-2026-004-B: la página de orden recibida queda excluida (funnel).'
 		);
-		foreach ( array( 'ltms-dashboard', 'ltms-wallet', 'ltms-orders' ) as $page_key ) {
+		// HOME-CATBAR-2026-011: el panel del vendedor se excluye por ID
+		// (opción) Y por slug — cubre TODAS sus páginas de app (dashboard,
+		// pedidos, billetera, KYC, seguros, reservas, RNT) y las páginas
+		// duplicadas heredadas (/ltms-dashboard/ vs /panel-vendedor/).
+		$this->assertStringContainsString(
+			'private static function is_vendor_panel_page()',
+			$module,
+			'HOME-CATBAR-2026-011: el helper is_vendor_panel_page centraliza la detección del panel (la usan should_render y panel_body_class).'
+		);
+		foreach ( array( 'ltms-dashboard', 'ltms-orders', 'ltms-wallet', 'ltms-kyc', 'ltms-insurance', 'ltms-bookings', 'ltms-rnt' ) as $page_key ) {
 			$this->assertStringContainsString(
 				"'{$page_key}'",
 				$module,
-				"HOME-CATBAR-2026-004-B: la página del panel '{$page_key}' queda excluida (app, no catálogo)."
+				"HOME-CATBAR-2026-011: la página del panel '{$page_key}' queda excluida por la opción (app, no catálogo)."
 			);
 		}
+		foreach ( array( 'panel-vendedor', 'mis-pedidos', 'mi-billetera', 'verificacion-identidad', 'mis-seguros', 'mis-reservas', 'rnt-turismo' ) as $panel_slug ) {
+			$this->assertStringContainsString(
+				"'{$panel_slug}'",
+				$module,
+				"HOME-CATBAR-2026-011: el slug del panel '{$panel_slug}' queda cubierto (páginas duplicadas heredadas)."
+			);
+		}
+		$this->assertStringContainsString(
+			'is_page( $panel_slug )',
+			$module,
+			'HOME-CATBAR-2026-011: los slugs del panel se matchean con is_page (cubre /ltms-dashboard/, la página REAL que usa el operador).'
+		);
+		$this->assertStringContainsString(
+			"ltms-panel-view",
+			$module,
+			'HOME-CATBAR-2026-011: panel_body_class añade ltms-panel-view (el CSS oculta el header del tema en esa vista).'
+		);
 	}
 
 	/**
@@ -275,6 +306,14 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			'.ltms-catbar__chip--all{',
 			$css,
 			'HOME-CATBAR-2026-010: el chip fantasma "Ver todas →" existe en el CSS (contorno blanco sobre rojo, texto 4.74:1 AA).'
+		);
+		// HOME-CATBAR-2026-011: en la vista del panel del vendedor se oculta
+		// el header del tema (el "hero" con el buscador) — petición del
+		// operador ("ocúltalos para esa vista").
+		$this->assertStringContainsString(
+			'body.ltms-panel-view .elementor-location-header{display:none!important;}',
+			$css,
+			'HOME-CATBAR-2026-011: el header del tema queda oculto en la vista del panel (body class ltms-panel-view).'
 		);
 		$this->assertStringNotContainsString(
 			'ltms-catbar__home',

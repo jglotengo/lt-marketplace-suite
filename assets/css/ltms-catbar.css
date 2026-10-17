@@ -159,3 +159,12 @@
    nav-menu; en navegadores sin :has() la franja queda visible (degradación
    elegante). */
 .elementor-location-header .elementor-element[data-element_type="container"]:has(.elementor-widget-nav-menu){display:none!important;}
+
+/* HOME-CATBAR-2026-011 (operador: en el panel de vendedor, desde PC o
+   móvil, se ven la barra de categorías y el hero que contiene el
+   navegador — "ocúltalos para esa vista"): la barra ya no renderiza en
+   las páginas del panel (is_vendor_panel_page, por ID y slug) y el body
+   class ltms-panel-view oculta el header del tema (el "hero" con el
+   buscador FiboSearch, logo y carrito) — la vista queda como app limpia
+   con su propia navegación interna. */
+body.ltms-panel-view .elementor-location-header{display:none!important;}

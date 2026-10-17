@@ -6,6 +6,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-10-17
 
+### Fixed — `HOME-CATBAR-2026-011` (el panel de vendedor mostraba la barra de categorías y el header del tema)
+
+> **Reporte del operador:** "en el panel de vendedor cuando abres desde
+> PC o móvil se ve la barra de categorías y el hero que contiene el
+> navegador — ocúltalos para esa vista".
+>
+> - **Causa raíz verificada:** la exclusión del panel cubría 3 páginas por
+>   ID desde la opción `ltms_installed_pages` — pero la opción apunta a la
+>   página DUPLICADA `/panel-vendedor/` (14343) mientras el operador usa
+>   `/ltms-dashboard/` (14337, shortcode `[ltms_vendor_dashboard]`), que
+>   quedaba sin cubrir (catbar renderizada al tope del body). Además KYC,
+>   seguros, reservas y RNT tampoco estaban excluidas.
+> - **Fix (1) — exclusión completa del panel:** nuevo helper
+>   `is_vendor_panel_page()` usado por `should_render()` — cubre TODAS las
+>   páginas de app por ID (opción: dashboard, pedidos, billetera, KYC,
+>   seguros, reservas, RNT) **Y por slug** (`ltms-dashboard`,
+>   `panel-vendedor`, `mis-pedidos`, `mi-billetera`,
+>   `verificacion-identidad`, `mis-seguros`, `mis-reservas`, `rnt-turismo`)
+>   — inmune a páginas duplicadas/heredadas.
+> - **Fix (2) — el "hero" del navegador oculto en esa vista:** body class
+>   `ltms-panel-view` (vía `panel_body_class` en el filtro `body_class`) +
+>   CSS `body.ltms-panel-view .elementor-location-header{display:none}`
+>   — en el panel, PC y móvil, la vista queda como app limpia con su
+>   propia navegación interna (sin catbar, sin header con el buscador
+>   FiboSearch, logo y carrito).
+> - **Hallazgo reportado (decisión del operador):** existen DOS páginas
+>   de panel duplicadas (14337 `/ltms-dashboard/` — la usada — y 14343
+>   `/panel-vendedor/` — la que apunta la opción). El fix por slug las
+>   cubre ambas; consolidarlas es limpieza de datos opcional.
+> - +16 asserts en GlobalCatbarTest (test_001/002/004, lección #119).
+>   Suite completa **5,248 tests, 11,457 assertions, 0 fallas** (3 skips
+>   preexistentes). `LTMS_VERSION 2.9.420 → 2.9.421`.
+
 ### Changed — `HOME-CATBAR-2026-010` (pulido profesional de la barra fija — aprobado por el operador)
 
 > **Consulta del operador:** "consideras que se puede mejorar que se vea

@@ -27,6 +27,13 @@
 	 *     LTMS_Global_Catbar::render_bar( 'home_header' ) desde home.php,
 	 *     HOME-CATBAR-2026-006): server-side, sin dependencia de JS de
 	 *     reubicación ni flash de reubicamiento.
+	 *   - Panel del vendedor (HOME-CATBAR-2026-011): TODAS sus páginas son
+	 *     app, no catálogo — dashboard, pedidos, billetera, KYC, seguros,
+	 *     reservas y RNT. Se detecta por ID (opción ltms_installed_pages)
+	 *     Y por slug (cubre páginas duplicadas heredadas: la opción apunta
+	 *     a /panel-vendedor/ pero el operador usa /ltms-dashboard/). En esa
+	 *     vista el body class ltms-panel-view oculta además el header del
+	 *     tema (el "hero" con el buscador) — petición del operador.
 	 *   - Checkout / order-received: protección del funnel de pago (misma
  *     filosofía de HOME-REDESIGN-007 — nada distrae del checkout).
  *   - Panel del vendedor (dashboard/wallet/orders): páginas de app, no de
@@ -80,6 +87,10 @@ class LTMS_Global_Catbar {
 		 * duplicaba sobre la inline del header. */
 		add_action( 'wp_body_open', [ __CLASS__, 'render_bar' ], 10, 0 );
 		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_assets' ] );
+		/* HOME-CATBAR-2026-011: body class de la vista del panel del
+		 * vendedor — el CSS oculta el header del tema ahí (el "hero" con
+		 * el buscador; petición del operador: "ocúltalos para esa vista"). */
+		add_filter( 'body_class', [ __CLASS__, 'panel_body_class' ] );
 	}
 
 	/**
@@ -134,17 +145,65 @@ class LTMS_Global_Catbar {
 			return false;
 		}
 
-		// Panel del vendedor: dashboard / wallet / orders son app, no catálogo.
-		$pages = get_option( 'ltms_installed_pages', [] );
-		if ( is_array( $pages ) ) {
-			foreach ( array( 'ltms-dashboard', 'ltms-wallet', 'ltms-orders' ) as $key ) {
-				if ( ! empty( $pages[ $key ] ) && is_page( (int) $pages[ $key ] ) ) {
-					return false;
-				}
-			}
+		// Panel del vendedor: TODAS sus páginas son app, no catálogo
+		// (HOME-CATBAR-2026-011 — por ID y por slug, ver helper).
+		if ( self::is_vendor_panel_page() ) {
+			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * ¿Es una página del panel del vendedor (app, no de catálogo)?
+	 *
+	 * HOME-CATBAR-2026-011: el operador veía la barra en /ltms-dashboard/
+	 * porque la opción ltms_installed_pages apunta a la página DUPLICADA
+	 * /panel-vendedor/ (14343) mientras la usada es /ltms-dashboard/
+	 * (14337). Se cubre por ID (opción) Y por slug (duplicadas/futuras):
+	 * dashboard, pedidos, billetera, KYC, seguros, reservas y RNT.
+	 *
+	 * @return bool
+	 */
+	private static function is_vendor_panel_page(): bool {
+		$pages = get_option( 'ltms_installed_pages', [] );
+		if ( is_array( $pages ) ) {
+			foreach ( array(
+				'ltms-dashboard', 'ltms-orders', 'ltms-wallet',
+				'ltms-kyc', 'ltms-insurance', 'ltms-bookings', 'ltms-rnt',
+			) as $key ) {
+				if ( ! empty( $pages[ $key ] ) && is_page( (int) $pages[ $key ] ) ) {
+					return true;
+				}
+			}
+		}
+		foreach ( array(
+			'ltms-dashboard', 'panel-vendedor', 'mis-pedidos', 'mi-billetera',
+			'verificacion-identidad', 'mis-seguros', 'mis-reservas', 'rnt-turismo',
+		) as $panel_slug ) {
+			if ( is_page( $panel_slug ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * HOME-CATBAR-2026-011: clase body para la vista del panel del
+	 * vendedor. El CSS de la barra (ltms-catbar.css) oculta el header del
+	 * tema (el "hero" con el buscador FiboSearch, logo y carrito) en esa
+	 * vista — petición del operador: en el panel, desde PC o móvil, se
+	 * veían la barra de categorías y el hero del navegador; la vista
+	 * queda como app limpia con su propia navegación interna.
+	 *
+	 * @param array $classes Clases body.
+	 * @return array
+	 */
+	public static function panel_body_class( array $classes ): array {
+		if ( self::is_vendor_panel_page() ) {
+			$classes[] = 'ltms-panel-view';
+		}
+		return $classes;
 	}
 
 	/**
