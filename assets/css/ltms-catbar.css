@@ -111,3 +111,16 @@
 @media (max-width:767px){
 	.pv-scope.pv-home .ltms-catbar__inner{padding:0 14px 4px;}
 }
+
+/* HOME-CATBAR-2026-008 (operador: "la barra roja del storefront eliminala"):
+   el header de Elementor (template 13610) lleva una franja roja sticky
+   (fondo --e-global-color-primary #E80001) con el menú HOME | CATEGORÍAS |
+   Accesorios | Bebé | ... — duplica la barra global de categorías. Oculta
+   en TODO el front-end: donde la catbar renderiza es redundante; donde no
+   (checkout/panel) su ausencia protege el funnel o es irrelevante. La
+   franja superior negra (logo, búsqueda fibosearch, carrito, cuenta) se
+   CONSERVA. Selector ESTRUCTURAL (no por data-id, que muere al re-editar el
+   template): cualquier container del header que contenga el widget
+   nav-menu; en navegadores sin :has() la franja queda visible (degradación
+   elegante). */
+.elementor-location-header .elementor-element[data-element_type="container"]:has(.elementor-widget-nav-menu){display:none!important;}

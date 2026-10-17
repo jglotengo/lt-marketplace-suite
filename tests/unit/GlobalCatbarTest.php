@@ -268,6 +268,15 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$css,
 			'HOME-CATBAR-2026-006: en la home la barra es static — hereda el sticky del header que la contiene (nunca se oculta).'
 		);
+		// HOME-CATBAR-2026-008: la franja roja de Elementor (menú de categorías
+		// HOME|CATEGORÍAS|..., fondo primary #E80001, sticky) duplicaba la
+		// barra global — oculta en todo el front-end ("la barra roja del
+		// storefront eliminala" — operador).
+		$this->assertStringContainsString(
+			'.elementor-element[data-element_type="container"]:has(.elementor-widget-nav-menu){display:none!important;}',
+			$css,
+			'HOME-CATBAR-2026-008: la barra roja de Elementor (menú de categorías duplicado) queda oculta en el header del tema.'
+		);
 	}
 
 	/**

@@ -6,6 +6,30 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-10-17
 
+### Fixed — `HOME-CATBAR-2026-008` (la barra roja del storefront eliminada)
+
+> **Reporte del operador:** "la barra roja del storefront eliminala".
+> Identificada con evidencia (CSS del kit 22 + template 13610): el header
+> de Elementor tiene dos franjas — la superior NEGRA (`accent #000000`:
+> logo, búsqueda fibosearch, carrito, seller/cliente) y una inferior
+> ROJA (`primary #E80001`, **sticky**) con el menú **HOME | CATEGORÍAS |
+> Accesorios | Bebé | Belleza | ...** — es la barra roja que duplicaba la
+> barra global de categorías (y la que la catbar tapaba al escrolear,
+> hallazgo del 007).
+>
+> - **Eliminada en todo el front-end** con selector ESTRUCTURAL en
+>   `ltms-catbar.css` (no por data-id, que muere al re-editar el template
+>   en Elementor): todo container del header que contenga el widget
+>   nav-menu (`:has()` — degradación elegante: en navegadores sin soporte
+>   la franja queda visible). La franja negra superior (logo, búsqueda,
+>   carrito, cuenta) se CONSERVA.
+> - Efecto colateral positivo: al morir la única sección sticky del
+>   header, la catbar stick a `top:0` tras el scroll sin superposición (el
+>   pegado geométrico del 007 cubre cualquier header sticky futuro).
+> - +1 assert en GlobalCatbarTest (test_004, lección #119). Suite completa
+>   **5,248 tests, 11,432 assertions, 0 fallas**. `LTMS_VERSION
+>   2.9.417 → 2.9.418`.
+
 ### Fixed — `HOME-CATBAR-2026-007` (la barra de categorías se superponía al header del tema en la tienda — Elementor Pro lo hace sticky)
 
 > **Reporte del operador:** "en la tienda, la storefront no se comporta
