@@ -98,6 +98,44 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   (`includes/business/class-ltms-booking-notifications.php` no existe
 >   en el repo) — produce "Done: 221 ok, 1 err" en CADA deploy.
 
+### Fixed/Changed — `HOME-CATBAR-2026-006` (feedback del operador sobre la barra: negro, sin logo, deslizable en escritorio)
+
+> **Reporte del operador:** "la barra donde están las categorías del home
+> no se desplaza y no hace contraste, cuando lleva a la página de la
+> storefront se observa el logo contenido en ella y la desborda, elimina
+> ese logo — ya cada página tiene su logo, es redundante; además revisa si
+> es mejor que el fondo de esa barra sea negro, revisa si es apropiado
+> para UX/UI y que se pueda desplazar; revisa los contrastes adecuados de
+> las letras."
+>
+> - **Fondo NEGRO `#000000`** (evaluado y SÍ apropiado para UX/UI): es el
+>   "footer negro" del brief (coherencia de marca), contrasta con el header
+>   rojo de la home arriba y con el hero de fondo claro debajo (resuelve el
+>   "no hace contraste"), y da al chrome el patrón clásico de dos bandas
+>   (header de marca rojo + banda de utilidad negra). **Contrastes de
+>   letras verificados (WCAG):** blanco sobre negro **21:1** (AAA); blanco
+>   sobre chip `rgba(255,255,255,.10)` ≈ **18.1:1** (AAA); chip activo
+>   dorado `#F7B731` con texto negro **11.8:1** (AAA); hover
+>   `rgba(255,255,255,.22)` ≈ **11.7:1** (AAA).
+> - **Logo ELIMINADO de la barra** en todas las páginas ("cada página ya
+>   tiene su logo, es redundante"): markup `.ltms-catbar__home` + sus
+>   reglas CSS fuera. El logo blanco sigue vivo en el header/footer de la
+>   home y el color en favicon/OG/storefront (BRAND-2026-001/002).
+> - **"Que se pueda desplazar" (escritorio):** la rueda del mouse ahora
+>   desliza la fila horizontalmente (solo mientras el track pueda avanzar
+>   — en los extremos la rueda escrolea la página) y se puede **arrastrar
+>   con el mouse** (pointer events, cursor grab/grabbing; el click al chip
+>   se suprime cuando fue un drag real de >6px). En touch el scroll nativo
+>   ya funcionaba.
+> - **Home más robusta:** la barra se renderiza ahora SERVER-SIDE dentro
+>   del header sticky (`LTMS_Global_Catbar::render_bar('home_header')`
+>   desde home.php) — sin dependencia del JS de reubicación ni flash; el JS
+>   lleva un guard `closest('.pv-home-header')` para no tocarla.
+> - `LTMS_VERSION 2.9.415 → 2.9.416`. Tests actualizados en el MISMO commit
+>   (lección #119): GlobalCatbarTest (002 render inline, 003 sin logo, 004
+>   negro + drag CSS, 005 guard + rueda/drag). Suite completa
+>   **5,248 tests, 11,428 assertions, 0 fallas** (3 skips preexistentes).
+
 ## [Unreleased] — 2026-10-03
 
 ### Fixed/Changed — `HOME-UX4-001` (visibilidad de la barra de categorías de la home)

@@ -1,21 +1,28 @@
 /* ============================================================================
-   LTMS Global Catbar — barra global de categorías (HOME-CATBAR-2026-004).
-   Barra sticky con logo oficial + TODAS las categorías activas en fila
-   única deslizable. Rojo de marca #E80001 (brief), chips blancos (4.74:1
-   AA), categoría activa en dorado primario #F7B731 con texto negro (11.8:1).
-   HOME-CATBAR-2026-005: también en la home nativa (adoptada dentro del
-   header sticky, reemplazando la fila de chips) y touch target 44px (brief
-   HOME-MATRIX-FIX). Los tokens (--pv-maxw, --ltms-gold) vienen de
-   plaza-viva.css (encolado global); los fallbacks cubren el caso extremo de
-   orden de carga.
+   LTMS Global Catbar — barra global de categorías (HOME-CATBAR-2026-006).
+   Barra sticky con TODAS las categorías activas en fila única deslizable.
+   Fondo NEGRO #000000 (el "footer negro" del brief — feedback del operador:
+   contrasta con el header rojo de la home y con el hero de fondo claro).
+   Contrastes de letras verificados (WCAG): blanco #FFF sobre negro 21:1
+   (AAA); blanco sobre chip rgba(255,255,255,.10) sobre negro ≈ 18.1:1
+   (AAA); chip activo dorado #F7B731 con texto negro 11.8:1 (AAA); hover
+   rgba(255,255,255,.22) sobre negro ≈ 11.7:1 (AAA). SIN logo ("cada página
+   ya tiene su logo, es redundante" — operador). Touch target 44px (brief
+   HOME-MATRIX-FIX). En escritorio la fila se desliza con rueda del mouse y
+   arrastre (JS + cursor grab). Los tokens (--pv-maxw, --ltms-gold) vienen
+   de plaza-viva.css (encolado global); los fallbacks cubren el caso
+   extremo de orden de carga.
    ============================================================================ */
 
 .ltms-catbar{
 	position:sticky;
 	top:0;
 	z-index:99990;
-	background:#E80001;
-	border-bottom:1px solid rgba(0,0,0,.14);
+	/* HOME-CATBAR-2026-006: negro del brief — banda de utilidad que
+	   contrasta con el header rojo de la home (arriba) y el fondo claro
+	   de las páginas (abajo). */
+	background:#000000;
+	border-bottom:1px solid rgba(255,255,255,.10);
 }
 .ltms-catbar__inner{
 	display:flex;
@@ -24,16 +31,6 @@
 	max-width:var(--pv-maxw,1400px);
 	margin:0 auto;
 	padding:5px 14px;
-}
-.ltms-catbar__home{
-	display:inline-flex;
-	align-items:center;
-	flex-shrink:0;
-}
-.ltms-catbar__home img{
-	height:22px;
-	width:auto;
-	display:block;
 }
 .ltms-catbar__track{
 	display:flex;
@@ -47,6 +44,16 @@
 	flex:1;
 }
 .ltms-catbar__track::-webkit-scrollbar{display:none;}
+/* HOME-CATBAR-2026-006: affordance de arrastre en escritorio ("que se
+   pueda desplazar" — operador); en touch el scroll nativo ya funciona. */
+@media (pointer:fine){
+	.ltms-catbar__track{cursor:grab;}
+}
+.ltms-catbar__track.is-dragging{
+	cursor:grabbing;
+	user-select:none;
+	-webkit-user-select:none;
+}
 /* Fade del borde derecho mientras queda contenido por deslizar (el JS
    togglea data-ltms-scrollable / data-ltms-at-end — mismo patrón de los
    carruseles de la home). */
@@ -87,20 +94,15 @@
 	.ltms-catbar__inner{padding:4px 14px;}
 }
 
-/* HOME-CATBAR-2026-005: en la home nativa la barra vive DENTRO del header
-   sticky (.pv-home-header la adopta el JS) como última fila — reemplaza la
-   fila de chips de HOME-CATBAR-2026-003. Hereda el "nunca se oculta" del
-   header (static, sin doble franja: el header ya es --brand), sin logo
-   duplicado (el header muestra el oficial) y alineada al contenedor
-   .pv-section (mismo --pv-maxw + padding 22/14px). El rojo del header
-   contrasta con el hero de fondo claro justo debajo. */
+/* HOME-CATBAR-2026-006: en la home nativa la barra se renderiza SERVER-SIDE
+   dentro del header sticky (render_bar('home_header') desde home.php) como
+   última fila — sin JS de reubicación ni flash. Fondo NEGRO heredado de la
+   base: banda de contraste bajo el header rojo, sobre el hero de fondo
+   claro. position:static — hereda el sticky del header (nunca se oculta). */
 .pv-scope.pv-home .ltms-catbar{
 	position:static;
-	background:transparent;
-	border-bottom:none;
 	z-index:auto;
 }
-.pv-scope.pv-home .ltms-catbar__home{display:none;}
 .pv-scope.pv-home .ltms-catbar__inner{padding:0 22px 6px;}
 @media (max-width:767px){
 	.pv-scope.pv-home .ltms-catbar__inner{padding:0 14px 4px;}

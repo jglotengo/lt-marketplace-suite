@@ -1,19 +1,21 @@
 /* ============================================================================
-   LTMS Global Catbar JS (HOME-CATBAR-2026-004) — vanilla, CSP-compliant.
-   1. Reubica la barra: en la HOME nativa la adopta DENTRO de su header
-      sticky (.pv-home-header, última fila — HOME-CATBAR-2026-005: reemplaza
-      la fila de chips de 003 y hereda el "nunca se oculta" del header; el
-      theme header está oculto en la home y el logo oficial ya vive en el
-      header, por eso el CSS esconde .ltms-catbar__home en el scope home).
-      En las demás páginas va DEBAJO del header del tema (Hello Elementor —
-      NO es sticky, verificado en producción, así que al escrolear la barra
-      queda sola arriba: siempre visible y usable).
+   LTMS Global Catbar JS (HOME-CATBAR-2026-004/006) — vanilla, CSP-compliant.
+   1. Reubica la barra DEBAJO del header del tema (.elementor-location-header
+      — NO es sticky, verificado en producción, así que al escrolear la barra
+      queda sola arriba: siempre visible y usable). La home NO pasa por aquí:
+      su template renderiza la barra INLINE dentro del header sticky
+      (HOME-CATBAR-2026-006) — el guard closest() lo respeta.
    2. Centra el chip de la categoría ACTIVA en el track al cargar
-      (navegabilidad: en archivos de categoría el chip activo puede quedar
-      fuera del área visible — así el usuario ve su contexto de inmediato).
-   3. Fade del borde derecho del track: mismo patrón data-ltms-scrollable /
-      data-ltms-at-end de los carruseles de la home (prefijo propio
-      data-ltms-* para no colisionar con el design system).
+      (navegabilidad: el usuario ve su contexto de inmediato en archivos
+      de categoría).
+   3. Deslizamiento en ESCRITORIO (feedback del operador: "que se pueda
+      desplazar"): rueda del mouse → scroll horizontal (solo mientras el
+      track pueda avanzar — en los extremos la rueda escrolea la página)
+      y arrastre con puntero (pointer events; el click del chip se
+      suprime cuando fue un drag real). En touch el scroll nativo ya
+      funciona.
+   4. Fade del borde derecho del track (patrón data-ltms-scrollable /
+      data-ltms-at-end de los carruseles de la home).
    ============================================================================ */
 (function () {
 	'use strict';
@@ -26,14 +28,9 @@
 		var bar = qs('.ltms-catbar');
 		if (!bar) return;
 
-		/* 1. Reubicación. */
-		var homeHeader = qs('.pv-home-header');
-		if (homeHeader) {
-			// Home nativa: dentro del header sticky propio (última fila).
-			if (bar.parentNode !== homeHeader) {
-				homeHeader.appendChild(bar);
-			}
-		} else {
+		/* 1. Reubicación (solo páginas del tema; la home ya la trae inline
+		   dentro de su header sticky — no tocarla). */
+		if (!bar.closest('.pv-home-header')) {
 			var header = qs('.elementor-location-header, #masthead, header.site-header');
 			if (header && header.parentNode && header.nextElementSibling !== bar) {
 				header.parentNode.insertBefore(bar, header.nextSibling);
@@ -49,7 +46,55 @@
 			active.scrollIntoView({ block: 'nearest', inline: 'center' });
 		}
 
-		/* 3. Fade del borde derecho mientras quede contenido por deslizar. */
+		/* 3a. Rueda → scroll horizontal (escritorio). En los extremos no se
+		   consume el evento: la página escrolea con normalidad. */
+		track.addEventListener('wheel', function (e) {
+			if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+			var max = track.scrollWidth - track.clientWidth;
+			if (max <= 4) return;
+			var canConsume = (e.deltaY > 0 && track.scrollLeft < max - 1) ||
+				(e.deltaY < 0 && track.scrollLeft > 1);
+			if (canConsume) {
+				e.preventDefault();
+				track.scrollLeft = Math.max(0, Math.min(max, track.scrollLeft + e.deltaY));
+			}
+		}, { passive: false });
+
+		/* 3b. Arrastre con puntero (mouse; touch usa el scroll nativo). */
+		var dragging = false;
+		var startX = 0;
+		var startScroll = 0;
+		var moved = 0;
+
+		track.addEventListener('pointerdown', function (e) {
+			if (e.pointerType !== 'mouse') return;
+			dragging = true;
+			moved = 0;
+			startX = e.clientX;
+			startScroll = track.scrollLeft;
+			track.classList.add('is-dragging');
+		});
+		window.addEventListener('pointermove', function (e) {
+			if (!dragging) return;
+			moved = Math.abs(e.clientX - startX);
+			track.scrollLeft = startScroll - (e.clientX - startX);
+		});
+		window.addEventListener('pointerup', function () {
+			if (!dragging) return;
+			dragging = false;
+			track.classList.remove('is-dragging');
+		});
+		/* Un drag real NO debe navegar al chip donde terminó el puntero:
+		   captura del click y supresión solo cuando hubo arrastre (>6px). */
+		track.addEventListener('click', function (e) {
+			if (moved > 6) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
+			moved = 0;
+		}, true);
+
+		/* 4. Fade del borde derecho mientras quede contenido por deslizar. */
 		function sync() {
 			var max = track.scrollWidth - track.clientWidth;
 			if (max > 4) {

@@ -1,24 +1,27 @@
 <?php
 /**
- * GlobalCatbarTest — HOME-CATBAR-2026-004/005 (2026-10-15).
+ * GlobalCatbarTest — HOME-CATBAR-2026-004/006 (2026-10-15).
  *
  * Barra global de categorías (petición del operador: "una barra de
  * categorías para móvil y escritorio, como la de la storefront con logo,
- * en todas las páginas, que no se oculte mientras se desplaza").
+ * en todas las páginas, que no se oculte mientras se desplaza" — 006:
+ * fondo negro, sin logo, deslizable en escritorio).
  *
  * Valida ESTRUCTURALMENTE:
  *   1. El módulo existe, se inicializa desde el kernel y engancha wp_body_open.
- *   2. La barra es sticky (nunca se oculta al escrolear) y usa el rojo de
- *      marca #E80001 + el logo oficial (variante blanca, BRAND-2026-001).
+ *   2. La barra es sticky (nunca se oculta al escrolear) y usa fondo NEGRO
+ *      #000000 (HOME-CATBAR-2026-006, feedback del operador) SIN logo
+ *      ("cada página ya tiene su logo, es redundante").
  *   3. Las categorías: TODAS las activas vía el helper normalizado, con la
  *      exclusión del artefacto 'no-aplica' y la categoría activa resaltada
  *      (is-active + aria-current) en los archivos de categoría.
  *   4. Exclusiones documentadas: checkout (funnel), panel del vendedor
- *      (dashboard/wallet/orders). HOME-CATBAR-2026-005: la home nativa YA
- *      NO se excluye — la barra reemplaza la fila de chips del header (el
- *      JS la adopta dentro del header sticky).
- *   5. Assets: CSS (sticky + fade del track) y JS (reubicación bajo el
- *      header del tema + fade) encolados, con .min.js sincronizado.
+ *      (dashboard/wallet/orders). HOME-CATBAR-2026-006: la home nativa se
+ *      excluye del wp_body_open porque su template la renderiza INLINE
+ *      dentro del header sticky (server-side, sin JS de reubicación).
+ *   5. Assets: CSS (sticky + negro + fade + affordance de arrastre) y JS
+ *      (reubicación bajo el header del tema + guard de la home + rueda →
+ *      horizontal + drag + fade) encolados, con .min.js sincronizado.
  *   6. El topbar del storefront usa el logo OFICIAL (BRAND-2026-002) — el
  *      theme mod custom_logo era la bandera (inconsistencia #8 del brief).
  *
@@ -98,20 +101,27 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-CATBAR-2026-004-B → HOME-CATBAR-2026-005: exclusiones — la home
-	 * nativa YA NO se excluye (la barra global reemplaza la fila de chips de
-	 * su header; el JS la adopta dentro del header sticky). Siguen
-	 * excluidos: checkout/order-received (funnel) y panel del vendedor
+	 * HOME-CATBAR-2026-004-B → HOME-CATBAR-2026-006: exclusiones — la home
+	 * nativa se excluye del wp_body_open porque su template la renderiza
+	 * INLINE dentro del header sticky (server-side). Siguen excluidos:
+	 * checkout/order-received (funnel) y panel del vendedor
 	 * (dashboard/wallet/orders).
 	 */
 	public function test_002_exclusiones_documentadas(): void {
 		$module = $this->strip_php_comments( file_get_contents( $this->module_path ) );
 
-		// HOME-CATBAR-2026-005: la home nativa ya NO se excluye.
-		$this->assertStringNotContainsString(
-			'is_front_page() && is_page()',
+		// HOME-CATBAR-2026-006: la home solo se excluye del wp_body_open —
+		// su template la renderiza inline dentro del header sticky.
+		$this->assertMatchesRegularExpression(
+			"/'wp_body_open' === \\\$context\s*\n?\s*&& get_option\( 'ltms_home_template_enabled', 'yes' \) === 'yes'/",
 			$module,
-			'HOME-CATBAR-2026-005: la home nativa YA NO se excluye — la barra global reemplaza la fila de chips (una sola barra en el proyecto).'
+			'HOME-CATBAR-2026-006: la home queda excluida del wp_body_open (su template la renderiza inline).'
+		);
+		$home = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/home.php' ) );
+		$this->assertStringContainsString(
+			"LTMS_Global_Catbar::render_bar( 'home_header' );",
+			$home,
+			'HOME-CATBAR-2026-006: home.php renderiza la barra INLINE dentro del header sticky (server-side, sin JS de reubicación).'
 		);
 		$this->assertStringContainsString(
 			"function_exists( 'is_checkout' )",
@@ -133,19 +143,26 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-CATBAR-2026-004-C: la barra renderiza el logo oficial (variante
-	 * blanca) + TODAS las categorías activas normalizadas con el artefacto
-	 * 'no-aplica' excluido, y marca la categoría activa (is-active +
-	 * aria-current="page").
+	 * HOME-CATBAR-2026-004-C → HOME-CATBAR-2026-006: la barra renderiza
+	 * TODAS las categorías activas normalizadas con el artefacto
+	 * 'no-aplica' excluido, marca la categoría activa (is-active +
+	 * aria-current="page") y NO lleva logo ("cada página ya tiene su logo,
+	 * es redundante" — feedback del operador).
 	 */
 	public function test_003_render_logo_categorias_y_estado_activo(): void {
 		$module = $this->strip_php_comments( file_get_contents( $this->module_path ) );
 
-		// Logo oficial (variante blanca — la barra es roja de marca).
-		$this->assertStringContainsString(
-			"'img/logo-lo-tengo-white.png'",
+		// HOME-CATBAR-2026-006: SIN logo — el blanco sigue vivo en el
+		// header/footer de la home (BRAND-2026-001), no en la barra.
+		$this->assertStringNotContainsString(
+			'ltms-catbar__home',
 			$module,
-			'HOME-CATBAR-2026-004-C: la barra usa el logo oficial en variante blanca (BRAND-2026-001).'
+			'HOME-CATBAR-2026-006: la barra NO lleva logo (cada página ya tiene el suyo — decisión del operador).'
+		);
+		$this->assertStringNotContainsString(
+			'logo-lo-tengo-white.png',
+			$module,
+			'HOME-CATBAR-2026-006: la barra no referencia el asset del logo blanco.'
 		);
 		// Fuente de categorías: helper normalizado + exclusión del artefacto.
 		$this->assertStringContainsString(
@@ -177,9 +194,11 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-CATBAR-2026-004-D: el CSS de la barra — sticky top (nunca se
-	 * oculta al escrolear), rojo de marca, fila deslizable con fade y
-	 * estado activo dorado del brief.
+	 * HOME-CATBAR-2026-004-D → HOME-CATBAR-2026-006: el CSS de la barra —
+	 * sticky top (nunca se oculta), fondo NEGRO (#000000, feedback del
+	 * operador: contrasta con el header rojo de la home y el hero claro),
+	 * fila deslizable con fade, estado activo dorado del brief y
+	 * affordance de arrastre en escritorio.
 	 */
 	public function test_004_css_sticky_rojo_de_marca_y_fade(): void {
 		$this->assertFileExists( $this->css_path, 'HOME-CATBAR-2026-004-D: el CSS de la barra debe existir.' );
@@ -191,9 +210,14 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			'HOME-CATBAR-2026-004-D: la barra es sticky — nunca se oculta mientras se desplaza (petición del operador).'
 		);
 		$this->assertStringContainsString(
-			'background:#E80001;',
+			'background:#000000;',
 			$css,
-			'HOME-CATBAR-2026-004-D: la barra usa el rojo de marca del brief #E80001.'
+			'HOME-CATBAR-2026-006: la barra usa fondo NEGRO #000000 — contrasta con el header rojo (home) y el fondo claro de las páginas (feedback del operador).'
+		);
+		$this->assertStringNotContainsString(
+			'ltms-catbar__home',
+			$css,
+			'HOME-CATBAR-2026-006: sin reglas de logo en el CSS de la barra (el logo fue eliminado).'
 		);
 		$this->assertStringContainsString(
 			'overflow-x:auto;',
@@ -217,24 +241,34 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$css,
 			'HOME-CATBAR-2026-005: los chips de la barra usan touch target 44px (brief HOME-MATRIX-FIX).'
 		);
-		// HOME-CATBAR-2026-005: variante home — la barra vive DENTRO del
-		// header sticky (static, sin doble franja, sin logo duplicado).
+		// HOME-CATBAR-2026-006: affordance de arrastre en escritorio
+		// ("que se pueda desplazar" — feedback del operador).
+		$this->assertStringContainsString(
+			'.ltms-catbar__track.is-dragging',
+			$css,
+			'HOME-CATBAR-2026-006: affordance de arrastre (cursor grab/grabbing + user-select none durante el drag).'
+		);
+		$this->assertStringContainsString(
+			'cursor:grab;',
+			$css,
+			'HOME-CATBAR-2026-006: cursor grab en el track (desktop, media pointer:fine).'
+		);
+		// HOME-CATBAR-2026-006: variante home — render server-side dentro del
+		// header sticky (static, negro heredado de la base).
 		$this->assertMatchesRegularExpression(
 			'/\.pv-scope\.pv-home \.ltms-catbar\{[^}]*position:static;/s',
 			$css,
-			'HOME-CATBAR-2026-005: en la home la barra es static — hereda el sticky del header que la adopta (nunca se oculta).'
-		);
-		$this->assertStringContainsString(
-			'.pv-scope.pv-home .ltms-catbar__home{display:none;}',
-			$css,
-			'HOME-CATBAR-2026-005: sin logo duplicado en la home (el header ya muestra el oficial).'
+			'HOME-CATBAR-2026-006: en la home la barra es static — hereda el sticky del header que la contiene (nunca se oculta).'
 		);
 	}
 
 	/**
-	 * HOME-CATBAR-2026-004-E: el JS reubica la barra DEBAJO del header del
-	 * tema (wp_body_open la imprime al inicio del body) y sincroniza el fade
-	 * del track. El .min.js existe (ltms_asset_url sirve el min en producción).
+	 * HOME-CATBAR-2026-004-E → HOME-CATBAR-2026-006: el JS reubica la barra
+	 * DEBAJO del header del tema (wp_body_open la imprime al inicio del
+	 * body), RESPETA la barra inline de la home (guard closest), la hace
+	 * deslizable en escritorio (rueda → horizontal + arrastre con puntero +
+	 * supresión del click tras un drag real) y sincroniza el fade del
+	 * track. El .min.js existe (ltms_asset_url sirve el min en producción).
 	 */
 	public function test_005_js_reubicacion_y_min_sincronizado(): void {
 		$this->assertFileExists( $this->js_path, 'HOME-CATBAR-2026-004-E: el JS de la barra debe existir.' );
@@ -250,17 +284,28 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$js,
 			'HOME-CATBAR-2026-004-E: la barra se inserta inmediatamente después del header del tema.'
 		);
-		// HOME-CATBAR-2026-005: en la home nativa la barra se adopta DENTRO
-		// del header sticky propio (el theme header está oculto en la home).
+		// HOME-CATBAR-2026-006: la home renderiza la barra INLINE dentro de
+		// su header sticky — el JS no debe reubicarla.
 		$this->assertStringContainsString(
-			"qs('.pv-home-header')",
+			"bar.closest('.pv-home-header')",
 			$js,
-			'HOME-CATBAR-2026-005: el JS detecta el header nativo de la home.'
+			'HOME-CATBAR-2026-006: guard closest — el JS respeta la barra inline de la home (no la reubica).'
+		);
+		// HOME-CATBAR-2026-006: deslizamiento en escritorio.
+		$this->assertStringContainsString(
+			"'wheel'",
+			$js,
+			'HOME-CATBAR-2026-006: rueda del mouse → scroll horizontal ("que se pueda desplazar" — operador).'
 		);
 		$this->assertStringContainsString(
-			'homeHeader.appendChild(bar)',
+			'is-dragging',
 			$js,
-			'HOME-CATBAR-2026-005: en la home la barra se adopta dentro del header sticky (última fila — nunca se oculta).'
+			'HOME-CATBAR-2026-006: arrastre con puntero (pointer events + clase is-dragging).'
+		);
+		$this->assertStringContainsString(
+			'stopPropagation',
+			$js,
+			'HOME-CATBAR-2026-006: un drag real NO navega al chip donde terminó el puntero (click suprimido >6px).'
 		);
 		$this->assertStringContainsString(
 			'data-ltms-scrollable',
@@ -291,7 +336,12 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString(
 			'pv-home-header',
 			$min,
-			'HOME-CATBAR-2026-005: el .min.js contiene la adopción en el header de la home (regenerado, no desincronizado).'
+			'HOME-CATBAR-2026-006: el .min.js contiene el guard de la home (regenerado, no desincronizado).'
+		);
+		$this->assertStringNotContainsString(
+			'ltms-catbar__home',
+			$min,
+			'HOME-CATBAR-2026-006: el .min.js no debe contener el logo (eliminado en 006).'
 		);
 	}
 
@@ -343,7 +393,7 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			'assets/css/ltms-catbar.css'                    => 'el CSS de la barra',
 			'assets/js/ltms-catbar.js'                       => 'el JS de la barra',
 			'assets/js/ltms-catbar.min.js'                   => 'el min.js de la barra',
-			'assets/img/logo-lo-tengo-white.png'             => 'el logo blanco (header/footer/barra)',
+			'assets/img/logo-lo-tengo-white.png'             => 'el logo blanco (header/footer de la home — la barra lo perdió en 006)',
 			'assets/img/logo-lo-tengo.png'                   => 'el logo a color (favicon/og/storefront)',
 		) as $file => $why ) {
 			$this->assertStringContainsString(

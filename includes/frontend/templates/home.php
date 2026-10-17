@@ -11,8 +11,9 @@
  * Secciones:
  *  - Header 3 zonas (logo · buscador · acciones de cuenta). Carrito abre el
  *    mini-cart lateral (HOME-UX2-004). La barra global de categorías
- *    (LTMS_Global_Catbar, HOME-CATBAR-2026-005) se adopta DENTRO del header
- *    sticky como última fila — reemplazó la fila de chips propia.
+ *    (LTMS_Global_Catbar) se renderiza DENTRO del header sticky como última
+ *    fila (server-side, HOME-CATBAR-2026-006): fondo negro que contrasta
+ *    con el header rojo y el hero, deslizable con rueda/arrastre.
  *  - Grid de categorías «Explora por categorías» con TODAS las activas
  *    (HOME-UX2-002).
  *  - Hero banner (slide 1 del Home Slider + tarjetas 2-3, texto en HTML).
@@ -461,6 +462,15 @@ do_action( 'ltms_before_home_plazaviva' );
             </nav>
 
         </div>
+
+        <?php /* HOME-CATBAR-2026-006: la barra global de categorías se
+             * renderiza SERVER-SIDE aquí (última fila del header sticky,
+             * hereda el "nunca se oculta"; sin JS de reubicación ni flash).
+             * Fondo negro: contrasta con el header rojo arriba y con el
+             * hero de fondo claro debajo; deslizable con rueda/arrastre. */ ?>
+        <?php if ( class_exists( 'LTMS_Global_Catbar' ) ) : ?>
+            <?php LTMS_Global_Catbar::render_bar( 'home_header' ); ?>
+        <?php endif; ?>
     </header><!-- /.pv-home-header -->
 
     <main id="pv-main">

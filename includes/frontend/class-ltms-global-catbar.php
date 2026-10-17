@@ -9,15 +9,24 @@
  * oculte mientras se desplaza con los productos, que el usuario pueda
  * utilizarla para seleccionar las categorías que desee".
  *
- * Barra sticky (position:sticky top:0 — nunca se oculta al escrolear)
- * con el logo oficial "Lo Tengo" (variante blanca, BRAND-2026-001) y TODAS
- * las categorías activas como chips en fila única deslizable. La categoría
- * activa se resalta (is-active + aria-current) en los archivos de
- * categoría. Misma fuente de datos que la home:
+	 * Barra sticky (position:sticky top:0 — nunca se oculta al escrolear)
+	 * con TODAS las categorías activas como chips en fila única deslizable.
+	 * Fondo NEGRO #000000 desde HOME-CATBAR-2026-006 (feedback del operador:
+	 * "revisa si es mejor que el fondo de esa barra sea negro" — es el
+	 * "footer negro" del brief y contrasta con el header rojo de la home y
+	 * con el hero de fondo claro). SIN logo: "cada página ya tiene su logo,
+	 * es redundante" (operador). La categoría activa se resalta (is-active +
+	 * aria-current) en los archivos de categoría. Misma fuente de datos que
+	 * la home:
  * LTMS_Utils::get_normalized_product_categories() (dedup por fingerprint +
  * orden por # de productos), con la exclusión del artefacto 'no-aplica'.
  *
 	 * Dónde NO renderiza (documentado):
+	 *   - Home nativa: NO renderiza via wp_body_open — su template la
+	 *     renderiza INLINE dentro del header sticky (llamado
+	 *     LTMS_Global_Catbar::render_bar( 'home_header' ) desde home.php,
+	 *     HOME-CATBAR-2026-006): server-side, sin dependencia de JS de
+	 *     reubicación ni flash de reubicamiento.
 	 *   - Checkout / order-received: protección del funnel de pago (misma
  *     filosofía de HOME-REDESIGN-007 — nada distrae del checkout).
  *   - Panel del vendedor (dashboard/wallet/orders): páginas de app, no de
@@ -29,21 +38,23 @@
  *     position:sticky !important, nunca se oculta) y sus categorías son
  *     filtros multi-select propios del sidebar.
  *
-	 * HOME-CATBAR-2026-005 (2026-10-15, operador — "reemplace la barra que
-	 * existe en las páginas del proyecto por esta"): la barra ahora TAMBIÉN
-	 * renderiza en la home nativa, REEMPLAZANDO la fila de chips que su header
-	 * llevaba desde HOME-CATBAR-2026-003 — una sola barra de categorías en
-	 * todo el proyecto. En la home el JS la adopta DENTRO del header sticky
-	 * (.pv-home-header, última fila): hereda el "nunca se oculta" del header,
-	 * va sin logo duplicado (el CSS esconde .ltms-catbar__home en el scope
-	 * home) y su rojo contrasta con el hero de fondo claro justo debajo.
+	 * HOME-CATBAR-2026-006 (2026-10-15, feedback del operador sobre 005):
+	 * (1) Fondo NEGRO #000000 (el "footer negro" del brief) — contrasta con
+	 * el header rojo de la home arriba y con el hero de fondo claro debajo;
+	 * texto blanco 21:1 (AAA), chip activo dorado #F7B731 con texto negro
+	 * 11.8:1 (AAA). (2) SIN logo — "cada página ya tiene su logo, es
+	 * redundante": eliminado de la barra en todas las páginas. (3) La fila
+	 * se desliza también en ESCRITORIO: rueda del mouse → scroll horizontal
+	 * + arrastre con puntero (assets/js/ltms-catbar.js). (4) En la home la
+	 * barra se renderiza SERVER-SIDE dentro de su header sticky (ver
+	 * arriba) — una sola barra de categorías en todo el proyecto.
 	 *
-	 * Ubicación: se imprime en wp_body_open (inicio del body) y el JS
-	 * (assets/js/ltms-catbar.js) la reubica: (a) home nativa → dentro de su
-	 * header sticky; (b) demás páginas → DEBAJO del header del tema
-	 * (.elementor-location-header — verificado en producción: el header del
-	 * tema NO es sticky, por lo que al escrolear la barra queda sola arriba,
-	 * siempre visible).
+	 * Ubicación: (a) home nativa → home.php la imprime DENTRO de su header
+	 * sticky (última fila, hereda el "nunca se oculta"); (b) demás páginas →
+	 * wp_body_open y el JS (assets/js/ltms-catbar.js) la reubica DEBAJO del
+	 * header del tema (.elementor-location-header — verificado en
+	 * producción: el header del tema NO es sticky, por lo que al escrolear
+	 * la barra queda sola arriba, siempre visible).
  *
  * @package LTMS
  * @since   2.9.414
@@ -87,16 +98,24 @@ class LTMS_Global_Catbar {
 	 *
 	 * Exclusiones documentadas en el docblock de la clase.
 	 *
+	 * @param string $context 'wp_body_open' (hook global) o 'home_header'
+	 *                        (render INLINE dentro del header sticky de la
+	 *                        home nativa, HOME-CATBAR-2026-006).
 	 * @return bool
 	 */
-	public static function should_render(): bool {
+	public static function should_render( string $context = 'wp_body_open' ): bool {
 		if ( is_admin() ) {
 			return false;
 		}
 
-		// HOME-CATBAR-2026-005: la home nativa YA NO se excluye — la barra
-		// reemplaza la fila de chips de su header (el JS la adopta dentro
-		// del header sticky como última fila).
+		// Home nativa: excluida del wp_body_open porque su template la
+		// renderiza INLINE dentro del header sticky (llamado desde home.php
+		// con $context = 'home_header' — HOME-CATBAR-2026-006).
+		if ( 'wp_body_open' === $context
+			&& get_option( 'ltms_home_template_enabled', 'yes' ) === 'yes'
+			&& is_front_page() && is_page() ) {
+			return false;
+		}
 
 		// Checkout + order-received: protección del funnel.
 		if ( function_exists( 'is_checkout' )
@@ -121,10 +140,13 @@ class LTMS_Global_Catbar {
 	}
 
 	/**
-	 * Renderiza la barra (hook wp_body_open).
+	 * Renderiza la barra.
+	 *
+	 * @param string $context 'wp_body_open' (hook global) o 'home_header'
+	 *                        (render INLINE desde home.php).
 	 */
-	public static function render_bar(): void {
-		if ( ! self::should_render() ) {
+	public static function render_bar( string $context = 'wp_body_open' ): void {
+		if ( ! self::should_render( $context ) ) {
 			return;
 		}
 
@@ -133,21 +155,11 @@ class LTMS_Global_Catbar {
 			return;
 		}
 
-		// Logo oficial (variante blanca — la barra es roja de marca #E80001).
-		$logo_url = '';
-		if ( defined( 'LTMS_ASSETS_URL' )
-			&& file_exists( LTMS_PLUGIN_DIR . 'assets/img/logo-lo-tengo-white.png' ) ) {
-			$logo_url = LTMS_ASSETS_URL . 'img/logo-lo-tengo-white.png';
-		}
-
+		/* HOME-CATBAR-2026-006: SIN logo — "cada página ya tiene su logo,
+		 * es redundante" (feedback del operador; el blanco sigue vivo en
+		 * header/footer de la home, BRAND-2026-001). */
 		echo '<nav class="ltms-catbar" aria-label="' . esc_attr__( 'Categorías del marketplace', 'ltms' ) . '">';
 		echo '<div class="ltms-catbar__inner">';
-
-		if ( '' !== $logo_url ) {
-			echo '<a class="ltms-catbar__home" href="' . esc_url( home_url( '/' ) ) . '" aria-label="' . esc_attr( get_bloginfo( 'name' ) ) . '">';
-			echo '<img src="' . esc_url( $logo_url ) . '" alt="' . esc_attr( get_bloginfo( 'name' ) ) . '" width="52" height="22" />';
-			echo '</a>';
-		}
 
 		echo '<div class="ltms-catbar__track" role="list">';
 		foreach ( $terms as $term ) {
