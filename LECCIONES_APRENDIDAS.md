@@ -4336,3 +4336,53 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    actualizar la whitelist entrega un fix que NO llega al server —
    re-corrida doble (self-update + segunda corrida) cuando se toca la
    whitelist.
+
+### Lección #192: `.gitignore` con `*.min.css` ignora SILENCIOSAMENTE los `.min.css` NUEVOS — el repo queda sin el asset y el webhook de deploy falla en cada corrida (REG-CHOICE-008, 2026-10-23)
+
+1. **Caso real:** el ciclo REG-CHOICE-008 añadió `assets/css/ltms-pv-header.css`
+   + su `.min.css` generado con `npm run build:css`. El `git status` mostraba
+   el `.css` como untracked pero el `.min.css` NO aparecía (ni como `??` ni
+   como warning). Causa: `.gitignore:88` tiene `*.min.css` — los `.min.css`
+   EXISTENTES (plaza-viva, catbar, checkout...) están trackeados porque
+   preceden a la regla; git ignora los no-trackeados que matchean y
+   `git status` no los lista. Se detectó solo con `git status --short -- <path>`
+   + confirmación de `git check-ignore -v` (salida: `.gitignore:88:*.min.css`).
+   Sin el `git add -f` manual, el commit habría viajado sin el `.min.css` y
+   la entrada del webhook habría ERR-eado en CADA deploy — y SG Optimizer
+   habría servido un 404 de stylesheet en producción.
+
+2. **Diagnóstico:** `git status` normal no muestra archivos ignored — la
+   ausencia del `.min.css` parecía "el build no lo generó", no "git lo
+   oculta". El desempate: `Test-Path` (existe en disco) +
+   `git check-ignore -v <path>` (dice QUÉ regla de qué línea lo captura).
+
+3. **Regla preventiva:** (1) Todo asset `.min` NUEVO requiere verificación
+   explícita de que quedó trackeado: `git ls-files <path>` tras el add —
+   si sale vacío, `git add -f`. (2) Tras cualquier `npm run build:css`
+   con CSS nuevo: `git check-ignore -v <nuevo>.min.css` antes de commitear.
+   (3) Backlog estructural: negar la regla para `assets/`
+   (`!assets/**/*.min.css`) — los `.min` del plugin VIAJAN commiteados por
+   diseño (SG no puede regenerarlos sin Node).
+
+### Lección #193: `@group` en el docblock de ARCHIVO no existe para PHPUnit — solo clase/método; un ciclo "verde" con `--filter` esconde el grupo vacío (REG-CHOICE-008, 2026-10-23; 2ª recurrencia)
+
+1. **Caso real:** segunda recurrencia del mismo error (1ª: RegChoiceE2ETest,
+   mismo ciclo REG-CHOICE). PvHeaderGlobalTest declaraba
+   `@group pv-header-global` solo en el docblock del archivo (antes del
+   `declare(strict_types=1)`). Localmente se validó con `--filter
+   PvHeaderGlobalTest` (10/10 OK) — pero `--group pv-header-global`
+   ejecutaba **0 tests**. En SG el grupo corrió vacío y se detectó recién
+   en la validación post-deploy ("No tests executed!"). PHPUnit SOLO lee
+   `@group` de los docblocks de CLASE y de MÉTODO.
+
+2. **Diagnóstico:** el test pasaba con `--filter` (matchea por nombre de
+   clase) y fallaba con `--group` (matchea por anotación) — validar solo
+   con `--filter` da un falso verde de infraestructura: el test corre,
+   pero el grupo que documentan los comandos del proyecto (AGENTS.md:
+   `--testsuite=unit --group X`) está roto.
+
+3. **Regla preventiva:** (1) `@group` SIEMPRE en el docblock de la clase.
+   (2) Al crear un grupo nuevo, la validación local mínima es `--group
+   <nuevo>` (no `--filter`) — "No tests executed" = anotación mal puesta.
+   (3) La validación SSH de un ciclo con grupo nuevo DEBE correr `--group
+   <nuevo>` en el server: es exactamente donde el grupo vacío se manifiesta.

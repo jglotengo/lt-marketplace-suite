@@ -4,6 +4,59 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-23 (2)
+
+### Changed — `REG-CHOICE-008` (header Plaza Viva compartido en TODAS las páginas públicas + header viejo del tema oculto)
+
+> **Reporte del operador:** "el header del home aplícalo para todas las
+> demás páginas públicas del proyecto y oculta el viejo".
+>
+> - **`LTMS_PV_Header`** (nuevo, `includes/frontend/class-ltms-pv-header.php`):
+>   el header de la home (logo oficial blanco · buscador con sugerencias
+>   live + filtro de categoría · **Vender GRATIS** · Cuenta/Favoritos/Carrito
+>   · catbar global) se extrajo a UN componente compartido — una sola
+>   fuente de verdad. `home.php` ya no imprime su propio header: lo recibe
+>   por el mismo hook que el resto del sitio (el markup y el CSS inline
+>   se movieron a la clase + `assets/css/ltms-pv-header.css`).
+> - **Inyección vía `wp_body_open`** (accepted_args=0 — lección #190) en
+>   todas las páginas públicas, incluidas las **no nativas** (legales,
+>   blog) — validado en producción: `/tienda/`, `/mi-cuenta/`, `/carrito/`,
+>   `/terminos-y-condiciones/` sirven el header; `/registro-vendedor/` no.
+> - **Exclusiones** (decisiones previas del operador): panel del vendedor
+>   (HOME-CATBAR-2026-011) y funnel auth vendedor (HOME-CATBAR-2026-012 /
+>   AUTH-LOGO-001b) conservan su chrome propio. La vitrina del vendedor
+>   imprime su HTML completo (wp_body_open nunca dispara) — no aplica.
+> - **Header viejo oculto** vía body class `pv-pv-header` (CSS del
+>   componente, selectores precisos — NUNCA bare `header`/`footer`; el
+>   footer del tema se conserva fuera de la home, que tiene el suyo).
+> - **Catbar sin duplicados**: el header la renderiza inline (contexto
+>   `home_header`, respetando las exclusiones de la propia catbar —
+>   checkout/order-received) y el hook global de la catbar se abstiene
+>   cuando `did_render=true` (lección barra duplicada 2026-006b).
+>   `is_vendor_panel_page`/`is_vendor_auth_page` ahora PUBLIC (los consulta
+>   el header PV); docblock stale corregido.
+> - **Live search global**: `initHome()` de `ltms-plaza-viva.js` inicializa
+>   el live search donde exista el header (no solo `.pv-scope.pv-home`).
+> - **header-nav JS**: guard extendido a toda página con header PV (fin
+>   del match por substring en TODO el front-end).
+> - **Compensación checkout**: el resumen sticky asumía el header del tema
+>   → `top:84px` (`116px` admin-bar) bajo `body.pv-pv-header`.
+> - **Whitelist webhook**: clase + CSS + .min.css + kernel + test nuevo
+>   (lección #177 — PvHeaderGlobalTest faltó en el primer deploy y se
+>   corrigió con la misma receta: doble corrida).
+> - **Trap `.gitignore`**: `*.min.css` (línea 88) ignora los `.min.css`
+>   NUEVOS silenciosamente (los existentes están trackeados por preceder
+>   a la regla) — el nuevo requirió `git add -f`. Lección #192.
+> - `LTMS_VERSION 2.9.427 → 2.9.428`.
+> - Tests: **`PvHeaderGlobalTest`** nuevo (+10 tests, 45 asserts, grupo
+>   `pv-header-global`) + 8 test files actualizados en el MISMO commit
+>   (lección #119): HomeHeaderRedesign, HomeUxV2, HomeBrandingBrief,
+>   HomeUxV3, HomeProductScopeAudit, GlobalCatbar, RegChoiceE2E,
+>   PlazaVivaDesignSystemAudit — las assertions del header apuntan al
+>   componente compartido. Suite completa **5,274 tests, 11,600
+>   assertions, 0 fallas** (3 skips preexistentes). Grupos validados en
+>   SG: `reg-choice-e2e` 13/13, `pv-header-global` 10/10.
+
 ## [Unreleased] — 2026-10-23 (1)
 
 ### Fixed — `REG-CHOICE` (confusión comprador/vendedor en el registro: URLs canónicas + franja dual + escape hatch)
