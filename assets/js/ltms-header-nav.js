@@ -68,8 +68,11 @@
                 '</div>' +
             '</div>';
         }
+        // REG-CHOICE-002 (2026-10-22): para guests el label pasa de "Mi Cuenta"
+        // a "Ingresar / Registrarse" — un visitante nuevo no sabía que aquí se
+        // crea la cuenta de comprador (auditoría de confusión comprador/vendedor).
         return '<a href="' + url + '" class="ltms-nav-btn ltms-btn-cliente">' +
-            ICONS.cliente + '<span class="ltms-btn-label">Mi Cuenta</span>' +
+            ICONS.cliente + '<span class="ltms-btn-label">Ingresar / Registrarse</span>' +
         '</a>';
     }
 

@@ -422,6 +422,25 @@ wp_enqueue_script( 'ltms-login-register', ltms_asset_url( 'js/ltms-login-registe
                 <?php esc_html_e( 'Iniciar sesión', 'ltms' ); ?>
             </a>
         </p>
+        <?php /* REG-CHOICE-004 (2026-10-22, auditoría de confusión comprador/vendedor):
+             * escape hatch para quien llegó aquí solo queriendo comprar — antes el
+             * wizard no ofrecía salida y el comprador terminaba registrado como
+             * vendedor (KYC, tienda, SAGRILAFT). SOLO en el modo registro normal:
+             * en complete_profile (Google OAuth) el usuario YA es vendor. */ ?>
+        <?php if ( ! $complete_profile && ! $profile_incomplete ) : ?>
+            <?php
+            $ltms_buyer_account_url = function_exists( 'wc_get_page_permalink' )
+                ? wc_get_page_permalink( 'myaccount' )
+                : home_url( '/mi-cuenta/' );
+            ?>
+            <p class="ltms-auth-switch-buyer">
+                <?php esc_html_e( '¿Solo quieres comprar?', 'ltms' ); ?>
+                <a href="<?php echo esc_url( $ltms_buyer_account_url ); ?>" class="ltms-auth-switch-link">
+                    <?php esc_html_e( 'Crea tu cuenta de comprador', 'ltms' ); ?>
+                </a>
+                <span class="ltms-auth-switch-hint"><?php esc_html_e( '— no necesitas una cuenta de vendedor para comprar.', 'ltms' ); ?></span>
+            </p>
+        <?php endif; ?>
     </div>
 
 </div><!-- .ltms-register-card -->

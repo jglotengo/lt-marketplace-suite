@@ -3007,6 +3007,16 @@
     text-decoration: underline !important;
 }
 
+/* REG-CHOICE-004 (2026-10-22): escape hatch comprador en el footer del wizard
+   de registro de vendedor. El hint es más tenue que el texto del footer. */
+.ltms-auth-footer .ltms-auth-switch-buyer {
+    margin-top: 10px;
+}
+
+.ltms-auth-footer .ltms-auth-switch-hint {
+    color: var(--ltms-gray-400);
+}
+
 /* Logo placeholder */
 .ltms-auth-site-name {
     font-size: 1.4rem;

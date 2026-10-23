@@ -870,6 +870,16 @@ $files = [
     'includes/business/class-ltms-business-sync-visibility-gate.php',
     'tests/unit/SyncVisibilityGateTest.php',
     'tests/unit/PublicAuthLostPasswordTest.php',
+    // REG-CHOICE v2.9.426 — auditoría confusión comprador/vendedor: URLs canónicas
+    // del funnel (home.php ya estaba), franja dual vender/comprar, escape hatch
+    // comprador en form-register (ya estaba) + label guest del header nav. Los
+    // assets del header-nav/ux-enhancements NO estaban en la whitelist — sin
+    // ellos el fix no llegaría al server via webhook (lección #177).
+    'assets/js/ltms-header-nav.js',
+    'assets/js/ltms-header-nav.min.js',
+    'assets/css/ltms-ux-enhancements.css',
+    'assets/css/ltms-ux-enhancements.min.css',
+    'tests/unit/RegChoiceE2ETest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

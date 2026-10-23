@@ -63,6 +63,26 @@ $pv_wishlist_url = apply_filters( 'ltms_wishlist_url', home_url( '/favoritos' ) 
 $pv_wishlist_count = apply_filters( 'ltms_wishlist_count', 0 );
 
 /**
+ * REG-CHOICE-001 (auditoría de confusión comprador/vendedor, 2026-10-22):
+ * URLs canónicas del funnel de vendedor. Los CTAs apuntaban a slugs fantasmas
+ * (/vendedor/registro vía redirect manual ajeno al plugin; /vendedores en 404
+ * real — verificado en producción). Se resuelven por ID desde el mapa de páginas
+ * del activator (ltms_installed_pages) con fallback al slug canónico, y se
+ * conservan los filtros originales para customizaciones.
+ */
+$pv_installed_pages         = get_option( 'ltms_installed_pages', array() );
+$pv_seller_register_page_id = (int) ( $pv_installed_pages['ltms-vendor-register'] ?? 0 );
+$pv_sellers_page_id         = (int) ( $pv_installed_pages['ltms-sellers'] ?? 0 );
+$pv_seller_register_url = apply_filters(
+	'ltms_become_seller_url',
+	$pv_seller_register_page_id ? get_permalink( $pv_seller_register_page_id ) : home_url( '/registro-vendedor/' )
+);
+$pv_sellers_landing_url = apply_filters(
+	'ltms_sellers_page_url',
+	$pv_sellers_page_id ? get_permalink( $pv_sellers_page_id ) : home_url( '/sellers/' )
+);
+
+/**
  * HOME-CATBAR-2026-005 (2026-10-15, operador — "reemplace la barra que
  * existe en las páginas del proyecto por esta"): la fila de chips de
  * categorías del header fue REEMPLAZADA por la barra global
@@ -431,9 +451,13 @@ do_action( 'ltms_before_home_plazaviva' );
 
             <?php /* --- Zona 3: Acciones de cuenta --- */ ?>
             <nav class="pv-home-header__actions" aria-label="<?php esc_attr_e( 'Acciones de cuenta', 'ltms' ); ?>">
-                <a class="pv-home-header__action" href="<?php echo esc_url( $pv_account_url ); ?>" aria-label="<?php esc_attr_e( 'Mi cuenta', 'ltms' ); ?>">
+                <?php /* REG-CHOICE-002 (2026-10-22): para invitados el label pasa de
+                     * "Cuenta" a "Ingresar / Registrarse" — un usuario nuevo que solo
+                     * quiere comprar no encontraba dónde crear su cuenta de comprador.
+                     * Logueados mantienen "Cuenta". */ ?>
+                <a class="pv-home-header__action" href="<?php echo esc_url( $pv_account_url ); ?>" aria-label="<?php echo is_user_logged_in() ? esc_attr__( 'Mi cuenta', 'ltms' ) : esc_attr__( 'Ingresar o registrarse', 'ltms' ); ?>">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span class="pv-home-header__action-label"><?php esc_html_e( 'Cuenta', 'ltms' ); ?></span>
+                    <span class="pv-home-header__action-label"><?php echo is_user_logged_in() ? esc_html__( 'Cuenta', 'ltms' ) : esc_html__( 'Ingresar / Registrarse', 'ltms' ); ?></span>
                 </a>
                 <a class="pv-home-header__action" href="<?php echo esc_url( $pv_wishlist_url ); ?>" aria-label="<?php esc_attr_e( 'Favoritos', 'ltms' ); ?>">
                     <span class="pv-home-header__action-icon">
@@ -800,7 +824,7 @@ do_action( 'ltms_before_home_plazaviva' );
                     <h2 id="pv-home-vendors-title" class="pv-section__title"><?php esc_html_e( 'Vendedores destacados', 'ltms' ); ?></h2>
                     <p class="pv-section__sub"><?php esc_html_e( 'Star Sellers verificados con KYC y excelente reputación', 'ltms' ); ?></p>
                 </div>
-                <a class="pv-section__more" href="<?php echo esc_url( apply_filters( 'ltms_sellers_page_url', home_url( '/vendedores' ) ) ); ?>">
+                <a class="pv-section__more" href="<?php echo esc_url( $pv_sellers_landing_url ); ?>">
                     <?php esc_html_e( 'Ver todos', 'ltms' ); ?>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                 </a>
@@ -895,6 +919,14 @@ do_action( 'ltms_before_home_plazaviva' );
      * primario --ltms-gold #F7B731. Sin cifras inventadas (brief). Desktop:
      * texto a la izquierda + botón a la derecha en una sola fila; móvil:
      * apilado, botón a todo el ancho.
+     *
+     * REG-CHOICE-003 (2026-10-22, auditoría de confusión comprador/vendedor):
+     * la franja pasa a ser DUAL — "Quiero vender" (registro de vendedor) y
+     * "Quiero comprar" (ingreso/registro de comprador en /mi-cuenta/). Antes
+     * el único botón de registro rotulado de la home era para vendedores y
+     * los compradores no encontraban dónde crear su cuenta (reporte del
+     * operador: confusión en el home). El botón comprador es secundario
+     * (ghost) para no diluir la vocación de captación de la franja.
      * =====================================================================
      */
     ?>
@@ -904,9 +936,14 @@ do_action( 'ltms_before_home_plazaviva' );
                 <h2 id="pv-home-sell-title" class="pv-home-sell__title"><?php esc_html_e( 'Vende con nosotros', 'ltms' ); ?></h2>
                 <p class="pv-home-sell__sub"><?php esc_html_e( 'Publica tus productos en el marketplace y llega a compradores de toda Colombia y México.', 'ltms' ); ?></p>
             </div>
-            <a class="pv-home-sell__cta" href="<?php echo esc_url( apply_filters( 'ltms_become_seller_url', home_url( '/vendedor/registro' ) ) ); ?>">
-                <?php esc_html_e( 'Registrarme como vendedor', 'ltms' ); ?>
-            </a>
+            <div class="pv-home-sell__ctas">
+                <a class="pv-home-sell__cta" href="<?php echo esc_url( $pv_seller_register_url ); ?>">
+                    <?php esc_html_e( 'Quiero vender', 'ltms' ); ?>
+                </a>
+                <a class="pv-home-sell__cta pv-home-sell__cta--ghost" href="<?php echo esc_url( $pv_account_url ); ?>">
+                    <?php esc_html_e( 'Quiero comprar', 'ltms' ); ?>
+                </a>
+            </div>
         </div>
     </section>
 
@@ -927,8 +964,8 @@ do_action( 'ltms_before_home_plazaviva' );
             <div class="pv-home-policies__group">
                 <h3 class="pv-home-policies__title"><?php esc_html_e( 'Vende con nosotros', 'ltms' ); ?></h3>
                 <ul class="pv-home-policies__links">
-                    <li><a href="<?php echo esc_url( apply_filters( 'ltms_become_seller_url', home_url( '/vendedor/registro' ) ) ); ?>"><?php esc_html_e( 'Regístrate como vendedor', 'ltms' ); ?></a></li>
-                    <li><a href="<?php echo esc_url( apply_filters( 'ltms_sellers_page_url', home_url( '/vendedores' ) ) ); ?>"><?php esc_html_e( 'Ver vendedores', 'ltms' ); ?></a></li>
+                    <li><a href="<?php echo esc_url( $pv_seller_register_url ); ?>"><?php esc_html_e( 'Regístrate como vendedor', 'ltms' ); ?></a></li>
+                    <li><a href="<?php echo esc_url( $pv_sellers_landing_url ); ?>"><?php esc_html_e( 'Ver vendedores', 'ltms' ); ?></a></li>
                 </ul>
             </div>
             <div class="pv-home-policies__group">
@@ -1640,11 +1677,25 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-home-sell__cta:hover{filter:brightness(.92);transform:translateY(-1px);}
 .pv-scope.pv-home .pv-home-sell__cta:focus-visible{outline:3px solid #fff;outline-offset:2px;}
+/* REG-CHOICE-003 (2026-10-22): contenedor dual. Móvil/tablet: columna con
+   botones a todo el ancho (align-items:stretch estira los inline-flex).
+   Escritorio: fila junto al texto (media de abajo). */
+.pv-scope.pv-home .pv-home-sell__ctas{
+    display:flex;flex-direction:column;align-items:stretch;gap:10px;width:100%;
+}
+/* Botón comprador secundario: sobre el rojo de marca, fondo oscuro
+   translúcido + borde blanco. #fff sobre #E80001+22% negro ≈ 6.3:1 (AA). */
+.pv-scope.pv-home .pv-home-sell__cta--ghost{
+    background:rgba(0,0,0,.22);color:#fff;
+    border:1.5px solid rgba(255,255,255,.75);
+}
+.pv-scope.pv-home .pv-home-sell__cta--ghost:hover{filter:brightness(1.15);}
 @media (min-width:1024px){
     .pv-scope.pv-home .pv-home-sell{
         flex-direction:row;align-items:center;justify-content:space-between;
         padding:36px 40px;
     }
+    .pv-scope.pv-home .pv-home-sell__ctas{flex-direction:row;width:auto;align-items:center;}
 }
 @media (max-width:560px){
     .pv-scope.pv-home .pv-home-sell__cta{width:100%;padding:0 16px;}
