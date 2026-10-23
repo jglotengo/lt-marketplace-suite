@@ -891,6 +891,9 @@ $files = [
     'assets/css/ltms-pv-header.min.css',
     'includes/core/class-ltms-kernel.php',
     'lt-marketplace-suite.php',
+    // Tests del ciclo (lección #177: sin sync al server, la suite en SG
+    // no ve el grupo nuevo).
+    'tests/unit/PvHeaderGlobalTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
