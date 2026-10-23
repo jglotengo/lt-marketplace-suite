@@ -46,6 +46,9 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 	private string $header_js_min_path;
 	private string $ux_css_path;
 	private string $ux_css_min_path;
+	private string $my_account_path;
+	private string $pv_css_path;
+	private string $pv_css_min_path;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -55,6 +58,9 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 		$this->header_js_min_path = dirname( __DIR__, 2 ) . '/assets/js/ltms-header-nav.min.js';
 		$this->ux_css_path        = dirname( __DIR__, 2 ) . '/assets/css/ltms-ux-enhancements.css';
 		$this->ux_css_min_path    = dirname( __DIR__, 2 ) . '/assets/css/ltms-ux-enhancements.min.css';
+		$this->my_account_path    = dirname( __DIR__, 2 ) . '/includes/frontend/templates/my-account.php';
+		$this->pv_css_path        = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css';
+		$this->pv_css_min_path    = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.min.css';
 	}
 
 	/**
@@ -334,14 +340,143 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * REG-CHOICE-005: bump de LTMS_VERSION (cache-busting de CSS/JS en SG).
-	 * Rango >= 2.9.426 (lección #188: pin exacto frágil ante bumps futuros).
+	 * Rango >= 2.9.427 (lección #188: pin exacto frágil ante bumps futuros).
 	 */
 	public function test_010_version_bump_cache_busting(): void {
 		$main = (string) file_get_contents( dirname( __DIR__, 2 ) . '/lt-marketplace-suite.php' );
 		$this->assertMatchesRegularExpression(
-			"/define\(\s*'LTMS_VERSION',\s*'2\.9\.4(2[6-9]|[3-9]\d|\d{3,})'\s*\)/",
+			"/define\(\s*'LTMS_VERSION',\s*'2\.9\.4(2[7-9]|[3-9]\d|\d{3,})'\s*\)/",
 			$main,
-			'REG-CHOICE-005: LTMS_VERSION debe ser >= 2.9.426 para forzar cache-busting de los assets tocados.'
+			'REG-CHOICE-005: LTMS_VERSION debe ser >= 2.9.427 para forzar cache-busting de los assets tocados.'
+		);
+	}
+
+	/**
+	 * REG-CHOICE-005-A (2026-10-23): botón "Vender" dorado ESTÁTICO en el
+	 * header de la home — captación de vendedores arriba del pliegue (la
+	 * franja vive al final) y sin depender de la inyección JS. Corrige la
+	 * regresión: el header-nav JS secuestraba por substring el link "Ver
+	 * todos" (href /sellers/) y la home perdía el botón Vender del header.
+	 */
+	public function test_011_header_home_boton_vender_estatico(): void {
+		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+
+		// Markup: botón dorado como PRIMER hijo de la zona de acciones, href
+		// canónico ($pv_sellers_landing_url) + badge GRATIS.
+		$this->assertMatchesRegularExpression(
+			'/<a class="pv-home-header__sell" href="<\?php echo esc_url\( \$pv_sellers_landing_url \); \?>"/',
+			$src,
+			'REG-CHOICE-005-A: el header de la home debe tener el botón Vender estático con URL canónica.'
+		);
+		$this->assertStringContainsString(
+			'pv-home-header__sell-free',
+			$src,
+			'REG-CHOICE-005-A: el botón Vender debe llevar el badge GRATIS.'
+		);
+
+		// CSS: dorado de marca + texto negro (BRAND-2026-001, AA 11.8:1) y
+		// compactación móvil.
+		$css = file_get_contents( $this->home_path );
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-home \.pv-home-header__sell\{[^}]*background:var\(--ltms-gold\);color:#000;/s',
+			$css,
+			'REG-CHOICE-005-A: el botón Vender del header debe ser dorado de marca con texto negro.'
+		);
+		$this->assertMatchesRegularExpression(
+			'/@media \(max-width:479px\)\{[^@]*\.pv-scope\.pv-home \.pv-home-header__sell-free\{display:none;\}/s',
+			$css,
+			'REG-CHOICE-005-A: en móvil el badge GRATIS se oculta (header compacto).'
+		);
+	}
+
+	/**
+	 * REG-CHOICE-005-B: el header-nav JS NO secuestra los CTAs de la home
+	 * nativa (guard isNativeHome) y NO inyecta un botón Vender duplicado
+	 * (el $wrap solo lleva cuenta en la home). Sincronizado con el .min.js.
+	 */
+	public function test_012_header_nav_guard_home_nativa(): void {
+		$src = file_get_contents( $this->header_js_path );
+
+		$this->assertMatchesRegularExpression(
+			"/var isNativeHome = !!document\.querySelector\('\.pv-scope\.pv-home'\);/",
+			$src,
+			'REG-CHOICE-005-B: injectButtons() debe detectar la home nativa antes de inyectar.'
+		);
+		$this->assertMatchesRegularExpression(
+			"/if \(!isNativeHome\) \\\$wrap\.append\(buildSellerBtn\(sellerUrl\)\);/",
+			$src,
+			'REG-CHOICE-005-B: en la home nativa el wrap NO debe incluir el botón Vender (evita duplicado).'
+		);
+		$this->assertMatchesRegularExpression(
+			"/if \(isNativeHome\) return false;/",
+			$src,
+			'REG-CHOICE-005-B: el match por substring de sellerEl debe excluir los CTAs de la home (fin del secuestro).'
+		);
+		$this->assertMatchesRegularExpression(
+			"/if \(document\.querySelector\('\.pv-scope\.pv-home'\)\) return;\s*\n\s*var \\\$btn/",
+			$src,
+			'REG-CHOICE-005-B: el re-flow móvil de resize debe saltarse la home nativa.'
+		);
+
+		// Sincronización .min.js (SG Optimizer carga el min en producción).
+		$min = file_get_contents( $this->header_js_min_path );
+		$this->assertStringContainsString(
+			'.pv-scope.pv-home',
+			$min,
+			'REG-CHOICE-005-B: el .min.js debe contener el guard de la home nativa (regenerado).'
+		);
+	}
+
+	/**
+	 * REG-CHOICE-007 (2026-10-23): red de captura de vendedores en la vista
+	 * guest de /mi-cuenta/ — banner ANTES del form login/registro con link
+	 * directo al wizard de vendedor (resolución canónica por installed_pages).
+	 * Un vendedor nuevo que se registra aquí queda atrapado como customer
+	 * (no existe conversión customer->vendor por email).
+	 */
+	public function test_013_banner_vendedor_mi_cuenta_guest(): void {
+		$this->assertFileExists( $this->my_account_path );
+		$src = file_get_contents( $this->my_account_path );
+
+		// Dentro de la rama guest (el banner vive en el bloque !is_user_logged_in).
+		$this->assertMatchesRegularExpression(
+			"/if \( ! is_user_logged_in\(\) \) \{[\s\S]*?pv-account__seller-net[\s\S]*?wc_get_template\( 'myaccount\/form-login\.php' \)/",
+			$src,
+			'REG-CHOICE-007: el banner debe estar en la rama guest, ANTES del form de login de WC.'
+		);
+		$this->assertMatchesRegularExpression(
+			"/\\\$pv_installed_pages\['ltms-vendor-register'\]/",
+			$src,
+			'REG-CHOICE-007: la URL del wizard debe resolverse desde ltms_installed_pages.'
+		);
+		$this->assertStringContainsString(
+			"home_url( '/registro-vendedor/' )",
+			$src,
+			'REG-CHOICE-007: fallback del wizard = /registro-vendedor/ (slug real).'
+		);
+		$this->assertStringContainsString(
+			"esc_html_e( 'Crea tu cuenta de vendedor gratis', 'ltms' )",
+			$src,
+			'REG-CHOICE-007: el CTA del banner debe rotularse "Crea tu cuenta de vendedor gratis".'
+		);
+
+		// CSS en el design system PV (plaza-viva.css) + .min sincronizado.
+		$pv_css = file_get_contents( $this->pv_css_path );
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-account \.pv-account__seller-net\{[^}]*background:radial-gradient\(120% 100% at 0% 0%,var\(--brand\) 0%,var\(--brand-600\) 100%\);[^}]*border-top:3px solid var\(--ltms-gold\);/s',
+			$pv_css,
+			'REG-CHOICE-007: el banner debe usar el patrón de marca (gradiente rojo + línea dorada).'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.pv-scope\.pv-account \.pv-account__seller-net-cta\{[^}]*background:var\(--ltms-gold\);color:#000;/s',
+			$pv_css,
+			'REG-CHOICE-007: el CTA del banner debe ser dorado con texto negro (AA 11.8:1).'
+		);
+		$pv_min = file_get_contents( $this->pv_css_min_path );
+		$this->assertStringContainsString(
+			'pv-account__seller-net',
+			$pv_min,
+			'REG-CHOICE-007: el .min.css de plaza-viva debe contener el banner (regenerado).'
 		);
 	}
 }

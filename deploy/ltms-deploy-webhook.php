@@ -880,6 +880,9 @@ $files = [
     'assets/css/ltms-ux-enhancements.css',
     'assets/css/ltms-ux-enhancements.min.css',
     'tests/unit/RegChoiceE2ETest.php',
+    // REG-CHOICE-007 v2.9.427 — red de captura de vendedores en /mi-cuenta/
+    // (banner guest). my-account.php NO estaba en la whitelist (lección #177).
+    'includes/frontend/templates/my-account.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

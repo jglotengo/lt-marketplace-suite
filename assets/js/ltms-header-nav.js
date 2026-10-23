@@ -120,18 +120,27 @@
     function injectButtons() {
         if ($('#ltms-floating-access').length || $('.ltms-header-access').length) return;
 
+        // REG-CHOICE-005 (2026-10-23): la home nativa gestiona su propio header
+        // (botón Vender estático + acciones de cuenta en home.php) — aquí SOLO
+        // se inyecta el chip/botón de cuenta, NUNCA el botón Vender. Antes el
+        // match por substring secuestraba los hrefs /sellers/ de la home ("Ver
+        // todos" de vendedores destacados) y los reemplazaba por el botón.
+        var isNativeHome = !!document.querySelector('.pv-scope.pv-home');
+
         var d          = ltmsHeaderNav;
         var sellerUrl  = d.sellers_url   || '/sellers/';
         var clienteUrl = d.mi_cuenta_url || '/mi-cuenta/';
 
-        // Construir HTML de botones
+        // Construir HTML de botones (en la home nativa: solo cuenta)
         var $wrap = $('<div class="ltms-header-access" id="ltms-header-access"></div>');
-        $wrap.append(buildSellerBtn(sellerUrl));
+        if (!isNativeHome) $wrap.append(buildSellerBtn(sellerUrl));
         var cHTML = buildClienteBtn(clienteUrl);
         if (cHTML) $wrap.append(cHTML);
 
-        // Buscar elementos existentes del tema
+        // Buscar elementos existentes del tema (en la home nativa: NUNCA
+        // matchear sus CTAs — el funnel lo gestiona home.php)
         var $sellerEl = $('a').filter(function() {
+            if (isNativeHome) return false;
             var href = ($(this).attr('href') || '').toLowerCase();
             var text = $(this).text().trim().toLowerCase();
             return href.includes('/sellers') || href.includes('/vender') ||
@@ -228,6 +237,9 @@
     // moverlos al .site-header directamente.
     $(window).on('load resize', function() {
         if (typeof ltmsHeaderNav === 'undefined') return;
+        // REG-CHOICE-005: la home nativa gestiona su header con CSS responsive —
+        // el re-flow de tema (burger menus) no aplica y duplicaría el botón Vender.
+        if (document.querySelector('.pv-scope.pv-home')) return;
         var $btn = $('.ltms-nav-btn, .ltms-header-access--seller, .ltms-header-access--cliente').first();
         if (!$btn.length) return;
         var w = window.innerWidth || document.documentElement.clientWidth;

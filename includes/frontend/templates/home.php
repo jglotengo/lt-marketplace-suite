@@ -450,7 +450,18 @@ do_action( 'ltms_before_home_plazaviva' );
             </div>
 
             <?php /* --- Zona 3: Acciones de cuenta --- */ ?>
-            <nav class="pv-home-header__actions" aria-label="<?php esc_attr_e( 'Acciones de cuenta', 'ltms' ); ?>">
+            <nav class="pv-home-header__actions" aria-label="<?php esc_attr_e( 'Acciones de cuenta y venta', 'ltms' ); ?>">
+                <?php /* REG-CHOICE-005 (2026-10-23, operador): botón Vender ESTÁTICO
+                     * en el header — captación de vendedores arriba del pliegue (la
+                     * franja "Vende con nosotros" vive al final de la página) y sin
+                     * depender de la inyección JS del header-nav. Antes el JS
+                     * secuestraba por substring el link "Ver todos" (href /sellers/)
+                     * y el header de la home perdía el botón Vender. Href a la
+                     * landing /sellers/ (mismo destino del botón global). */ ?>
+                <a class="pv-home-header__sell" href="<?php echo esc_url( $pv_sellers_landing_url ); ?>" aria-label="<?php esc_attr_e( 'Vender en el marketplace — registro gratis', 'ltms' ); ?>">
+                    <?php esc_html_e( 'Vender', 'ltms' ); ?>
+                    <span class="pv-home-header__sell-free"><?php esc_html_e( 'GRATIS', 'ltms' ); ?></span>
+                </a>
                 <?php /* REG-CHOICE-002 (2026-10-22): para invitados el label pasa de
                      * "Cuenta" a "Ingresar / Registrarse" — un usuario nuevo que solo
                      * quiere comprar no encontraba dónde crear su cuenta de comprador.
@@ -1271,6 +1282,27 @@ body.pv-home-native{font-size:16px;}
 /* HOME-UX3-001: badge de favoritos vacío (count 0) se oculta — el elemento
    existe SIEMPRE para que el JS pueda actualizarlo en vivo. */
 .pv-scope.pv-home .pv-home-header__badge:empty{display:none;}
+/* REG-CHOICE-005 (2026-10-23): botón Vender estático — dorado de marca
+   (BRAND-2026-001, patrón VENDER GRATIS: #F7B731 + texto #000, AA 11.8:1). */
+.pv-scope.pv-home .pv-home-header__sell{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    min-height:40px;padding:0 14px;flex-shrink:0;
+    background:var(--ltms-gold);color:#000;
+    font-family:var(--display);font-size:13px;font-weight:800;
+    border-radius:12px;text-decoration:none;white-space:nowrap;
+    transition:filter var(--t),transform var(--t);
+}
+.pv-scope.pv-home .pv-home-header__sell:hover{filter:brightness(.92);transform:translateY(-1px);}
+.pv-scope.pv-home .pv-home-header__sell:focus-visible{outline:3px solid #fff;outline-offset:2px;}
+.pv-scope.pv-home .pv-home-header__sell-free{
+    background:rgba(0,0,0,.85);color:var(--ltms-gold);
+    font-size:9px;font-weight:800;letter-spacing:.05em;
+    padding:2px 6px;border-radius:99px;
+}
+@media (max-width:479px){
+    .pv-scope.pv-home .pv-home-header__sell-free{display:none;}
+    .pv-scope.pv-home .pv-home-header__sell{padding:0 10px;font-size:12px;}
+}
 
 /* Enlace "Saltar al contenido" — oculto hasta recibir foco. */
 .pv-scope.pv-home .pv-home-skip{

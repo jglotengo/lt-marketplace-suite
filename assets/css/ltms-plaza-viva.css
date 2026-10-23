@@ -1962,6 +1962,26 @@ li.product.pv-enhanced:hover {
 
 /* Layout principal: navegacion | contenido (1 columna en movil) */
 .pv-scope.pv-account .pv-account__main--guest{width:100%;max-width:520px;margin:0 auto;}
+/* REG-CHOICE-007 (2026-10-23): red de captura de vendedores en la vista guest —
+   mismo patrón visual de la franja "Vende con nosotros" de la home (rojo de
+   marca + detalle dorado + CTA dorado VENDER GRATIS AA 11.8:1). */
+.pv-scope.pv-account .pv-account__seller-net{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    background:radial-gradient(120% 100% at 0% 0%,var(--brand) 0%,var(--brand-600) 100%);
+    border-top:3px solid var(--ltms-gold);border-radius:var(--r-md);
+    padding:18px 22px;margin-bottom:18px;
+}
+.pv-scope.pv-account .pv-account__seller-net-text{color:#fff;font-size:14.5px;font-weight:600;line-height:1.45;margin:0;}
+.pv-scope.pv-account .pv-account__seller-net-cta{
+    display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;flex-shrink:0;
+    background:var(--ltms-gold);color:#000;border-radius:12px;
+    font-family:var(--display);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap;
+    transition:filter var(--t);
+}
+.pv-scope.pv-account .pv-account__seller-net-cta:hover{filter:brightness(.92);}
+@media (max-width:560px){
+    .pv-scope.pv-account .pv-account__seller-net{flex-direction:column;align-items:stretch;}
+}
 .pv-scope.pv-account .pv-account__main:not(.pv-account__main--guest){
     display:grid;grid-template-columns:minmax(220px,260px) minmax(0,1fr);
     gap:24px;align-items:start;width:100%;

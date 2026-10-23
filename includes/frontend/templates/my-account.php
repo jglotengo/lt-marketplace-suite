@@ -49,9 +49,28 @@ if ( ! function_exists( 'WC' ) || ! function_exists( 'wc_get_account_menu_items'
  */
 if ( ! is_user_logged_in() ) {
     get_header( 'shop' );
+    /*
+     * REG-CHOICE-007 (2026-10-23, operador): red de captura de vendedores.
+     * Un vendedor nuevo que clica "Ingresar / Registrarse" (header) aterriza
+     * aquí y registrarse como COMPRADOR es un callejón sin salida: no existe
+     * conversión customer->vendor por email (solo vía Google OAuth). El
+     * banner redirige al wizard de vendedor ANTES de que se registre mal.
+     * Resolución canónica por ID (mismo patrón REG-CHOICE-001 de home.php).
+     */
+    $pv_installed_pages = get_option( 'ltms_installed_pages', array() );
+    $pv_register_page_id = (int) ( $pv_installed_pages['ltms-vendor-register'] ?? 0 );
+    $pv_seller_register_url = $pv_register_page_id
+        ? get_permalink( $pv_register_page_id )
+        : home_url( '/registro-vendedor/' );
     ?>
     <div class="pv-scope pv-account">
         <main class="pv-section pv-account__main pv-account__main--guest" role="main">
+            <aside class="pv-account__seller-net" aria-label="<?php esc_attr_e( 'Quiero vender', 'ltms' ); ?>">
+                <p class="pv-account__seller-net-text"><?php esc_html_e( '¿Quieres vender tus productos en el marketplace?', 'ltms' ); ?></p>
+                <a class="pv-account__seller-net-cta" href="<?php echo esc_url( $pv_seller_register_url ); ?>">
+                    <?php esc_html_e( 'Crea tu cuenta de vendedor gratis', 'ltms' ); ?>
+                </a>
+            </aside>
             <?php wc_get_template( 'myaccount/form-login.php' ); ?>
         </main>
     </div>
