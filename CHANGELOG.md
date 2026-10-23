@@ -55,6 +55,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   versión). Suite completa **5,261 tests, 11,535 assertions, 0 fallas**
 >   (3 skips preexistentes). Validado en SG: grupo 10/10 + home sirviendo
 >   hrefs canónicos, franja dual y escape hatch (`ver=2.9.426`).
+>
+> **Seguimiento del mismo ciclo (v2.9.427, mismo día — reporte del
+> operador: "ingresar y registrate en el header aun no es claro, muchos
+> vendedores pueden pensar que alli es donde deben registrarse; la seccion
+> registro vendedores esta casi al final de la pagina"):**
+> - `REG-CHOICE-005` — botón "Vender" dorado **ESTÁTICO** en el header de
+>   la home (primer elemento de las acciones, arriba del pliegue, badge
+>   GRATIS, href canónico a `/sellers/`) — la captación de vendedores ya no
+>   depende de la inyección JS ni de llegar al final de la página. Patrón
+>   marketplace (Amazon/Etsy): captación en header + pitch largo abajo.
+> - **Regresión corregida:** desde v2.9.426 el header-nav JS secuestraba
+>   por substring el link "Ver todos" (href `/sellers/`) reemplazándolo por
+>   el botón Vender en sitio, y la home PERDÍA el botón Vender del header.
+>   Guard `isNativeHome` en `injectButtons()` y en el re-flow de resize: la
+>   home nativa gestiona su header, el JS solo aporta el chip/botón de
+>   cuenta (login + dropdown logueado).
+> - `REG-CHOICE-007` — red de captura: banner "¿Quieres vender tus
+>   productos? Crea tu cuenta de vendedor gratis" en la vista guest de
+>   `/mi-cuenta/`, ANTES del form de login/registro de WC (un vendedor
+>   nuevo que se registra ahí queda atrapado como customer — no existe
+>   conversión customer→vendor por email). `my-account.php` agregado al
+>   whitelist del webhook (lección #177 — no estaba).
+> - Decisiones del operador mantenidas: label guest "Ingresar /
+>   Registrarse" (desambiguado por el botón Vender al lado + red de
+>   captura) y franja dual en su posición.
+> - `LTMS_VERSION 2.9.426 → 2.9.427`. `RegChoiceE2ETest` +3 tests (13
+>   total, 56 asserts). Suite completa **5,264 tests, 11,552 assertions,
+>   0 fallas**. Validado en SG: botón estático en el HTML del header,
+>   banner visible en `/mi-cuenta/` guest, guard en el `.min.js` servido
+>   (`ver=2.9.427`).
 
 ## [Unreleased] — 2026-10-17 (4)
 
