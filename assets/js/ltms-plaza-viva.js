@@ -2139,12 +2139,20 @@
 
     function initHome() {
       var scope = document.querySelector('.pv-scope.pv-home');
-      if (!scope) return;
-      initLiveSearch(scope);
-      initCatCarousels(scope);
-      // HOME-CATBAR-2026-005: la barra de categorías global (ltms-catbar.js)
-      // reemplazó la fila de chips del header — este scope queda con live
-      // search y carruseles; válvula de extensión para futuros behaviours.
+      if (scope) {
+        initLiveSearch(scope);
+        initCatCarousels(scope);
+        // HOME-CATBAR-2026-005: la barra de categorías global (ltms-catbar.js)
+        // reemplazó la fila de chips del header — este scope queda con live
+        // search y carruseles; válvula de extensión para futuros behaviours.
+        return;
+      }
+      // REG-CHOICE-008 (2026-10-23): el header PV es GLOBAL (wp_body_open en
+      // todas las páginas públicas) — el live search del buscador funciona
+      // donde exista el header, no solo en la home. El scope del live search
+      // es el propio header (los selectores por clase son los mismos).
+      var header = document.querySelector('.pv-home-header');
+      if (header) initLiveSearch(header);
     }
 
     if (document.readyState === 'loading') {

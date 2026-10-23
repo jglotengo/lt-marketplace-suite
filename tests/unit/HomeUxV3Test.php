@@ -125,23 +125,26 @@ final class HomeUxV3Test extends LTMS_Unit_Test_Case {
 	 * por CSS :empty).
 	 */
 	public function test_003_badge_header_actualizable(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		// REG-CHOICE-008: el markup/CSS del header vive en el componente
+		// compartido (LTMS_PV_Header + su hoja CSS).
+		$hdr = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' ) );
+		$css = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-header.css' );
 
 		$this->assertStringContainsString(
 			'data-pv-wishlist-count',
-			$src,
+			$hdr,
 			'HOME-UX3-001c: el badge de favoritos debe llevar data-pv-wishlist-count para el update en vivo.'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__badge:empty\{display:none;\}/",
-			$src,
+			"/\.pv-home-header \.pv-home-header__badge:empty\{display:none;\}/",
+			$css,
 			'HOME-UX3-001c: el badge vacío (count 0) se oculta por CSS :empty.'
 		);
 		// El render condicional viejo (badge solo con count>0) fue eliminado.
 		$this->assertStringNotContainsString(
-			"if ( \$pv_wishlist_count > 0 ) : ?>\n                            <span class=\"pv-home-header__badge\">",
-			$src,
-			'HOME-UX3-001c: el badge ya no se renderiza condicionalmente — existe SIEMPRE.'
+			'pv-home-header__badge">',
+			$hdr,
+			'HOME-UX3-001c: el badge ya no se renderiza condicionalmente - existe SIEMPRE (el span no lleva badge--accent ni render condicional).'
 		);
 	}
 

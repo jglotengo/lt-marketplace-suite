@@ -883,6 +883,14 @@ $files = [
     // REG-CHOICE-007 v2.9.427 — red de captura de vendedores en /mi-cuenta/
     // (banner guest). my-account.php NO estaba en la whitelist (lección #177).
     'includes/frontend/templates/my-account.php',
+    // REG-CHOICE-008 v2.9.428 — header PV compartido en todas las páginas
+    // públicas: clase nueva + CSS nuevo + kernel + catbar (ya estaba) +
+    // home.php (ya estaba). Lección #177: la whitelist es inventario vivo.
+    'includes/frontend/class-ltms-pv-header.php',
+    'assets/css/ltms-pv-header.css',
+    'assets/css/ltms-pv-header.min.css',
+    'includes/core/class-ltms-kernel.php',
+    'lt-marketplace-suite.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

@@ -379,135 +379,17 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * HEADER — 3 zonas: logo oficial · buscador (sugerencias live + filtro
-     * categoría) · acciones de cuenta. HOME-REDESIGN-002 (patrón Amazon
-     * simplificado) → UX5-003 → BRAND-2026-001 → HOME-UX-014 (17/10/2026,
-     * operador): fondo NEGRO #000000, texto blanco, logo oficial "Lo Tengo"
-     * en variante blanca, buscador protagonista con sugerencias (máx 6 — JS
-     * en el scope HOME de ltms-plaza-viva.js) y filtro opcional de
-     * categoría dentro del campo (select product_cat —
-     * apply_shop_filters() ya lo soporta en /tienda/). Móvil 2 filas,
-     * tablet 1 fila, escritorio buscador min 480px. CSP-compliant: sin
-     * <script> inline.
+     * HEADER — REG-CHOICE-008 (2026-10-23, operador: "el header del home
+     * aplícalo para todas las demás páginas públicas del proyecto y oculta
+     * el viejo"): el header Plaza Viva (logo · buscador con sugerencias
+     * live + filtro categoría · Vender GRATIS + Cuenta/Favoritos/Carrito ·
+     * catbar global) ya NO se imprime aquí — vive en el componente
+     * compartido LTMS_PV_Header (class-ltms-pv-header.php + CSS
+     * assets/css/ltms-pv-header.css) que el hook wp_body_open inyecta en
+     * TODAS las páginas públicas, esta incluida. Una sola fuente de verdad.
      * =====================================================================
      */
     ?>
-    <header class="pv-home-header" role="banner">
-        <div class="pv-section pv-home-header__inner">
-
-            <?php /* --- Zona 1: Logo "Lo Tengo" --- */
-            /* BRAND-2026-001 (brief 15/10/2026): logo OFICIAL del brief en vez del
-             * placeholder SVG map-pin del ciclo UIUX2-D17. Variante BLANCA —
-             * HOME-UX-014: el header es NEGRO #000000 (antes rojo de marca; el
-             * logo a color lleva "TENGO" en rojo). PNG 769x324 renderizado a
-             * 40px de altura = densidad 8x: nítido en cualquier DPI. */ ?>
-            <a class="pv-home-header__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
-                <img class="pv-home-header__logo-img"
-                     src="<?php echo esc_url( ( defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : '' ) . 'img/logo-lo-tengo-white.png' ); ?>"
-                     alt="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>"
-                     width="95" height="40" />
-            </a>
-
-            <?php /* --- Zona 2: Buscador --- */ ?>
-            <div class="pv-home-header__search" role="search">
-                <form class="pv-home-header__search-form" method="get" action="<?php echo esc_url( $pv_shop_url ); ?>">
-                    <label class="pv-visually-hidden" for="pv-home-search"><?php esc_html_e( 'Buscar productos', 'ltms' ); ?></label>
-                    <span class="pv-home-header__search-icon" aria-hidden="true">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    </span>
-                    <?php if ( ! empty( $pv_cat_terms ) && ! is_wp_error( $pv_cat_terms ) ) : ?>
-                        <?php /* HOME-REDESIGN-002: filtro de categoría dentro del campo
-                             (patrón Amazon, opcional). Viaja como product_cat junto a la
-                             búsqueda — apply_shop_filters() en /tienda/ ya lo aplica. */ ?>
-                        <label class="pv-visually-hidden" for="pv-home-search-cat"><?php esc_html_e( 'Todas las categorías', 'ltms' ); ?></label>
-                        <select id="pv-home-search-cat" class="pv-home-header__search-cat" name="product_cat">
-                            <option value=""><?php esc_html_e( 'Todas las categorías', 'ltms' ); ?></option>
-                            <?php foreach ( $pv_cat_terms as $pv_cat_term_opt ) : ?>
-                                <option value="<?php echo esc_attr( $pv_cat_term_opt->slug ); ?>"><?php echo esc_html( $pv_cat_term_opt->name ); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    <?php endif; ?>
-                    <input type="search"
-                           id="pv-home-search"
-                           class="pv-home-header__search-input"
-                           name="s"
-                           placeholder="<?php esc_attr_e( 'Buscar productos, marcas, vendedores...', 'ltms' ); ?>"
-                           value="<?php echo esc_attr( get_search_query() ); ?>"
-                           autocomplete="off"
-                           role="combobox"
-                           aria-autocomplete="list"
-                           aria-expanded="false"
-                           aria-controls="pv-home-suggestions" />
-                    <input type="hidden" name="post_type" value="product" />
-                    <button type="submit" class="pv-btn pv-btn--sm pv-home-header__search-btn">
-                        <?php esc_html_e( 'Buscar', 'ltms' ); ?>
-                    </button>
-                </form>
-                <?php /* HOME-REDESIGN-002: panel de sugerencias live (máx 6) —
-                     el JS del scope HOME lo llena contra ltms_live_search
-                     (productos visibles, rate limit 30/min server-side). */ ?>
-                <div id="pv-home-suggestions" class="pv-home-header__suggestions" role="listbox" aria-label="<?php esc_attr_e( 'Sugerencias de búsqueda', 'ltms' ); ?>" hidden></div>
-            </div>
-
-            <?php /* --- Zona 3: Acciones de cuenta --- */ ?>
-            <nav class="pv-home-header__actions" aria-label="<?php esc_attr_e( 'Acciones de cuenta y venta', 'ltms' ); ?>">
-                <?php /* REG-CHOICE-005 (2026-10-23, operador): botón Vender ESTÁTICO
-                     * en el header — captación de vendedores arriba del pliegue (la
-                     * franja "Vende con nosotros" vive al final de la página) y sin
-                     * depender de la inyección JS del header-nav. Antes el JS
-                     * secuestraba por substring el link "Ver todos" (href /sellers/)
-                     * y el header de la home perdía el botón Vender. Href a la
-                     * landing /sellers/ (mismo destino del botón global). */ ?>
-                <a class="pv-home-header__sell" href="<?php echo esc_url( $pv_sellers_landing_url ); ?>" aria-label="<?php esc_attr_e( 'Vender en el marketplace — registro gratis', 'ltms' ); ?>">
-                    <?php esc_html_e( 'Vender', 'ltms' ); ?>
-                    <span class="pv-home-header__sell-free"><?php esc_html_e( 'GRATIS', 'ltms' ); ?></span>
-                </a>
-                <?php /* REG-CHOICE-002 (2026-10-22): para invitados el label pasa de
-                     * "Cuenta" a "Ingresar / Registrarse" — un usuario nuevo que solo
-                     * quiere comprar no encontraba dónde crear su cuenta de comprador.
-                     * Logueados mantienen "Cuenta". */ ?>
-                <a class="pv-home-header__action" href="<?php echo esc_url( $pv_account_url ); ?>" aria-label="<?php echo is_user_logged_in() ? esc_attr__( 'Mi cuenta', 'ltms' ) : esc_attr__( 'Ingresar o registrarse', 'ltms' ); ?>">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span class="pv-home-header__action-label"><?php echo is_user_logged_in() ? esc_html__( 'Cuenta', 'ltms' ) : esc_html__( 'Ingresar / Registrarse', 'ltms' ); ?></span>
-                </a>
-                <a class="pv-home-header__action" href="<?php echo esc_url( $pv_wishlist_url ); ?>" aria-label="<?php esc_attr_e( 'Favoritos', 'ltms' ); ?>">
-                    <span class="pv-home-header__action-icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                        <?php /* HOME-UX3-001: badge SIEMPRE renderizado con data-pv-wishlist-count
-                             * — el JS (listener del evento pv:wishlist-toggle) lo actualiza en vivo
-                             * tras cada toggle; vacío se oculta por CSS (:empty). El count inicial
-                             * viene del filtro ltms_wishlist_count (LTMS_Wishlist::filter_wishlist_count). */ ?>
-                        <span class="pv-home-header__badge" data-pv-wishlist-count><?php echo esc_html( $pv_wishlist_count > 0 ? number_format_i18n( $pv_wishlist_count ) : '' ); ?></span>
-                    </span>
-                    <span class="pv-home-header__action-label"><?php esc_html_e( 'Favoritos', 'ltms' ); ?></span>
-                </a>
-                <?php /* HOME-UX2-004 (2026-10-02): el carrito abre el mini-cart
-                     * lateral (.ltms-minicart, mismo patrón del topbar del
-                     * storefront) en vez de navegar a /carrito/. El href queda
-                     * como fallback sin JS. El drawer tiene "Ver carrito"
-                     * dentro para la página completa. */ ?>
-                <a class="pv-home-header__action" href="<?php echo esc_url( $pv_cart_url ); ?>" data-ltms-open-cart aria-label="<?php esc_attr_e( 'Carrito', 'ltms' ); ?>">
-                    <span class="pv-home-header__action-icon">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                        <?php if ( $pv_cart_count > 0 ) : ?>
-                            <span class="pv-home-header__badge pv-home-header__badge--accent"><?php echo esc_html( number_format_i18n( $pv_cart_count ) ); ?></span>
-                        <?php endif; ?>
-                    </span>
-                    <span class="pv-home-header__action-label"><?php esc_html_e( 'Carrito', 'ltms' ); ?></span>
-                </a>
-            </nav>
-
-        </div>
-
-        <?php /* HOME-CATBAR-2026-006/009: la barra global de categorías se
-             * renderiza SERVER-SIDE aquí (última fila del header sticky,
-             * hereda el "nunca se oculta"; sin JS de reubicación ni flash).
-             * Fondo rojo de marca (009) con chips blancos — se funde con el
-             * header rojo (chrome continuo); deslizable con rueda/arrastre. */ ?>
-        <?php if ( class_exists( 'LTMS_Global_Catbar' ) ) : ?>
-            <?php LTMS_Global_Catbar::render_bar( 'home_header' ); ?>
-        <?php endif; ?>
-    </header><!-- /.pv-home-header -->
 
     <main id="pv-main">
 
@@ -1140,169 +1022,12 @@ body.pv-home-native{font-size:16px;}
    específica viene después en la cascada y gana por orden). */
 .pv-scope.pv-home .pv-btn{border-radius:12px;}
 
-    /* HOME-UX5-003 → BRAND-2026-001 → HOME-CATBAR-2026-003 → HOME-UX-014:
-    header NEGRO #000000 (operador 17/10/2026 — mismo chrome que la franja
-    de Elementor del resto del sitio; la catbar roja de categorías queda
-    como banda bajo el header). Contraste blanco sobre #000000 = 21:1
-    (AAA). El botón Buscar mantiene el rojo de marca (viaja DENTRO del
-    campo blanco, 4.74:1 AA) con hover --brand-600. Sticky conservado: la
-    zona de búsqueda+acciones permanece fija al desplazarse en TODOS los
-    tamaños; la barra global de categorías (HOME-CATBAR-2026-009) es
-    SIEMPRE visible bajo el header.
-    Mobile-first (heredado del ciclo UX2):
-    - Base 360-479: 2 filas — fila 1 logo+acciones, fila 2 buscador full-width.
-    - ≥480: filtro de categoría dentro del campo.
-    - ≥768 (tablet): 1 fila con buscador flexible.
-    - ≥1024: buscador central min 480px. */
-.pv-scope.pv-home .pv-home-header{
-    position:sticky;top:0;z-index:50;
-    /* HOME-UX-014 (2026-10-17, operador: "en el header donde está el
-       buscador, logo, carrito y demás del home cambia el fondo de ese
-       header a negro"): header NEGRO #000000 — mismo chrome que la franja
-       de Elementor del resto del sitio; la catbar roja (009) queda como
-       banda de categorías bajo el header. Texto blanco 21:1 (AAA). */
-    background:#000000;
-    border-bottom:1px solid rgba(255,255,255,.10);
-    padding-top:calc(env(safe-area-inset-top, 0px) + 8px);
-}
-.pv-scope.pv-home .pv-home-header__inner{
-    display:grid;
-    grid-template-columns:auto 1fr;
-    grid-template-areas:
-        "logo actions"
-        "search search";
-    align-items:center;
-    gap:12px;
-    padding-top:10px;
-    padding-bottom:12px;
-}
-.pv-scope.pv-home .pv-home-header__logo{
-    grid-area:logo;
-    display:inline-flex;align-items:center;text-decoration:none;color:#fff;
-}
-/* BRAND-2026-001: logo oficial (variante blanca, PNG transparente 769x324)
-   renderizado a 40px de altura — el atributo width/height evita el layout
-   shift (CLS) y la densidad 8x lo mantiene nítido en retina. */
-.pv-scope.pv-home .pv-home-header__logo-img{height:40px;width:auto;display:block;}
-
-.pv-scope.pv-home .pv-home-header__search{
-    grid-area:search;
-    display:flex;flex-direction:column;gap:8px;min-width:0;
-    position:relative;
-}
-.pv-scope.pv-home .pv-home-header__search-form{
-    display:flex;align-items:center;gap:0;
-    background:var(--surface);border:1px solid var(--border-2);
-    border-radius:var(--r-pill);padding:3px 3px 3px 14px;
-    transition:box-shadow var(--t),border-color var(--t);
-}
-/* Foco del buscador: anillo azul del design system (el dorado sobre fondo
-   claro no alcanzaba contraste como indicador de foco). */
-.pv-scope.pv-home .pv-home-header__search-form:focus-within{
-    box-shadow:0 0 0 3px var(--primary);
-}
-.pv-scope.pv-home .pv-home-header__search-icon{color:var(--text-3);flex-shrink:0;display:flex;}
-/* Filtro de categoría dentro del campo (patrón Amazon). En base móvil se
-   oculta (la barra global de categorías va justo debajo dentro del header
-   — mismo camino); visible desde 480px. font-size 16px: evita el zoom
-   automático de iOS en campos. */
-.pv-scope.pv-home .pv-home-header__search-cat{
-    display:none;
-    height:44px;min-width:0;flex-shrink:1;
-    margin:0 6px;padding:0 8px;
-    border:0;border-right:1px solid var(--border);
-    border-radius:0;background:transparent;
-    font-size:16px;color:var(--text);
-    cursor:pointer;outline:none;
-    max-width:150px;
-}
-.pv-scope.pv-home .pv-home-header__search-input{
-    flex:1;height:44px;border:0;background:transparent;font-size:16px;
-    padding:0 12px;min-width:0;color:var(--text);
-}
-.pv-scope.pv-home .pv-home-header__search-input:focus{outline:none;}
-.pv-scope.pv-home .pv-home-header__search-btn{
-    border-radius:var(--r-pill);height:44px;min-width:44px;
-    background:var(--brand);color:#fff;padding:0 18px;flex-shrink:0;
-}
-.pv-scope.pv-home .pv-home-header__search-btn:hover{background:var(--brand-600);}
-
-/* Panel de sugerencias live (máx 6) — combobox ARIA accesible. */
-.pv-scope.pv-home .pv-home-header__suggestions{
-    position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:60;
-    background:var(--surface);border-radius:var(--r-md);
-    box-shadow:var(--sh-3);
-    max-height:340px;overflow-y:auto;
-    border:1px solid var(--border);
-}
-.pv-scope.pv-home .pv-home-header__suggestion{
-    display:flex;align-items:center;justify-content:space-between;gap:12px;
-    padding:12px 16px;text-decoration:none;
-    border-bottom:1px solid var(--border);
-    cursor:pointer;min-height:44px;
-}
-.pv-scope.pv-home .pv-home-header__suggestion:last-child{border-bottom:none;}
-.pv-scope.pv-home .pv-home-header__suggestion:hover,
-.pv-scope.pv-home .pv-home-header__suggestion.is-active{background:var(--primary-50);}
-.pv-scope.pv-home .pv-home-header__suggestion-label{
-    font-size:14px;font-weight:600;color:var(--text);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
-}
-.pv-scope.pv-home .pv-home-header__suggestion-price{
-    font-size:13px;font-weight:700;color:var(--primary-700);flex-shrink:0;white-space:nowrap;
-}
-
-/* HOME-CATBAR-2026-005 (2026-10-15, operador): la fila de chips del header
-    fue REEMPLAZADA por la barra global LTMS_Global_Catbar — el JS de
-    ltms-catbar.js la adopta DENTRO de este header sticky como última fila
-    (variante home en assets/css/ltms-catbar.css: static, sin logo, alineada
-    a --pv-maxw). Las reglas de chips de aquí abajo murieron con el markup. */
-
-.pv-scope.pv-home .pv-home-header__actions{grid-area:actions;justify-self:end;display:flex;align-items:center;gap:4px;}
-.pv-scope.pv-home .pv-home-header__action{
-    display:flex;flex-direction:column;align-items:center;gap:3px;
-    padding:6px 12px;border-radius:var(--r-md);color:rgba(255,255,255,.92);
-    text-decoration:none;transition:background var(--t),color var(--t);
-    position:relative;min-height:44px;justify-content:center;
-}
-.pv-scope.pv-home .pv-home-header__action:hover{background:rgba(255,255,255,.14);color:#fff;}
-.pv-scope.pv-home .pv-home-header__action-label{font-size:11px;font-weight:600;}
-.pv-scope.pv-home .pv-home-header__action-icon{position:relative;display:flex;}
-.pv-scope.pv-home .pv-home-header__badge{
-    position:absolute;top:-4px;right:-6px;
-    min-width:18px;height:18px;padding:0 5px;
-    display:flex;align-items:center;justify-content:center;
-    background:var(--ltms-gold);color:var(--text);
-    border-radius:var(--r-pill);font-size:10.5px;font-weight:700;
-    /* HOME-UX-014: el borde "recorta" el badge dorado contra el header
-       NEGRO (antes lo recortaba contra el rojo de marca). */
-    border:2px solid #000000;
-}
-.pv-scope.pv-home .pv-home-header__badge--accent{background:var(--ltms-gold);}
-/* HOME-UX3-001: badge de favoritos vacío (count 0) se oculta — el elemento
-   existe SIEMPRE para que el JS pueda actualizarlo en vivo. */
-.pv-scope.pv-home .pv-home-header__badge:empty{display:none;}
-/* REG-CHOICE-005 (2026-10-23): botón Vender estático — dorado de marca
-   (BRAND-2026-001, patrón VENDER GRATIS: #F7B731 + texto #000, AA 11.8:1). */
-.pv-scope.pv-home .pv-home-header__sell{
-    display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    min-height:40px;padding:0 14px;flex-shrink:0;
-    background:var(--ltms-gold);color:#000;
-    font-family:var(--display);font-size:13px;font-weight:800;
-    border-radius:12px;text-decoration:none;white-space:nowrap;
-    transition:filter var(--t),transform var(--t);
-}
-.pv-scope.pv-home .pv-home-header__sell:hover{filter:brightness(.92);transform:translateY(-1px);}
-.pv-scope.pv-home .pv-home-header__sell:focus-visible{outline:3px solid #fff;outline-offset:2px;}
-.pv-scope.pv-home .pv-home-header__sell-free{
-    background:rgba(0,0,0,.85);color:var(--ltms-gold);
-    font-size:9px;font-weight:800;letter-spacing:.05em;
-    padding:2px 6px;border-radius:99px;
-}
-@media (max-width:479px){
-    .pv-scope.pv-home .pv-home-header__sell-free{display:none;}
-    .pv-scope.pv-home .pv-home-header__sell{padding:0 10px;font-size:12px;}
-}
+/* ── HEADER (REG-CHOICE-008, 2026-10-23): el markup y el CSS del header
+   Plaza Viva viven en el componente compartido LTMS_PV_Header
+   (class-ltms-pv-header.php + assets/css/ltms-pv-header.css) — se inyecta
+   vía wp_body_open en TODAS las páginas públicas, esta incluida. Aquí solo
+   quedan las reglas exclusivas de la home: skip link, defensiva del tema,
+   y el resto del design system de la página. */
 
 /* Enlace "Saltar al contenido" — oculto hasta recibir foco. */
 .pv-scope.pv-home .pv-home-skip{
@@ -1339,35 +1064,6 @@ body.pv-home-native #ltms-floating-access,
 body.pv-home-native #ltms-hello-access,
 body.pv-home-native #ltms-header-access,
 body.pv-home-native .ltms-header-access{display:none!important}
-
-@media (min-width:480px){
-    .pv-scope.pv-home .pv-home-header__search-cat{display:block;}
-}
-@media (min-width:768px){
-    .pv-scope.pv-home .pv-home-header__inner{
-        grid-template-columns:auto 1fr auto;
-        grid-template-areas:"logo search actions";
-        gap:16px;
-    }
-    .pv-scope.pv-home .pv-home-header__actions{justify-self:end;}
-    .pv-scope.pv-home .pv-home-header__action-label{display:none;}
-    .pv-scope.pv-home .pv-home-header__logo{grid-area:logo;}
-    .pv-scope.pv-home .pv-home-header__search{grid-area:search;}
-}
-@media (min-width:1024px){
-    .pv-scope.pv-home .pv-home-header__search{
-        max-width:none;min-width:480px;
-    }
-    .pv-scope.pv-home .pv-home-header__inner{
-        gap:24px;
-        padding-top:14px;
-        padding-bottom:14px;
-    }
-}
-@media (min-width:1280px){
-    .pv-scope.pv-home .pv-home-header__action-label{display:inline;}
-    .pv-scope.pv-home .pv-home-header__action{flex-direction:row;gap:6px;}
-}
 
 /* ── HERO (HOME-REDESIGN-004, patrón Amazon) ──────────────────────────────
    Mobile-first: banner a ancho completo + 2 tarjetas en fila 2 columnas

@@ -49,6 +49,8 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 	private string $my_account_path;
 	private string $pv_css_path;
 	private string $pv_css_min_path;
+	private string $pv_header_class_path;
+	private string $pv_header_css_path;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -61,6 +63,9 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 		$this->my_account_path    = dirname( __DIR__, 2 ) . '/includes/frontend/templates/my-account.php';
 		$this->pv_css_path        = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css';
 		$this->pv_css_min_path    = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.min.css';
+		// REG-CHOICE-008 (2026-10-23): header PV compartido en todas las públicas.
+		$this->pv_header_class_path = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php';
+		$this->pv_header_css_path   = dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-header.css';
 	}
 
 	/**
@@ -235,7 +240,8 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 	 * cuenta de la home (logueados siguen viendo "Cuenta").
 	 */
 	public function test_006_home_label_guest_condicional(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		// REG-CHOICE-008: el markup del header vive en el componente compartido.
+		$src = $this->strip_php_comments( file_get_contents( $this->pv_header_class_path ) );
 
 		$this->assertMatchesRegularExpression(
 			"/is_user_logged_in\(\)\s*\?\s*esc_html__\(\s*'Cuenta',\s*'ltms'\s*\)\s*:\s*esc_html__\(\s*'Ingresar \/ Registrarse',\s*'ltms'\s*\)/",
@@ -359,14 +365,17 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 	 * todos" (href /sellers/) y la home perdía el botón Vender del header.
 	 */
 	public function test_011_header_home_boton_vender_estatico(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		// REG-CHOICE-008: el markup/CSS del header vive en el componente
+		// compartido (LTMS_PV_Header + su hoja CSS) — válido en TODAS las
+		// páginas públicas.
+		$src = $this->strip_php_comments( file_get_contents( $this->pv_header_class_path ) );
 
 		// Markup: botón dorado como PRIMER hijo de la zona de acciones, href
-		// canónico ($pv_sellers_landing_url) + badge GRATIS.
+		// canónico ($sellers_landing_url) + badge GRATIS.
 		$this->assertMatchesRegularExpression(
-			'/<a class="pv-home-header__sell" href="<\?php echo esc_url\( \$pv_sellers_landing_url \); \?>"/',
+			'/<a class="pv-home-header__sell" href="<\?php echo esc_url\( \$sellers_landing_url \); \?>"/',
 			$src,
-			'REG-CHOICE-005-A: el header de la home debe tener el botón Vender estático con URL canónica.'
+			'REG-CHOICE-005-A: el header PV debe tener el botón Vender estático con URL canónica.'
 		);
 		$this->assertStringContainsString(
 			'pv-home-header__sell-free',
@@ -376,14 +385,14 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 
 		// CSS: dorado de marca + texto negro (BRAND-2026-001, AA 11.8:1) y
 		// compactación móvil.
-		$css = file_get_contents( $this->home_path );
+		$css = file_get_contents( $this->pv_header_css_path );
 		$this->assertMatchesRegularExpression(
-			'/\.pv-scope\.pv-home \.pv-home-header__sell\{[^}]*background:var\(--ltms-gold\);color:#000;/s',
+			'/\.pv-home-header \.pv-home-header__sell\{[^}]*background:var\(--ltms-gold\);color:#000;/s',
 			$css,
 			'REG-CHOICE-005-A: el botón Vender del header debe ser dorado de marca con texto negro.'
 		);
 		$this->assertMatchesRegularExpression(
-			'/@media \(max-width:479px\)\{[^@]*\.pv-scope\.pv-home \.pv-home-header__sell-free\{display:none;\}/s',
+			'/@media \(max-width:479px\)\{[^@]*\.pv-home-header \.pv-home-header__sell-free\{display:none;\}/s',
 			$css,
 			'REG-CHOICE-005-A: en móvil el badge GRATIS se oculta (header compacto).'
 		);
@@ -397,10 +406,12 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 	public function test_012_header_nav_guard_home_nativa(): void {
 		$src = file_get_contents( $this->header_js_path );
 
+		// REG-CHOICE-008: el guard cubre la home nativa Y cualquier página con
+		// el header PV compartido (ambas gestionan su propio header).
 		$this->assertMatchesRegularExpression(
-			"/var isNativeHome = !!document\.querySelector\('\.pv-scope\.pv-home'\);/",
+			"/var isNativeHome = !!document\.querySelector\('\.pv-scope\.pv-home, \.pv-home-header'\);/",
 			$src,
-			'REG-CHOICE-005-B: injectButtons() debe detectar la home nativa antes de inyectar.'
+			'REG-CHOICE-005-B: injectButtons() debe detectar la home nativa / header PV antes de inyectar.'
 		);
 		$this->assertMatchesRegularExpression(
 			"/if \(!isNativeHome\) \\\$wrap\.append\(buildSellerBtn\(sellerUrl\)\);/",
@@ -413,17 +424,17 @@ final class RegChoiceE2ETest extends LTMS_Unit_Test_Case {
 			'REG-CHOICE-005-B: el match por substring de sellerEl debe excluir los CTAs de la home (fin del secuestro).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/if \(document\.querySelector\('\.pv-scope\.pv-home'\)\) return;\s*\n\s*var \\\$btn/",
+			"/if \(document\.querySelector\('\.pv-scope\.pv-home, \.pv-home-header'\)\) return;\s*\n\s*var \\\$btn/",
 			$src,
-			'REG-CHOICE-005-B: el re-flow móvil de resize debe saltarse la home nativa.'
+			'REG-CHOICE-005-B: el re-flow móvil de resize debe saltarse la home nativa / header PV.'
 		);
 
 		// Sincronización .min.js (SG Optimizer carga el min en producción).
 		$min = file_get_contents( $this->header_js_min_path );
 		$this->assertStringContainsString(
-			'.pv-scope.pv-home',
+			'.pv-home-header',
 			$min,
-			'REG-CHOICE-005-B: el .min.js debe contener el guard de la home nativa (regenerado).'
+			'REG-CHOICE-005-B: el .min.js debe contener el guard (regenerado).'
 		);
 	}
 

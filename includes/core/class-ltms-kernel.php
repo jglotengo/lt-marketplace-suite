@@ -427,6 +427,15 @@ final class LTMS_Core_Kernel {
             LTMS_Global_Catbar::init();
         }
 
+        // REG-CHOICE-008 (2026-10-23) — PV Header compartido: el header Plaza
+        // Viva de la home (logo · buscador live · Vender GRATIS · cuenta) se
+        // inyecta vía wp_body_open en TODAS las páginas públicas y el header
+        // del tema se oculta (body class pv-pv-header). Exclusiones: panel
+        // del vendedor y funnel auth (decisiones HOME-CATBAR-2026-011/012).
+        if ( class_exists( 'LTMS_PV_Header' ) ) {
+            LTMS_PV_Header::init();
+        }
+
         // SYNC-VIS-GATE (2026-09-28): gate de vendibilidad pública — productos sin
         // stock, imagen o precio (VTEX/PosGold/panel) no aparecen en NINGUNA página
         // pública, solo en el panel del vendedor. Hooks new/update product +

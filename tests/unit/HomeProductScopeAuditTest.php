@@ -222,15 +222,17 @@ final class HomeProductScopeAuditTest extends LTMS_Unit_Test_Case {
 			'AUDIT-FE-HOME-001: la clase .pv-home del scope debe seguir presente (la lee ltms-plaza-viva.js)'
 		);
 
-		// (2) Search input presente.
+		// (2) Search input presente — REG-CHOICE-008: vive en el componente
+		// compartido del header (LTMS_PV_Header).
+		$hdr = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' );
 		$this->assertStringContainsString(
 			'pv-home-search',
-			$src,
-			'AUDIT-FE-HOME-001: el input de búsqueda #pv-home-search debe seguir presente'
+			$hdr,
+			'AUDIT-FE-HOME-001: el input de búsqueda #pv-home-search debe seguir presente (header PV compartido)'
 		);
 
 		// (3) HOME-CATBAR-2026-005: los chips de búsqueda murieron con la
-		// fila reemplazada por la barra global — data-pv-search-chip NO debe
+		// fila reemplazada por la barra global - data-pv-search-chip NO debe
 		// existir en la home (el handler global queda para otros templates).
 		$this->assertStringNotContainsString(
 			'data-pv-search-chip',
@@ -238,10 +240,11 @@ final class HomeProductScopeAuditTest extends LTMS_Unit_Test_Case {
 			'HOME-CATBAR-2026-005: la home ya no emite chips data-pv-search-chip (la fila fue reemplazada por la barra global).'
 		);
 
-		// (4) Header del scope presente.
+		// (4) Header del scope presente — REG-CHOICE-008: el markup vive en el
+		// componente compartido (home.php lo recibe vía wp_body_open).
 		$this->assertStringContainsString(
 			'pv-home-header',
-			$src,
+			$hdr,
 			'AUDIT-FE-HOME-001: la clase .pv-home-header debe seguir presente aunque su shadow handler fue eliminado'
 		);
 	}

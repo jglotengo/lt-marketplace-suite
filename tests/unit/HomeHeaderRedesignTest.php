@@ -36,6 +36,8 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	private string $native_templates_path;
 	private string $pv_js_path;
 	private string $pv_min_js_path;
+	private string $pv_header_class_path;
+	private string $pv_header_css_path;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -43,6 +45,11 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 		$this->native_templates_path  = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php';
 		$this->pv_js_path             = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
 		$this->pv_min_js_path         = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.min.js';
+		// REG-CHOICE-008 (2026-10-23): el header PV es un componente compartido
+		// (markup en la clase, CSS en hoja dedicada) inyectado vía wp_body_open
+		// en TODAS las páginas públicas.
+		$this->pv_header_class_path   = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php';
+		$this->pv_header_css_path     = dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-header.css';
 	}
 
 	/**
@@ -100,17 +107,18 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	 * (lección #119).
 	 */
 	public function test_002_header_rojo_tokens(): void {
-		$src = file_get_contents( $this->home_path );
+		// REG-CHOICE-008: el CSS del header vive en la hoja del componente.
+		$src = file_get_contents( $this->pv_header_css_path );
 
 		// Fondo NEGRO (HOME-UX-014 — antes rojo de marca #E80001).
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:#000000;/s",
+			"/\.pv-home-header\{[^}]*background:#000000;/s",
 			$src,
 			'HOME-UX-014: el header debe tener fondo NEGRO #000000 (operador: "cambia el fondo de ese header a negro" — texto blanco 21:1 AAA).'
 		);
 		// Logo blanco sobre negro.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__logo\{[^}]*color:#fff;/s",
+			"/\.pv-home-header \.pv-home-header__logo\{[^}]*color:#fff;/s",
 			$src,
 			'HOME-UX5-003: el logo del header debe usar blanco sobre el fondo negro.'
 		);
@@ -122,7 +130,7 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 		);
 		// Sticky: la zona de búsqueda+acciones permanece fija al desplazarse.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*position:sticky;top:0;/s",
+			"/\.pv-home-header\{[^}]*position:sticky;top:0;/s",
 			$src,
 			'HOME-UX5-003: el header debe seguir sticky (top:0) — se mantiene visible al hacer scroll.'
 		);
@@ -141,6 +149,13 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 			$src,
 			'HOME-CATBAR-2026-005: la fila de chips fue eliminada del header — la barra global la reemplaza (una sola barra en el proyecto).'
 		);
+		// REG-CHOICE-008: el componente oculta el header VIEJO del tema en
+		// todas las páginas públicas (body class pv-pv-header).
+		$this->assertMatchesRegularExpression(
+			"/body\.pv-pv-header \.elementor-location-header,/",
+			$src,
+			'REG-CHOICE-008: el header del tema debe ocultarse en todas las páginas públicas (body.pv-pv-header).'
+		);
 	}
 
 	/**
@@ -148,7 +163,8 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	 * panel de sugerencias.
 	 */
 	public function test_003_buscador_filtro_categoria_y_sugerencias(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		// REG-CHOICE-008: el markup del header vive en el componente compartido.
+		$src = $this->strip_php_comments( file_get_contents( $this->pv_header_class_path ) );
 
 		// Filtro de categoría dentro del campo (select product_cat).
 		$this->assertStringContainsString(
@@ -269,25 +285,26 @@ final class HomeHeaderRedesignTest extends LTMS_Unit_Test_Case {
 	 * (evita el zoom automático de iOS en campos).
 	 */
 	public function test_006_touch_targets_y_font_size_ios(): void {
-		$src = file_get_contents( $this->home_path );
+		// REG-CHOICE-008: el CSS del header vive en la hoja del componente.
+		$src = file_get_contents( $this->pv_header_css_path );
 
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*height:44px;/s",
+			"/\.pv-home-header \.pv-home-header__search-btn\{[^}]*height:44px;/s",
 			$src,
 			'HOME-REDESIGN-002-F: el botón Buscar debe tener 44px de altura (touch target).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__suggestion\{[^}]*min-height:44px;/s",
+			"/\.pv-home-header \.pv-home-header__suggestion\{[^}]*min-height:44px;/s",
 			$src,
 			'HOME-REDESIGN-002-F: las sugerencias deben tener min-height 44px (touch target).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-input\{[^}]*font-size:16px;/s",
+			"/\.pv-home-header \.pv-home-header__search-input\{[^}]*font-size:16px;/s",
 			$src,
 			'HOME-REDESIGN-002-F: el input del buscador debe ser 16px (evita el zoom automático de iOS).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-cat\{[^}]*font-size:16px;/s",
+			"/\.pv-home-header \.pv-home-header__search-cat\{[^}]*font-size:16px;/s",
 			$src,
 			'HOME-REDESIGN-002-F: el select de categoría debe ser 16px (evita el zoom automático de iOS).'
 		);

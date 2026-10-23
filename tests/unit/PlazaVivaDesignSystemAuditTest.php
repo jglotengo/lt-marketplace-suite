@@ -1351,18 +1351,20 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	 */
 	public function test_036_home_sin_emoji_estructurales(): void {
 		$home = file_get_contents( $this->home_template_path );
+		// REG-CHOICE-008: el markup del header vive en el componente compartido.
+		$pv_header = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' );
 
 		// (1) El logo del header es el oficial (variante blanca, <img> con
-		//     dimensiones explícitas — sin CLS). El src es PHP (esc_url) — el
+		//     dimensiones explícitas - sin CLS). El src es PHP (esc_url) - el
 		//     match llega hasta el nombre del archivo.
 		$this->assertMatchesRegularExpression(
 			'/__logo-img"\s*src="[^"]*logo-lo-tengo-white\.png/s',
-			$home,
+			$pv_header,
 			'BRAND-2026-001: el logo del header debe ser el logo oficial (variante blanca)'
 		);
 		$this->assertStringContainsString(
 			'width="95" height="40"',
-			$home,
+			$pv_header,
 			'BRAND-2026-001: el logo del header lleva width/height explícitos (CLS 0)'
 		);
 

@@ -123,11 +123,18 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 			$module,
 			'HOME-CATBAR-2026-006: la home queda excluida del wp_body_open (su template la renderiza inline).'
 		);
-		$home = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/templates/home.php' ) );
+		// REG-CHOICE-008 (2026-10-23): el header PV compartido renderiza la
+		// barra inline DENTRO del header (la llamada vivía en home.php).
+		$pv_header = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' ) );
 		$this->assertStringContainsString(
 			"LTMS_Global_Catbar::render_bar( 'home_header' );",
-			$home,
-			'HOME-CATBAR-2026-006: home.php renderiza la barra INLINE dentro del header sticky (server-side, sin JS de reubicación).'
+			$pv_header,
+			'REG-CHOICE-008: LTMS_PV_Header renderiza la barra INLINE dentro del header compartido (server-side, sin JS de reubicación).'
+		);
+		$this->assertStringContainsString(
+			'LTMS_PV_Header::did_render()',
+			$module,
+			'REG-CHOICE-008: el hook global de la catbar se abstiene cuando el header PV ya renderizó (sin barra duplicada).'
 		);
 		// HOME-CATBAR-2026-006b: normalización del contexto — cinturón y
 		// tirantes frente al '' dummy de do_action (hallazgo live: la barra
@@ -152,9 +159,9 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 		// pedidos, billetera, KYC, seguros, reservas, RNT) y las páginas
 		// duplicadas heredadas (/ltms-dashboard/ vs /panel-vendedor/).
 		$this->assertStringContainsString(
-			'private static function is_vendor_panel_page()',
+			'public static function is_vendor_panel_page()',
 			$module,
-			'HOME-CATBAR-2026-011: el helper is_vendor_panel_page centraliza la detección del panel (la usan should_render y panel_body_class).'
+			'HOME-CATBAR-2026-011: el helper is_vendor_panel_page centraliza la detección del panel (la usan should_render, panel_body_class y LTMS_PV_Header desde REG-CHOICE-008).'
 		);
 		foreach ( array( 'ltms-dashboard', 'ltms-orders', 'ltms-wallet', 'ltms-kyc', 'ltms-insurance', 'ltms-bookings', 'ltms-rnt' ) as $page_key ) {
 			$this->assertStringContainsString(
@@ -185,9 +192,9 @@ final class GlobalCatbarTest extends LTMS_Unit_Test_Case {
 		// apropiadas" — operador), por ID y slug, SIN panel-view (el header
 		// del tema se conserva ahí).
 		$this->assertStringContainsString(
-			'private static function is_vendor_auth_page()',
+			'public static function is_vendor_auth_page()',
 			$module,
-			'HOME-CATBAR-2026-012: el helper is_vendor_auth_page excluye el funnel de registro/login.'
+			'HOME-CATBAR-2026-012: el helper is_vendor_auth_page excluye el funnel de registro/login (público desde REG-CHOICE-008: también lo consulta LTMS_PV_Header).'
 		);
 		foreach ( array( 'ltms-vendor-register', 'ltms-register', 'ltms-login', 'ltms-lost-password' ) as $auth_key ) {
 			$this->assertStringContainsString(

@@ -132,9 +132,20 @@ class LTMS_Global_Catbar {
 			return false;
 		}
 
+		// REG-CHOICE-008 (2026-10-23): cuando el header PV compartido
+		// (LTMS_PV_Header) ya renderizó —con la barra inline DENTRO del
+		// header—, el hook global se abstiene. Sin duplicados (misma
+		// lección de la barra duplicada, HOME-CATBAR-2026-006b).
+		if ( 'wp_body_open' === $context && class_exists( 'LTMS_PV_Header' ) && LTMS_PV_Header::did_render() ) {
+			return false;
+		}
+
 		// Home nativa: excluida del wp_body_open porque su template la
 		// renderiza INLINE dentro del header sticky (llamado desde home.php
-		// con $context = 'home_header' — HOME-CATBAR-2026-006).
+		// con $context = 'home_header' — HOME-CATBAR-2026-006). Desde
+		// REG-CHOICE-008 el header de la home también lo sirve el hook de
+		// LTMS_PV_Header (did_render cubre el caso); la exclusión queda
+		// como cinturón-y-tirantes si el header PV se desactiva.
 		if ( 'wp_body_open' === $context
 			&& get_option( 'ltms_home_template_enabled', 'yes' ) === 'yes'
 			&& is_front_page() && is_page() ) {
@@ -175,12 +186,15 @@ class LTMS_Global_Catbar {
 	 * públicas apropiadas" (operador). Por ID (opción) Y por slug
 	 * (cubriendo duplicadas: la opción ltms-register apunta a
 	 * /registro-vendedor/ pero además existe la página /ltms-register/).
-	 * NO añade el body class ltms-panel-view: el header del tema se
-	 * conserva en estas páginas.
+	 * El header del tema aquí se oculta vía body class ltms-panel-view
+	 * (AUTH-LOGO-001b) y el header PV compartido NO renderiza en estas
+	 * páginas (REG-CHOICE-008 — el funnel lleva su propio chrome con el
+	 * logo en la card). PUBLIC desde REG-CHOICE-008: la consulta también
+	 * LTMS_PV_Header::should_render().
 	 *
 	 * @return bool
 	 */
-	private static function is_vendor_auth_page(): bool {
+	public static function is_vendor_auth_page(): bool {
 		$pages = get_option( 'ltms_installed_pages', [] );
 		if ( is_array( $pages ) ) {
 			foreach ( array(
@@ -209,10 +223,13 @@ class LTMS_Global_Catbar {
 	 * /panel-vendedor/ (14343) mientras la usada es /ltms-dashboard/
 	 * (14337). Se cubre por ID (opción) Y por slug (duplicadas/futuras):
 	 * dashboard, pedidos, billetera, KYC, seguros, reservas y RNT.
+	 * PUBLIC desde REG-CHOICE-008: la consulta también
+	 * LTMS_PV_Header::should_render() (el header PV no renderiza en el panel
+	 * — chrome propio, decisión HOME-CATBAR-2026-011).
 	 *
 	 * @return bool
 	 */
-	private static function is_vendor_panel_page(): bool {
+	public static function is_vendor_panel_page(): bool {
 		$pages = get_option( 'ltms_installed_pages', [] );
 		if ( is_array( $pages ) ) {
 			foreach ( array(

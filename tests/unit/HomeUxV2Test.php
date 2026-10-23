@@ -87,18 +87,20 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 		// BRAND-2026-001 (2026-10-15, brief): el botón Buscar pasó a var(--brand)
 		// — rojo DE MARCA #E80001 del brief (unifica los rojos de la home,
 		// inconsistencia #2); viaja DENTRO del campo blanco y mantiene texto
-		// blanco AA (4.74:1). Hover --brand-600.
+		// blanco AA (4.74:1). Hover --brand-600. REG-CHOICE-008: el CSS del
+		// header vive en la hoja del componente compartido.
+		$hdr = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-header.css' );
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*background:var\(--brand\);/s",
-			$src,
+			"/\.pv-home-header \.pv-home-header__search-btn\{[^}]*background:var\(--brand\);/s",
+			$hdr,
 			'BRAND-2026-001: el botón Buscar usa var(--brand) — rojo de marca del brief, blanco 4.74:1 AA.'
 		);
 	// HOME-UX-014 (17/10/2026, operador): el header pasó a NEGRO #000000
 	// — mismo chrome que la franja de Elementor del resto del sitio; la
 	// catbar roja (009) queda como banda de categorías bajo el header.
 	$this->assertMatchesRegularExpression(
-		"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:#000000;/s",
-		$src,
+		"/\.pv-home-header\{[^}]*background:#000000;/s",
+		$hdr,
 		'HOME-UX-014: el header de la home es NEGRO #000000 (operador; texto blanco 21:1 AAA).'
 	);
 		// BRAND-2026-001: la franja Vende usa el gradiente ROJO de marca del
@@ -112,8 +114,8 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 		// (--ltms-gold #F7B731, botón "VENDER GRATIS"); --gold queda como
 		// dorado premium secundario.
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__badge\{[^}]*background:var\(--ltms-gold\);/s",
-			$src,
+			"/\.pv-home-header \.pv-home-header__badge\{[^}]*background:var\(--ltms-gold\);/s",
+			$hdr,
 			'BRAND-2026-001: el badge del contador usa var(--ltms-gold) (dorado primario del brief) con texto var(--text).'
 		);
 	}
@@ -158,18 +160,20 @@ final class HomeUxV2Test extends LTMS_Unit_Test_Case {
 	 * (data-ltms-open-cart, el drawer de LTMS_Cart_Drawer), con href de fallback.
 	 */
 	public function test_003_carrito_abre_minicart(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		// REG-CHOICE-008: el markup del carrito del header vive en el
+		// componente compartido (LTMS_PV_Header).
+		$hdr = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' ) );
 
 		// El <a> del carrito lleva data-ltms-open-cart (el JS del drawer hace preventDefault y abre).
 		$this->assertMatchesRegularExpression(
-			"/<a class=\"pv-home-header__action\" href=\"<\?php echo esc_url\( \\\$pv_cart_url \); \?>\" data-ltms-open-cart/",
-			$src,
+			"/<a class=\"pv-home-header__action\" href=\"<\?php echo esc_url\( \\\$cart_url \); \?>\" data-ltms-open-cart/",
+			$hdr,
 			'HOME-UX2-004: el carrito del header debe abrir el mini-cart (data-ltms-open-cart).'
 		);
 		// El href de fallback a /carrito se conserva para no-JS.
 		$this->assertStringContainsString(
-			'$pv_cart_url    = wc_get_cart_url();',
-			$src,
+			"function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : home_url( '/carrito/' )",
+			$hdr,
 			'HOME-UX2-004: el href de fallback a la página de carrito se conserva.'
 		);
 		// El selector JS del drawer reconoce data-ltms-open-cart como opt-in.

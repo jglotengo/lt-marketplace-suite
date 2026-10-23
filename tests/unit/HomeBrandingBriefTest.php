@@ -147,25 +147,27 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 	 * primario --ltms-gold con borde NEGRO (recorte contra el header).
 	 */
 	public function test_004_header_rojo_de_marca(): void {
-		$src = file_get_contents( $this->home_path );
+		// REG-CHOICE-008 (2026-10-23): el CSS del header vive en la hoja del
+		// componente compartido (LTMS_PV_Header) — prefijo .pv-home-header.
+		$src = file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-header.css' );
 
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header\{[^}]*background:#000000;[^}]*border-bottom:1px solid rgba\(255,255,255,\.10\);/s",
+			"/\.pv-home-header\{[^}]*background:#000000;[^}]*border-bottom:1px solid rgba\(255,255,255,\.10\);/s",
 			$src,
 			'HOME-UX-014: el header debe ser NEGRO #000000 con hairline rgba(255,255,255,.10) (operador: "cambia el fondo de ese header a negro").'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-btn\{[^}]*background:var\(--brand\);/s",
+			"/\.pv-home-header \.pv-home-header__search-btn\{[^}]*background:var\(--brand\);/s",
 			$src,
 			'BRAND-2026-001-D: el botón Buscar debe ser var(--brand) (rojo de marca).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__search-btn:hover\{background:var\(--brand-600\);\}/s",
+			"/\.pv-home-header \.pv-home-header__search-btn:hover\{background:var\(--brand-600\);\}/s",
 			$src,
 			'BRAND-2026-001-D: hover del botón Buscar = --brand-600 (hover oficial del brief).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-header__badge\{[^}]*background:var\(--ltms-gold\);[^}]*border:2px solid #000000;/s",
+			"/\.pv-home-header \.pv-home-header__badge\{[^}]*background:var\(--ltms-gold\);[^}]*border:2px solid #000000;/s",
 			$src,
 			'HOME-UX-014: el badge del contador debe ser --ltms-gold con borde NEGRO (recorte contra el header negro).'
 		);
@@ -177,11 +179,14 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 	 * sería invisible), <img> con width/height explícitos (sin CLS).
 	 */
 	public function test_005_logo_oficial_en_header_y_footer(): void {
+		// REG-CHOICE-008: el markup del header vive en el componente compartido;
+		// el del footer sigue en home.php.
+		$hdr = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' ) );
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
 		$this->assertMatchesRegularExpression(
 			'/class="pv-home-header__logo-img"\s*src="[^"]*logo-lo-tengo-white\.png/s',
-			$src,
+			$hdr,
 			'BRAND-2026-001-E: el header debe usar el logo oficial en variante blanca.'
 		);
 		$this->assertMatchesRegularExpression(
@@ -190,10 +195,10 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 			'BRAND-2026-001-E: el footer debe usar el logo oficial en variante blanca.'
 		);
 		// Dimensiones explícitas en ambos (evita layout shift).
-		$this->assertStringContainsString( 'width="95" height="40"', $src, 'BRAND-2026-001-E: el logo del header lleva width/height (CLS 0).' );
+		$this->assertStringContainsString( 'width="95" height="40"', $hdr, 'BRAND-2026-001-E: el logo del header lleva width/height (CLS 0).' );
 		$this->assertStringContainsString( 'width="85" height="36"', $src, 'BRAND-2026-001-E: el logo del footer lleva width/height (CLS 0).' );
 		// El placeholder SVG map-pin fue retirado del header y del footer.
-		$this->assertStringNotContainsString( 'pv-home-header__logo-mark', $src, 'BRAND-2026-001-E: el placeholder logo-mark del header fue reemplazado por el logo oficial.' );
+		$this->assertStringNotContainsString( 'pv-home-header__logo-mark', $hdr, 'BRAND-2026-001-E: el placeholder logo-mark del header fue reemplazado por el logo oficial.' );
 		$this->assertStringNotContainsString( 'pv-home-footer__logo-mark', $src, 'BRAND-2026-001-E: el placeholder logo-mark del footer fue reemplazado por el logo oficial.' );
 	}
 
