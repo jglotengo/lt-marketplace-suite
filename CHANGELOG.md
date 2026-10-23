@@ -4,6 +4,58 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-23 (1)
+
+### Fixed — `REG-CHOICE` (confusión comprador/vendedor en el registro: URLs canónicas + franja dual + escape hatch)
+
+> **Reporte del operador:** "las personas en el home se están confundiendo
+> con el proceso de registro para vendedores y para compradores — revisa ese
+> proceso y audítalo; si es necesario rediseña el e2e".
+>
+> **Auditoría e2e verificada en producción (SSH SG):**
+> - **P0 — CTAs con slugs fantasma:** "Registrarme como vendedor" (franja y
+>   políticas) apuntaba a `/vendedor/registro` — solo funcionaba vía un
+>   redirect 301 manual ajeno al plugin; "Ver vendedores"/"Ver todos"
+>   apuntaban a `/vendedores` — **404 real en producción**. Los filtros
+>   `ltms_become_seller_url` / `ltms_sellers_page_url` no tenían ningún
+>   `add_filter` en el repo; los tests legacy solo verificaban que el string
+>   del filtro apareciera en el source, no que el destino existiera.
+> - **P1 — sin registro de comprador visible:** ningún CTA de registro para
+>   compradores en toda la home; el icono "Cuenta" y el botón guest "Mi
+>   Cuenta" del header nav no comunicaban que ahí se crea la cuenta.
+> - **P1 — única acción rotulada era de vendedor:** un comprador que hacía
+>   clic terminaba en el wizard (tienda, régimen tributario, SAGRILAFT) sin
+>   salida.
+> - **P1 — wizard sin escape:** el footer del registro de vendedor solo
+>   ofrecía login de vendedor.
+>
+> **Fixes (decisiones de producto del operador):**
+> - `REG-CHOICE-001` — URLs canónicas resueltas por ID desde
+>   `ltms_installed_pages` (verificado en SG: `ltms-vendor-register`=14342,
+>   `ltms-sellers`=13599) con fallback a los slugs reales
+>   (`/registro-vendedor/`, `/sellers/`); filtros preservados (backward
+>   compat + tests legacy).
+> - `REG-CHOICE-003` — franja "Vende con nosotros" ahora **DUAL**:
+>   "Quiero vender" (dorado BRAND-2026-001, primario) + "Quiero comprar"
+>   (ghost oscuro translúcido, AA 6.3:1, hacia `/mi-cuenta/`).
+> - `REG-CHOICE-004` — escape hatch en el wizard: "¿Solo quieres comprar?
+>   Crea tu cuenta de comprador" **solo en modo registro normal** (no en
+>   `complete_profile` de Google OAuth donde el usuario ya es vendor).
+> - `REG-CHOICE-002` — label guest "Ingresar / Registrarse" en el icono
+>   Cuenta de la home y en `buildClienteBtn()` del header nav global (el JS
+>   **reemplaza** al icono en runtime — un fix solo-PHP no se habría visto).
+> - Whitelist del webhook ampliada (lección #177): `ltms-header-nav.js/.min.js`,
+>   `ltms-ux-enhancements.css/.min.css` + test nuevo — los assets del fix
+>   NO estaban y no habrían llegado al server (patrón AUTH-LOGO-001b).
+> - `LTMS_VERSION 2.9.425 → 2.9.426` (cache-busting).
+> - Tests: **`RegChoiceE2ETest`** nuevo (+10 tests, 39 asserts, grupo
+>   `reg-choice-e2e`: slugs fantasma eliminados, resolución por
+>   installed_pages, 4 CTAs canónicos, franja dual + CSS, label guest,
+>   header-nav sincronizado con `.min`, escape hatch condicionado, bump de
+>   versión). Suite completa **5,261 tests, 11,535 assertions, 0 fallas**
+>   (3 skips preexistentes). Validado en SG: grupo 10/10 + home sirviendo
+>   hrefs canónicos, franja dual y escape hatch (`ver=2.9.426`).
+
 ## [Unreleased] — 2026-10-17 (4)
 
 ### Fixed — `AUTH-LOGO-001b` (form-login y form-lost-password nunca se sincronizaron) + header oculto en recuperar-contrasena

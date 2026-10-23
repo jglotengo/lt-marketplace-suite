@@ -4297,3 +4297,42 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    del esperado se trata como X"). (3) Un "imposible" runtime (probe
    dice A, el hook hace B) se resuelve con backtrace del punto exacto,
    no con más teoría.
+
+### Lección #191: un test que verifica la PRESENCIA de un filtro/CTA en el source no verifica que el DESTINO exista — y un fix solo-PHP es invisible si JS reemplaza el elemento en runtime (REG-CHOICE, 2026-10-23)
+
+1. **Caso real:** los CTAs de vendedor de la home (`Registrarme como
+   vendedor`, `Ver vendedores`) apuntaban a slugs fantasmas
+   (`/vendedor/registro` salvado por un redirect 301 manual ajeno al
+   plugin; `/vendedores` en 404 REAL en producción) durante semanas —
+   mientras `HomeTrustSellTest` y `HomeFooterTest` pasaban en verde
+   porque su assertion era `assertStringContainsString('ltms_become_seller_url', $src)`:
+   verificaban que el FILTRO aparecía en el source, nunca que la URL
+   destino resolviera. La suite completa (5,000+ tests) no tenía NI UNA
+   assert sobre el destino de los hrefs del funnel de registro.
+
+2. **Segundo patrón del mismo ciclo:** el fix del label guest
+   ("Ingresar / Registrarse") se aplicó primero SOLO en el PHP de la
+   home — pero `ltms-header-nav.js` (`injectButtons()`) REEMPLAZA en
+   runtime el link "Cuenta" del tema por su propio botón con label
+   hardcoded "Mi Cuenta". Un fix solo en el template habría pasado
+   php -l, los tests source-based del template, Y el QA visual del
+   elemento PHP… sin cambiar NADA de lo que ve el usuario. Además el
+   selector JS matchea por substring (`href.includes('/vender')`
+   matcheaba también `/vendedor/registro` y `/vendedores`) — los
+   selectores de reemplazo por substring son una fuente silenciosa de
+   "desapareció el CTA".
+
+3. **Regla preventiva:** (1) Todo test que cubra un enlace/CTA del
+   funnel debe verificar el DESTINO (slug/página del activator), no la
+   presencia de un string de filtro: los fallbacks hardcoded de slugs
+   son 404s latentes. (2) Antes de editar el markup de un elemento,
+   grep de qué JS lo REEMPLAZA o re-renderiza en runtime
+   (ltms-header-nav.js, homepage-fixes.js, ux-enhancements.js) — el fix
+   va en AMBAS capas y el test exige sincronía con el `.min` (SG
+   Optimizer carga el min). (3) Los filtros `*_url` sin consumidor
+   (`add_filter` inexistente) son deuda: o se registra el consumidor
+   canónico o se elimina el filtro muerto. (4) El deploy webhook es
+   whitelist-based (lección #177): un ciclo que toca assets nuevos SIN
+   actualizar la whitelist entrega un fix que NO llega al server —
+   re-corrida doble (self-update + segunda corrida) cuando se toca la
+   whitelist.
