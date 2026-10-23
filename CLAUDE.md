@@ -518,6 +518,29 @@ find . -maxdepth 1 -type f \( -name '=5' -o -name 'tatus' -o -name 'pecialmente*
 git status --short
 ```
 
+### Deploy manual del webhook vía PHP CLI (REG-CHOICE, 2026-10-23)
+
+El disparo HTTP del webhook (curl desde el propio server o desde local) es
+bloqueado por el anti-bot de SiteGround (challenge HTML), y el auto-trigger
+de GitHub **no está disparando** con los pushes (pendiente de revisar la
+config de hooks del repo). El método determinístico es invocar el webhook
+directamente por PHP CLI desde SSH (el token GH se resuelve desde
+`wp-config.php`):
+
+```bash
+cd /home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/deploy
+php -d error_reporting=0 -r "\$_GET['token']='ltms_deploy_2026_s3cur3_t0k3n_x9z'; require 'ltms-deploy-webhook.php';"
+```
+
+**Doble corrida cuando el commit toca la whitelist del webhook**: el
+webhook se auto-actualiza al INICIO de cada corrida, pero la corrida en
+curso ya compiló la whitelist VIEJA (PHP no re-ejecuta el archivo
+sobreescrito). Correrlo DOS veces: la primera auto-actualiza la whitelist
+en disco, la segunda deploya los archivos que la whitelist nueva añadió
+(lección #177 + patrón AUTH-LOGO-001b). El único ERR esperable en cada
+corrida es `class-ltms-booking-notifications.php` (entrada fantasma
+preexistente — el archivo no existe en el repo; pendiente de limpieza).
+
 ---
 
 ## Notas de auditoría abiertas (a validar, no confirmadas en producción)

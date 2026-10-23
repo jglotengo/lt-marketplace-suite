@@ -89,6 +89,9 @@ lt-marketplace-suite/
 │   │   ├── class-ltms-frontend-assets.php     # CSS/JS enqueueing
 │   │   ├── class-ltms-dashboard-logic.php     # Vendor SPA logic
 │   │   ├── class-ltms-public-auth-handler.php # Login/register
+│   │   ├── class-ltms-native-templates.php     # template_include overrides (home, shop, checkout, etc.)
+│   │   ├── class-ltms-pv-header.php           # Header PV compartido — wp_body_open en TODAS las públicas (REG-CHOICE-008)
+│   │   ├── class-ltms-global-catbar.php       # Barra global de categorías (sticky)
 │   │   └── views/                             # PHP view templates
 │   │
 │   └── roles/                   # RBAC
@@ -405,7 +408,7 @@ The autoloader lives in `lt-marketplace-suite.php` (function `ltms_load_autoload
    - `LTMS_Trust_Badges` → `frontend/class-ltms-trust-badges.php`
    - `LTMS_SEO_Enhanced` → `frontend/class-ltms-seo-enhanced.php`
 
-In total, v2.9.35 added 35+ missing entries to the autoloader classmap (silent `class_exists() === false` failures in production). New PosGold classes (`LTMS_Api_Posgold`, `LTMS_PosGold_Sync`, `LTMS_PosGold_Price_Calculator`) and `LTMS_Core_TOTP_2FA` are also registered.
+In total, v2.9.35 added 35+ missing entries to the autoloader classmap (silent `class_exists() === false` failures in production). New PosGold classes (`LTMS_Api_Posgold`, `LTMS_PosGold_Sync`, `LTMS_PosGold_Price_Calculator`) and `LTMS_Core_TOTP_2FA` are also registered. Classmap additions in v2.9.414+ (`LTMS_Global_Catbar` → `frontend/class-ltms-global-catbar.php`) and v2.9.428 (`LTMS_PV_Header` → `frontend/class-ltms-pv-header.php`) follow the same pattern.
 
 **Rule:** when adding a new class, if its path does not follow the standard convention, register the exception in `$two_part_exceptions` or `$exceptions_npart` in the **same commit**. Without this, `class_exists()` silently returns `false` in production (no fatal, the class just never loads).
 

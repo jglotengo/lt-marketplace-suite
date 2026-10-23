@@ -32,6 +32,8 @@ LT Marketplace Suite (LTMS) transforms WooCommerce into a full-featured enterpri
 - **Bookings** module with calendar grid view, seasons, and policies
 - **Cloudflare Turnstile** CAPTCHA on registration and 2FA flows
 - **CSP-compliant frontend** — 0 inline handlers (onclick/onchange/onfocus/onsubmit), 0 alerts, 0 unnecessary reloads
+- **Unified Plaza Viva header on every public page** (REG-CHOICE-008) — official logo, live-search with suggestions + category filter, "Vender GRATIS" button, account/wishlist/cart actions and the global category bar, injected via `wp_body_open` from a single shared component (`LTMS_PV_Header`); the theme header is hidden via `body.pv-pv-header`.
+- **Registration funnel clarity** (REG-CHOICE cycle) — canonical funnel URLs resolved from the activator page map, dual CTAs on the home band ("Quiero vender" / "Quiero comprar"), guest label "Ingresar / Registrarse", a seller catch-net banner in My Account, and a buyer escape hatch in the vendor registration wizard.
 
 ---
 
