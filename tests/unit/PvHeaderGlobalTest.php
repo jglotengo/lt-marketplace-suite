@@ -33,6 +33,8 @@ namespace LTMS\Tests\Unit;
 
 /**
  * Class PvHeaderGlobalTest
+ *
+ * @group pv-header-global
  */
 final class PvHeaderGlobalTest extends LTMS_Unit_Test_Case {
 
