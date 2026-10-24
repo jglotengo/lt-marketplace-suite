@@ -41,6 +41,8 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 	private string $native_templates_path;
 	private string $branding_engine_path;
 	private string $img_dir;
+	private string $pv_footer_component_path;
+	private string $pv_footer_css_path;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -50,6 +52,10 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 		$this->native_templates_path = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-native-templates.php';
 		$this->branding_engine_path = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-branding-engine.php';
 		$this->img_dir              = dirname( __DIR__, 2 ) . '/assets/img';
+		// FOOTER-GLOBAL-2026-10-24: markup y CSS del footer viven en el
+		// componente compartido (antes: home.php inline).
+		$this->pv_footer_component_path = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-footer.php';
+		$this->pv_footer_css_path       = dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-footer.css';
 	}
 
 	/**
@@ -177,12 +183,14 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 	 * BRAND-2026-001-E: logo OFICIAL en header y footer — variante blanca
 	 * (header rojo / footer negro; el logo a color lleva "TENGO" en rojo e
 	 * sería invisible), <img> con width/height explícitos (sin CLS).
+	 * FOOTER-GLOBAL-2026-10-24: el markup del footer vive en el componente
+	 * compartido LTMS_PV_Footer (mismo patrón del header REG-CHOICE-008).
 	 */
 	public function test_005_logo_oficial_en_header_y_footer(): void {
-		// REG-CHOICE-008: el markup del header vive en el componente compartido;
-		// el del footer sigue en home.php.
+		// REG-CHOICE-008 + FOOTER-GLOBAL-2026-10-24: el markup del header Y
+		// del footer viven en sus componentes compartidos.
 		$hdr = $this->strip_php_comments( file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' ) );
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		$ftr = $this->strip_php_comments( file_get_contents( $this->pv_footer_component_path ) );
 
 		$this->assertMatchesRegularExpression(
 			'/class="pv-home-header__logo-img"\s*src="[^"]*logo-lo-tengo-white\.png/s',
@@ -191,15 +199,15 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 		);
 		$this->assertMatchesRegularExpression(
 			'/class="pv-home-footer__logo-img"\s*src="[^"]*logo-lo-tengo-white\.png/s',
-			$src,
+			$ftr,
 			'BRAND-2026-001-E: el footer debe usar el logo oficial en variante blanca.'
 		);
 		// Dimensiones explícitas en ambos (evita layout shift).
 		$this->assertStringContainsString( 'width="95" height="40"', $hdr, 'BRAND-2026-001-E: el logo del header lleva width/height (CLS 0).' );
-		$this->assertStringContainsString( 'width="85" height="36"', $src, 'BRAND-2026-001-E: el logo del footer lleva width/height (CLS 0).' );
+		$this->assertStringContainsString( 'width="85" height="36"', $ftr, 'BRAND-2026-001-E: el logo del footer lleva width/height (CLS 0).' );
 		// El placeholder SVG map-pin fue retirado del header y del footer.
 		$this->assertStringNotContainsString( 'pv-home-header__logo-mark', $hdr, 'BRAND-2026-001-E: el placeholder logo-mark del header fue reemplazado por el logo oficial.' );
-		$this->assertStringNotContainsString( 'pv-home-footer__logo-mark', $src, 'BRAND-2026-001-E: el placeholder logo-mark del footer fue reemplazado por el logo oficial.' );
+		$this->assertStringNotContainsString( 'pv-home-footer__logo-mark', $ftr, 'BRAND-2026-001-E: el placeholder logo-mark del footer fue reemplazado por el logo oficial.' );
 	}
 
 	/**
@@ -234,50 +242,52 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 	 * pagos/afiliaciones DIRECTAS sobre el negro (FOOTER-BRANDS-2026-10-23:
 	 * chips blancos retirados; los PNG transparentes de contenido oscuro se
 	 * vuelven legibles vía filter invert+hue-rotate) y © en blanco atenuado.
+	 * FOOTER-GLOBAL-2026-10-24: el CSS vive en ltms-pv-footer.css (plano —
+	 * el footer renderiza a nivel de body vía wp_footer en TODAS las páginas).
 	 */
 	public function test_007_footer_negro_de_marca(): void {
-		$src = file_get_contents( $this->home_path );
+		$css = file_get_contents( $this->pv_footer_css_path );
 
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer\{[^}]*background:#000000;/s",
-			$src,
-			'BRAND-2026-001-G: el footer de la home debe ser NEGRO #000000 (color de marca del brief).'
+			"/\.pv-home-footer\{[^}]*background:#000000;/s",
+			$css,
+			'BRAND-2026-001-G: el footer debe ser NEGRO #000000 (color de marca del brief).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer__social-link:hover\{[^}]*background:var\(--ltms-gold\);color:#000;/s",
-			$src,
+			"/\.pv-home-footer \.pv-home-footer__social-link:hover\{[^}]*background:var\(--ltms-gold\);color:#000;/s",
+			$css,
 			'BRAND-2026-001-G: el hover de las redes debe ser dorado --ltms-gold con icono negro (acento de marca).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer__brand-item img\{[^}]*filter:invert\(1\) hue-rotate\(180deg\);/s",
-			$src,
+			"/\.pv-home-footer \.pv-home-footer__brand-item img\{[^}]*filter:invert\(1\) hue-rotate\(180deg\);/s",
+			$css,
 			'FOOTER-BRANDS-2026-10-23: los logos (PNG transparentes oscuros) viajan directos sobre el footer negro con el filtro dark-mode invert+hue-rotate para ser legibles sin esfuerzo.'
 		);
 		$this->assertDoesNotMatchRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer__brand-item img\{[^}]*background:#fff;/s",
-			$src,
+			"/\.pv-home-footer \.pv-home-footer__brand-item img\{[^}]*background:#fff;/s",
+			$css,
 			'FOOTER-BRANDS-2026-10-23: el chip blanco fue ELIMINADO (pedido del operador: fondo negro).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer__brand-item\{[^}]*width:clamp\(150px,30%,320px\);/s",
-			$src,
+			"/\.pv-home-footer \.pv-home-footer__brand-item\{[^}]*width:clamp\(150px,30%,320px\);/s",
+			$css,
 			'FOOTER-BRANDS-2026-10-23: el tamaño de los logos es ancho-driven responsive (clamp 150px→320px).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/@media \(max-width:560px\)\{[^}]*\}[^@]*\.pv-scope\.pv-home \.pv-home-footer__brand-item\{width:calc\(50% - 14px\);\}/s",
-			$src,
+			"/@media \(max-width:560px\)\{[^@]*\.pv-home-footer \.pv-home-footer__brand-item\{width:calc\(50% - 14px\);\}/s",
+			$css,
 			'FOOTER-BRANDS-2026-10-23: en móvil los logos ocupan media fila cada uno (grid 2×2 legible).'
 		);
 		// Whitelist del deploy webhook (lección #177: inventario vivo) — el fix
 		// viaja con sus tests o el webhook fallback deja tests viejos que
-		// exigen background:#fff contra un home.php nuevo.
+		// exigen background:#fff contra un footer nuevo.
 		$webhook = (string) file_get_contents( dirname( __DIR__, 2 ) . '/deploy/ltms-deploy-webhook.php' );
 		$this->assertStringContainsString( "'tests/unit/HomeBrandingBriefTest.php',", $webhook, 'FOOTER-BRANDS-2026-10-23: el test de branding debe estar en la whitelist del webhook (lección #177).' );
 		$this->assertStringContainsString( "'tests/unit/HomeUxV3Test.php',", $webhook, 'FOOTER-BRANDS-2026-10-23: el test de UX3 debe estar en la whitelist del webhook (lección #177).' );
 		$this->assertStringContainsString( "'includes/frontend/templates/home.php',", $webhook, 'FOOTER-BRANDS-2026-10-23: home.php debe seguir en la whitelist del webhook.' );
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer__bottom-inner\{[^}]*color:rgba\(255,255,255,\.66\);/s",
-			$src,
+			"/\.pv-home-footer \.pv-home-footer__bottom-inner\{[^}]*color:rgba\(255,255,255,\.66\);/s",
+			$css,
 			'BRAND-2026-001-G: la línea de © debe ser blanca atenuada legible sobre negro.'
 		);
 	}

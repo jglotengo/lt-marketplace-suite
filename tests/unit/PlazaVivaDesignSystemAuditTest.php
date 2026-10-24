@@ -761,22 +761,25 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 	public function test_018_home_footer_grid_breathing_room(): void {
 		$this->assertFileExists( $this->home_template_path );
 		$home = file_get_contents( $this->home_template_path );
+		// FOOTER-GLOBAL-2026-10-24: el CSS del footer vive ahora en el
+		// componente compartido — la vigilancia se extiende ahí (lección #119).
+		$footer_css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-footer.css' );
 
 		// La columna de marca ya no absorbe 2fr (histórico) y NINGUNA grid
 		// de columnas debe existir en el footer visual nuevo.
 		$this->assertStringNotContainsString(
 			'grid-template-columns:2fr 1fr 1fr 1fr',
-			$home,
+			$home . $footer_css,
 			'AUDIT-FE-PV-DS-016 fix: el footer de home no debe volver a 2fr 1fr 1fr 1fr'
 		);
 		$this->assertStringNotContainsString(
 			'grid-template-columns:1.6fr 1fr 1fr 1fr',
-			$home,
+			$home . $footer_css,
 			'HOME-UX2-005: el footer visual no tiene columnas de enlaces — el texto vive en la sección políticas'
 		);
 		$this->assertDoesNotMatchRegularExpression(
 			'/pv-home-footer__inner\s*\{[^}]*grid-template-columns/s',
-			$home,
+			$home . $footer_css,
 			'HOME-UX2-005: pv-home-footer__inner es flex (logo + redes), no un grid de columnas'
 		);
 	}
@@ -1353,6 +1356,8 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$home = file_get_contents( $this->home_template_path );
 		// REG-CHOICE-008: el markup del header vive en el componente compartido.
 		$pv_header = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-header.php' );
+		// FOOTER-GLOBAL-2026-10-24: el markup del footer también (lección #119).
+		$pv_footer = file_get_contents( dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-footer.php' );
 
 		// (1) El logo del header es el oficial (variante blanca, <img> con
 		//     dimensiones explícitas - sin CLS). El src es PHP (esc_url) - el
@@ -1372,7 +1377,7 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		//     footer negro de marca).
 		$this->assertMatchesRegularExpression(
 			'/footer__logo-img"\s*src="[^"]*logo-lo-tengo-white\.png/s',
-			$home,
+			$pv_footer,
 			'BRAND-2026-001: el logo del footer debe ser el logo oficial en variante blanca'
 		);
 

@@ -6,9 +6,17 @@
  * (2026-10-02): el footer pasó a ser PURAMENTE VISUAL (logo, redes reales,
  * badges de pago, ©) y TODO el texto de enlaces se organizó en la nueva
  * sección "Ayuda y políticas" del body (Vende con nosotros · Ayuda · Legal ·
- * Contacto). El footer del tema (Elementor) se oculta en la home para
- * eliminar la redundancia de dos footers apilados (el operador reportó
+ * Contacto). El footer del tema (Elementor) se oculta para eliminar la
+ * redundancia de dos footers apilados (el operador reportó
  * políticas/redes/pagos duplicados).
+ *
+ * FOOTER-GLOBAL-2026-10-24: el footer se extrajo de home.php al componente
+ * compartido LTMS_PV_Footer (class-ltms-pv-footer.php) — se inyecta vía
+ * wp_footer en TODAS las páginas públicas y el footer del tema se oculta
+ * globalmente vía body class pv-pv-footer. Los asserts de markup/CSS del
+ * footer apuntan ahora al componente; los de la sección "Ayuda y políticas"
+ * siguen en home.php. La cobertura estructural del componente compartido
+ * vive en PvFooterGlobalTest (grupo pv-footer-global).
  *
  * Tests PURAMENTE estructurales (file_get_contents + asserts): deterministas
  * en LTMS_UNIT_ONLY=true (mismo patrón que HomeTemplateWiringTest).
@@ -26,10 +34,14 @@ namespace LTMS\Tests\Unit;
 final class HomeFooterTest extends LTMS_Unit_Test_Case {
 
 	private string $home_path;
+	private string $component_path;
+	private string $css_path;
 
 	protected function setUp(): void {
 		parent::setUp();
-		$this->home_path = dirname( __DIR__, 2 ) . '/includes/frontend/templates/home.php';
+		$this->home_path      = dirname( __DIR__, 2 ) . '/includes/frontend/templates/home.php';
+		$this->component_path = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-footer.php';
+		$this->css_path       = dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-footer.css';
 	}
 
 	/**
@@ -46,10 +58,13 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 	 * HOME-UX2-005-A: el footer es puramente visual — logo + redes + pagos + ©.
 	 * Las columnas de texto (acordeones <details>, col brand con tagline) fueron
 	 * ELIMINADAS y su contenido vive en la sección "Ayuda y políticas".
+ * FOOTER-GLOBAL-2026-10-24: el markup del footer vive en el componente.
 	 */
 	public function test_001_footer_visual_sin_columnas_de_texto(): void {
 		$this->assertFileExists( $this->home_path );
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		$this->assertFileExists( $this->component_path );
+		// Footer visual en el COMPONENTE compartido (fuente única).
+		$src = $this->strip_php_comments( (string) file_get_contents( $this->component_path ) );
 
 		// Presente: marca, redes, pagos, ©.
 		$this->assertStringContainsString(
@@ -73,25 +88,27 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 			'HOME-UX2-005-A: el footer visual debe tener la línea de ©.'
 		);
 
-		// Eliminado: columnas de texto del footer viejo.
+		// Eliminado: columnas de texto del footer viejo (en TODA la base —
+		// ni home.php ni el componente las reintroducen).
+		$combined = $src . $this->strip_php_comments( (string) file_get_contents( $this->home_path ) );
 		$this->assertStringNotContainsString(
 			'pv-home-footer__acc',
-			$src,
+			$combined,
 			'HOME-UX2-005-A: los acordeones de columnas fueron eliminados (el texto vive en la sección políticas).'
 		);
 		$this->assertStringNotContainsString(
 			'pv-home-footer__col',
-			$src,
+			$combined,
 			'HOME-UX2-005-A: las columnas de enlaces del footer fueron eliminadas.'
 		);
 		$this->assertStringNotContainsString(
 			'pv-home-footer__tagline',
-			$src,
+			$combined,
 			'HOME-UX2-005-A: el tagline fue eliminado del footer (redundante con el hero).'
 		);
 		$this->assertStringNotContainsString(
 			'pv-home-footer__built',
-			$src,
+			$combined,
 			'HOME-UX2-005-A: la línea "powered by" fue eliminada del footer visual.'
 		);
 	}
@@ -101,7 +118,7 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 	 * Elementor) — antes eran placeholders genéricos a instagram.com etc.
 	 */
 	public function test_002_redes_sociales_reales(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		$src = $this->strip_php_comments( (string) file_get_contents( $this->component_path ) );
 
 		$this->assertStringContainsString(
 			'https://www.instagram.com/lotengooficial/',
@@ -132,10 +149,11 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * HOME-UX2-005-C: sección "Ayuda y políticas" — organiza el texto
-	 * eliminado del footer (Vende · Ayuda · Legal · Contacto).
+	 * eliminado del footer (Vende · Ayuda · Legal · Contacto). Sigue viva en
+	 * el BODY de la home (no en el footer visual).
 	 */
 	public function test_003_seccion_ayuda_y_politicas(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		$src = $this->strip_php_comments( (string) file_get_contents( $this->home_path ) );
 
 		$this->assertStringContainsString(
 			'pv-home__policies',
@@ -146,10 +164,10 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 			$this->assertStringContainsString(
 				sprintf( "esc_html_e( '%s', 'ltms' )", $title ),
 				$src,
-				sprintf( "HOME-UX2-005-C: el grupo '%s' debe existir en la sección de políticas.", $title )
+				sprintf( 'HOME-UX2-005-C: el grupo %s debe existir en la sección de políticas.', $title )
 			);
 		}
-		// Contacto real del operador (antes vivía solo en el footer Elementor, hoy oculto en la home).
+		// Contacto real del operador (antes vivía solo en el footer Elementor, hoy oculto).
 		$this->assertStringContainsString(
 			'dircomercialcol@lo-tengo.com.co',
 			$src,
@@ -169,32 +187,41 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * HOME-UX2-005-D: el footer del tema (Elementor) se oculta SOLO en la home
-	 * — mismo patrón defensivo del header. NUNCA un bare `footer`.
+	 * FOOTER-GLOBAL-2026-10-24: el footer del tema (Elementor/clásico) se
+	 * oculta ahora GLOBALMENTE vía body class pv-pv-footer (CSS del
+	 * componente compartido) — ya no solo en la home con body.pv-home-native.
+	 * NUNCA un bare `footer`.
 	 */
-	public function test_004_footer_del_tema_oculto(): void {
-		$src = file_get_contents( $this->home_path );
+	public function test_004_footer_del_tema_oculto_global(): void {
+		$css = (string) file_get_contents( $this->css_path );
 
 		$this->assertStringContainsString(
-			'body.pv-home-native .elementor-location-footer',
-			$src,
-			'HOME-UX2-005-D: el footer Elementor debe ocultarse en la home.'
+			'body.pv-pv-footer .elementor-location-footer',
+			$css,
+			'FOOTER-GLOBAL: el footer Elementor debe ocultarse en TODAS las páginas (body.pv-pv-footer).'
 		);
 		$this->assertStringContainsString(
-			'body.pv-home-native #colophon',
-			$src,
-			'HOME-UX2-005-D: el footer del tema clásico (#colophon) debe ocultarse en la home.'
+			'body.pv-pv-footer #colophon',
+			$css,
+			'FOOTER-GLOBAL: el footer del tema clásico (#colophon) debe ocultarse globalmente.'
 		);
 		$this->assertStringContainsString(
-			'body.pv-home-native .site-footer',
-			$src,
-			'HOME-UX2-005-D: el .site-footer del tema debe ocultarse en la home.'
+			'body.pv-pv-footer .site-footer',
+			$css,
+			'FOOTER-GLOBAL: el .site-footer del tema debe ocultarse globalmente.'
 		);
 		// El selector NUNCA debe ser un bare footer (matchearía .pv-home-footer).
 		$this->assertStringNotContainsString(
-			'body.pv-home-native footer{',
-			$src,
-			'HOME-UX2-005-D: prohibido el selector bare `footer` — ocultaría el footer PV propio.'
+			'body.pv-pv-footer footer{',
+			$css,
+			'FOOTER-GLOBAL: prohibido el selector bare `footer` — ocultaría el footer PV propio.'
+		);
+		// Los selectores home-only viejos fueron retirados de home.php.
+		$home = (string) file_get_contents( $this->home_path );
+		$this->assertStringNotContainsString(
+			'body.pv-home-native .elementor-location-footer',
+			$home,
+			'FOOTER-GLOBAL: la ocultación home-only del footer del tema fue reemplazada por la global (pv-pv-footer).'
 		);
 	}
 
@@ -202,7 +229,7 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 	 * HOME-REDESIGN-006-C (se mantiene): enlaces solo a páginas reales.
 	 */
 	public function test_005_enlaces_paginas_reales(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		$src = $this->strip_php_comments( (string) file_get_contents( $this->home_path ) );
 
 		// Centro de ayuda (/ayuda — page slug verificado en is_help_page()).
 		$this->assertStringContainsString(
@@ -223,10 +250,11 @@ final class HomeFooterTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * HOME-REDESIGN-006-D (se mantiene): fila de pagos + selector de moneda
-	 * solo si ya existe soporte multi-moneda.
+	 * solo si ya existe soporte multi-moneda. FOOTER-GLOBAL-2026-10-24: el
+	 * markup vive en el componente compartido.
 	 */
 	public function test_006_pagos_y_selector_moneda(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		$src = $this->strip_php_comments( (string) file_get_contents( $this->component_path ) );
 
 		$this->assertStringContainsString(
 			'pv-home-footer__payrow',

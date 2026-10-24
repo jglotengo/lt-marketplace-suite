@@ -1,0 +1,90 @@
+/*
+ * LTMS PV Footer — footer Plaza Viva compartido en TODAS las páginas públicas.
+ * FOOTER-GLOBAL-2026-10-24 (operador: "a todas").
+ *
+ * Estructura: estilos del footer (extraídos de home.php, ahora flat porque
+ * el componente renderiza a nivel de body vía wp_footer) + ocultación del
+ * footer del tema (Elementor/clásico) vía body class pv-pv-footer y del
+ * footer minimal de la vitrina (.ltms-sf-footer).
+ *
+ * Dependencia: ltms-plaza-viva.css (tokens :root + .pv-section).
+ */
+
+/* ── OCULTACIÓN DEL FOOTER VIEJO (patrón defensivo del header global,
+   REG-CHOICE-008; antes vivía en home.php solo para la home). Selectores
+   precisos — NUNCA un bare `footer` (matchearía .pv-home-footer propio). */
+body.pv-pv-footer .elementor-location-footer,
+body.pv-pv-footer footer[data-elementor-type="footer"],
+body.pv-pv-footer #colophon,
+body.pv-pv-footer .site-footer,
+/* Vitrina /vendedor/{slug}: emite HTML completo con footer minimal propio —
+   el footer PV lo reemplaza (decisión del operador: todas sin excepción). */
+body.pv-pv-footer .ltms-sf-footer{display:none!important}
+
+/* ── FOOTER PV (BRAND-2026-001: fondo NEGRO #000000, color de marca del
+   brief — "footer negro", texto blanco, hover dorado --ltms-gold.
+   FOOTER-BRANDS-2026-10-23: chips blancos eliminados; los 4 assets de
+   pagos/afiliaciones son PNG TRANSPARENTES de contenido OSCURO y viajan
+   DIRECTOS sobre el negro con el filtro dark-mode estándar
+   invert(1) hue-rotate(180deg): invierte la luminosidad (oscuro→claro)
+   y devuelve el tono original (~180°), preservando formas y estructura
+   interna de cada logo). */
+.pv-home-footer{
+    margin-top:56px;background:#000000;border-top:1px solid rgba(255,255,255,.14);
+}
+.pv-home-footer .pv-home-footer__inner{
+    display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+    padding-top:32px;padding-bottom:28px;
+}
+.pv-home-footer .pv-home-footer__logo{
+    display:inline-flex;align-items:center;
+    text-decoration:none;
+}
+/* BRAND-2026-001: logo oficial (variante blanca, transparente) — 36px. */
+.pv-home-footer .pv-home-footer__logo-img{height:36px;width:auto;display:block;}
+.pv-home-footer .pv-home-footer__social{display:flex;gap:8px;}
+.pv-home-footer .pv-home-footer__social-link{
+    width:40px;height:40px;border-radius:var(--r-md);
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:#fff;
+    transition:background var(--t),color var(--t),border-color var(--t),transform var(--t);
+}
+.pv-home-footer .pv-home-footer__social-link:hover{
+    background:var(--ltms-gold);color:#000;border-color:var(--ltms-gold);transform:translateY(-2px);
+}
+/* Fila de marcas (pagos/donaciones/afiliaciones) + selector de moneda
+   (bajo la marca). FOOTER-BRANDS-2026-10-23: tamaño ancho-driven
+   (height:auto) → responsive real sin deformar (aspect-ratio natural). */
+.pv-home-footer .pv-home-footer__payrow{
+    display:flex;flex-direction:column;gap:10px;
+    padding-top:24px;padding-bottom:32px;
+    border-top:1px solid rgba(255,255,255,.14);
+}
+.pv-home-footer .pv-home-footer__brands{
+    display:flex;align-items:center;justify-content:center;
+    gap:20px;flex-wrap:wrap;list-style:none;margin:0;padding:0;
+}
+.pv-home-footer .pv-home-footer__brand-item{
+    /* clamp: móvil ~150px legible → 30% en tablet → 320px cap en desktop
+       (4×320 + 3 gaps = 1340px ≡ ancho útil del contenedor .pv-section). */
+    width:clamp(150px,30%,320px);
+}
+.pv-home-footer .pv-home-footer__brand-item img{
+    width:100%;height:auto;max-width:100%;display:block;
+    filter:invert(1) hue-rotate(180deg);
+}
+@media (max-width:560px){
+    .pv-home-footer .pv-home-footer__brands{gap:14px;}
+    /* Grid 2×2: cada logo ocupa media fila — se leen sin esfuerzo. */
+    .pv-home-footer .pv-home-footer__brand-item{width:calc(50% - 14px);}
+}
+/* Selector de moneda sobre fondo negro (label legible; el select es blanco). */
+.pv-home-footer .pv-home-footer__payrow .ltms-currency-switcher__label{color:rgba(255,255,255,.7);}
+.pv-home-footer .pv-home-footer__bottom{border-top:1px solid rgba(255,255,255,.14);}
+.pv-home-footer .pv-home-footer__bottom-inner{
+    display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+    padding-top:18px;padding-bottom:18px;font-size:12.5px;color:rgba(255,255,255,.66);
+}
+@media (max-width:560px){
+    .pv-home-footer .pv-home-footer__bottom-inner{flex-direction:column;align-items:center;}
+}

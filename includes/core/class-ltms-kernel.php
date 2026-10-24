@@ -436,6 +436,17 @@ final class LTMS_Core_Kernel {
             LTMS_PV_Header::init();
         }
 
+        // FOOTER-GLOBAL-2026-10-24 — PV Footer compartido: el footer Plaza
+        // Viva de la home (logo · redes reales · marcas de pagos con filtro
+        // dark-mode · ©) se inyecta vía wp_footer en TODAS las páginas
+        // públicas y el footer del tema se oculta (body class pv-pv-footer).
+        // Decisión del operador "todas sin excepción": a diferencia del
+        // header (REG-CHOICE-008), aquí NO se excluye el panel del vendedor
+        // ni el funnel auth ni la vitrina.
+        if ( class_exists( 'LTMS_PV_Footer' ) ) {
+            LTMS_PV_Footer::init();
+        }
+
         // SYNC-VIS-GATE (2026-09-28): gate de vendibilidad pública — productos sin
         // stock, imagen o precio (VTEX/PosGold/panel) no aparecen en NINGUNA página
         // pública, solo en el panel del vendedor. Hooks new/update product +

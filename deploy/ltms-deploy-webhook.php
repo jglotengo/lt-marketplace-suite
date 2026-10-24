@@ -900,6 +900,14 @@ $files = [
     // Tests del ciclo (lección #177: sin sync al server, la suite en SG
     // no ve el grupo nuevo).
     'tests/unit/PvHeaderGlobalTest.php',
+    // FOOTER-GLOBAL-2026-10-24 — footer PV compartido en TODAS las páginas
+    // públicas: clase nueva + CSS nuevo + home.php/kernel/main (ya estaban:
+    // líneas 726 / 793 / 643). Lección #177: la whitelist es inventario vivo.
+    'includes/frontend/class-ltms-pv-footer.php',
+    'assets/css/ltms-pv-footer.css',
+    'assets/css/ltms-pv-footer.min.css',
+    'tests/unit/PvFooterGlobalTest.php',
+    'tests/unit/HomeFooterTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

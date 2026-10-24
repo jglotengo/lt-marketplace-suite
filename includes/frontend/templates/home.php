@@ -341,21 +341,10 @@ $pv_hero_cards  = array_slice( $pv_hero_slides, 0, 2 ); // slides 2-3 → tarjet
 /**
  * Renderiza un icono SVG de red social.
  *
- * @param string $pv_key Clave del icono (instagram, facebook, tiktok, youtube, x).
- * @return string Markup SVG.
- */
-if ( ! function_exists( 'ltms_pv_social_icon' ) ) :
-function ltms_pv_social_icon( $pv_key ) {
-    $pv_icons = array(
-        'instagram' => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>',
-        'facebook'  => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>',
-        'tiktok'    => '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>',
-        'youtube'   => '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"/></svg>',
-        'x'         => '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
-    );
-    return isset( $pv_icons[ $pv_key ] ) ? $pv_icons[ $pv_key ] : '';
-}
-endif; // ltms_pv_social_icon
+ * FOOTER-GLOBAL-2026-10-24: el helper se movió al componente compartido
+ * LTMS_PV_Footer::social_icon() junto con el footer — la home ya no
+ * declara iconos (una sola fuente de verdad).
+ * ------------------------------------------------------------------------- */
 
 get_header();
 
@@ -901,93 +890,17 @@ do_action( 'ltms_before_home_plazaviva' );
 
     <?php
     /* =====================================================================
-     * FOOTER (HOME-UX2-005, 2026-10-02): puramente VISUAL — logo, redes
-     * reales, badges de pago y ©. TODO el texto de enlaces (Vende, Ayuda,
-     * Legal, Contacto) se organizó en la sección "Ayuda y políticas" del
-     * body. El footer del tema (Elementor) se oculta en la home vía CSS
-     * (bloque defensivo de abajo) para eliminar la redundancia de dos
-     * footers apilados con las mismas políticas/redes/pagos.
+     * FOOTER — FOOTER-GLOBAL-2026-10-24 (operador: "lleva el footer del
+     * home a todas las páginas públicas del proyecto"): el footer Plaza
+     * Viva (logo · redes reales · marcas de pagos/afiliaciones con filtro
+     * dark-mode · ©) ya NO se imprime aquí — vive en el componente
+     * compartido LTMS_PV_Footer (class-ltms-pv-footer.php + CSS
+     * assets/css/ltms-pv-footer.css) que el hook wp_footer inyecta en
+     * TODAS las páginas públicas, esta incluida. Una sola fuente de
+     * verdad (mismo patrón del header global REG-CHOICE-008).
      * =====================================================================
      */
     ?>
-    <footer class="pv-home-footer" role="contentinfo">
-        <div class="pv-section pv-home-footer__inner">
-
-            <?php /* --- Marca --- */
-            /* BRAND-2026-001 (brief): logo oficial en variante BLANCA — el footer
-             * es NEGRO (#000000, color de marca del brief) y el logo a color
-             * llevaría "TENGO" en rojo (invisible sobre negro). PNG 769x324 a
-             * 36px de altura = densidad 9x. */ ?>
-            <a class="pv-home-footer__logo" href="<?php echo esc_url( home_url( '/' ) ); ?>">
-                <img class="pv-home-footer__logo-img"
-                     src="<?php echo esc_url( ( defined( 'LTMS_ASSETS_URL' ) ? LTMS_ASSETS_URL : '' ) . 'img/logo-lo-tengo-white.png' ); ?>"
-                     alt="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>"
-                     width="85" height="36" />
-            </a>
-
-            <?php /* --- Redes reales del operador (HOME-UX2-005: antes eran
-                 * placeholders genéricos a instagram.com/facebook.com etc.) --- */ ?>
-            <ul class="pv-home-footer__social" aria-label="<?php esc_attr_e( 'Redes sociales', 'ltms' ); ?>">
-                <?php
-                $pv_socials = apply_filters( 'ltms_home_footer_socials', array(
-                    array( 'label' => 'Instagram', 'url' => 'https://www.instagram.com/lotengooficial/', 'icon' => 'instagram' ),
-                    array( 'label' => 'TikTok',    'url' => 'https://www.tiktok.com/@lotengocolombia', 'icon' => 'tiktok' ),
-                    array( 'label' => 'YouTube',   'url' => 'https://www.youtube.com/@lotengocolombia', 'icon' => 'youtube' ),
-                ) );
-                foreach ( $pv_socials as $pv_soc ) :
-                ?>
-                    <li>
-                        <a class="pv-home-footer__social-link" href="<?php echo esc_url( $pv_soc['url'] ); ?>" target="_blank" rel="noopener noreferrer" aria-label="<?php echo esc_attr( $pv_soc['label'] ); ?>">
-                            <?php echo ltms_pv_social_icon( $pv_soc['icon'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-                        </a>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-
-        <?php /* --- Pagos, donaciones y afiliaciones (HOME-UX3-002: las IMÁGENES
-             * reales que el footer del tema mostraba y se perdieron al ocultarlo
-             * — logos de métodos de pago incl. OpenPay, Fundación Cardioinfantil
-             * LaCardio, Cámara de Comercio de Cali y Cámara Colombiana de
-             * Comercio Electrónico. Mismos assets del footer Elementor) +
-             * selector de moneda (solo si multi-moneda activa). --- */ ?>
-        <div class="pv-section pv-home-footer__payrow">
-            <ul class="pv-home-footer__brands" aria-label="<?php esc_attr_e( 'Pagos seguros, donaciones y afiliaciones', 'ltms' ); ?>">
-                <?php
-                /* FOOTER-BRANDS-2026-10-23: srcs a los ORIGINALES full-size
-                 * (640x360 / 480x178) — a los tamaños de render nuevos (hasta
-                 * 320px CSS) las variantes -300x salían blurry en retina 2x.
-                 * width/height explícitos: CLS 0 + aspect-ratio intrínseco. */
-                $pv_footer_brands = apply_filters( 'ltms_home_footer_brands', array(
-                    array( 'src' => '/wp-content/uploads/2025/10/logos-footer-4.png', 'alt' => __( 'Pagos seguros: PSE, Nequi, Daviplata, Visa, Mastercard, Amex, OpenPay', 'ltms' ), 'width' => 640, 'height' => 360 ),
-                    array( 'src' => '/wp-content/uploads/2026/09/logo-lacardio.png',  'alt' => __( 'Fundación Cardioinfantil LaCardio', 'ltms' ), 'width' => 480, 'height' => 178 ),
-                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-1.png',    'alt' => __( 'Cámara de Comercio de Cali — La CCC', 'ltms' ), 'width' => 640, 'height' => 360 ),
-                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-2.png',    'alt' => __( 'Cámara Colombiana de Comercio Electrónico', 'ltms' ), 'width' => 640, 'height' => 360 ),
-                ) );
-                foreach ( $pv_footer_brands as $pv_brand ) :
-                ?>
-                    <li class="pv-home-footer__brand-item">
-                        <img src="<?php echo esc_url( home_url( $pv_brand['src'] ) ); ?>" alt="<?php echo esc_attr( $pv_brand['alt'] ); ?>" width="<?php echo absint( $pv_brand['width'] ); ?>" height="<?php echo absint( $pv_brand['height'] ); ?>" loading="lazy" decoding="async" />
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-            <?php
-            /* HOME-REDESIGN-006: selector de moneda solo si ya existe soporte
-               multi-moneda (brief). El widget canónico del checkout reutilizado
-               — hace bail defensivo si el motor cross-border no está cargado o
-               no hay monedas habilitadas (renderiza nada). */
-            if ( class_exists( 'LTMS_Currency_Manager' ) && method_exists( 'LTMS_Currency_Manager', 'render_currency_selector' ) ) {
-                LTMS_Currency_Manager::render_currency_selector();
-            }
-            ?>
-        </div>
-
-        <div class="pv-home-footer__bottom">
-            <div class="pv-section pv-home-footer__bottom-inner">
-                <span>&copy; <?php echo esc_html( date_i18n( 'Y' ) ); ?> <?php echo esc_html( get_bloginfo( 'name' ) ); ?>. <?php esc_html_e( 'Todos los derechos reservados.', 'ltms' ); ?></span>
-            </div>
-        </div>
-    </footer><!-- /.pv-home-footer -->
 
 </div><!-- /.pv-scope.pv-home -->
 
@@ -1049,18 +962,13 @@ body.pv-home-native{font-size:16px;}
    tiene su propio header con acciones de cuenta. Selectores precisos: NUNCA
    un bare `header` (matchearía .pv-home-header). Mismo patrón probado de la
    vitrina (class-ltms-vendor-storefront.php HEADER OVERLAP FIX).
-   HOME-UX2-005 (2026-10-02): también el FOOTER del tema (Elementor
-   location-footer) — la home ya tiene su propio footer visual; el del tema
-   apilaba políticas/redes/pagos duplicados. NUNCA un bare `footer`
-   (matchearía .pv-home-footer). */
+   FOOTER-GLOBAL-2026-10-24: la ocultación del FOOTER del tema se movió al
+   CSS del componente compartido (body.pv-pv-footer — cubre TODAS las
+   páginas públicas, esta incluida; ver assets/css/ltms-pv-footer.css). */
 body.pv-home-native #site-header,
 body.pv-home-native .site-header,
 body.pv-home-native #masthead,
 body.pv-home-native .elementor-location-header,
-body.pv-home-native .elementor-location-footer,
-body.pv-home-native footer[data-elementor-type="footer"],
-body.pv-home-native #colophon,
-body.pv-home-native .site-footer,
 body.pv-home-native .whb-header,
 body.pv-home-native .whb-sticky-header,
 body.pv-home-native .woodmart-header,
@@ -1478,76 +1386,11 @@ body.pv-home-native .ltms-header-access{display:none!important}
     .pv-scope.pv-home .pv-home-policies{grid-template-columns:repeat(4,1fr);}
 }
 
-/* ── FOOTER (HOME-UX2-005: puramente visual → BRAND-2026-001, 2026-10-15) ──
-    BRAND-2026-001 (brief): fondo NEGRO #000000 (color de marca del brief —
-    "footer negro"), texto blanco, hover dorado --ltms-gold. Las imágenes de
-    pagos/afiliaciones van DIRECTAS sobre el negro (FOOTER-BRANDS-2026-10-23:
-    chips blancos retirados; legibilidad vía filter invert+hue-rotate — ver
-    comentario en el bloque __brands de abajo). */
-.pv-scope.pv-home .pv-home-footer{
-    margin-top:56px;background:#000000;border-top:1px solid rgba(255,255,255,.14);
-}
-.pv-scope.pv-home .pv-home-footer__inner{
-    display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
-    padding-top:32px;padding-bottom:28px;
-}
-.pv-scope.pv-home .pv-home-footer__logo{
-    display:inline-flex;align-items:center;
-    text-decoration:none;
-}
-/* BRAND-2026-001: logo oficial (variante blanca, transparente) — 36px. */
-.pv-scope.pv-home .pv-home-footer__logo-img{height:36px;width:auto;display:block;}
-.pv-scope.pv-home .pv-home-footer__social{display:flex;gap:8px;}
-.pv-scope.pv-home .pv-home-footer__social-link{
-    width:40px;height:40px;border-radius:var(--r-md);
-    display:flex;align-items:center;justify-content:center;
-    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:#fff;
-    transition:background var(--t),color var(--t),border-color var(--t),transform var(--t);
-}
-.pv-scope.pv-home .pv-home-footer__social-link:hover{
-    background:var(--ltms-gold);color:#000;border-color:var(--ltms-gold);transform:translateY(-2px);
-}
-/* Fila de marcas (pagos/donaciones/afiliaciones — las imágenes reales del
-    operador) + selector de moneda (bajo la marca). HOME-UX3-002.
-    FOOTER-BRANDS-2026-10-23: chips blancos ELIMINADOS por pedido del
-    operador (fondo negro). Los 4 assets son PNG TRANSPARENTES de contenido
-    OSCURO (verificado por análisis de píxeles: LaCardio luminancia media 49,
-    CCCali 80, CCCE 74, medios de pago 100 — ilegibles sobre #000 sin
-    tratamiento). El filtro invert(1) hue-rotate(180deg) es el recipe
-    dark-mode estándar: invierte la luminosidad (oscuro→claro) y devuelve el
-    tono original (~180°), preservando formas y estructura interna de cada
-    logo. El tamaño pasa a ser ancho-driven (height:auto) → responsive real
-    sin deformar (aspect-ratio natural de cada asset). */
-.pv-scope.pv-home .pv-home-footer__payrow{
-    display:flex;flex-direction:column;gap:10px;
-    padding-top:24px;padding-bottom:32px;
-    border-top:1px solid rgba(255,255,255,.14);
-}
-.pv-scope.pv-home .pv-home-footer__brands{
-    display:flex;align-items:center;justify-content:center;
-    gap:20px;flex-wrap:wrap;list-style:none;margin:0;padding:0;
-}
-.pv-scope.pv-home .pv-home-footer__brand-item{
-    /* clamp: móvil ~150px legible → 30% en tablet → 320px cap en desktop
-       (4×320 + 3 gaps = 1340px ≡ ancho útil del contenedor .pv-section). */
-    width:clamp(150px,30%,320px);
-}
-.pv-scope.pv-home .pv-home-footer__brand-item img{
-    width:100%;height:auto;max-width:100%;display:block;
-    filter:invert(1) hue-rotate(180deg);
-}
-@media (max-width:560px){
-    .pv-scope.pv-home .pv-home-footer__brands{gap:14px;}
-    /* Grid 2×2: cada logo ocupa media fila — se leen sin esfuerzo. */
-    .pv-scope.pv-home .pv-home-footer__brand-item{width:calc(50% - 14px);}
-}
-/* Selector de moneda sobre fondo negro (label legible; el select es blanco). */
-.pv-scope.pv-home .pv-home-footer__payrow .ltms-currency-switcher__label{color:rgba(255,255,255,.7);}
-.pv-scope.pv-home .pv-home-footer__bottom{border-top:1px solid rgba(255,255,255,.14);}
-.pv-scope.pv-home .pv-home-footer__bottom-inner{
-    display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
-    padding-top:18px;padding-bottom:18px;font-size:12.5px;color:rgba(255,255,255,.66);
-}
+/* ── FOOTER — FOOTER-GLOBAL-2026-10-24: todas las reglas del footer viven
+    AHORA en el CSS del componente compartido (assets/css/ltms-pv-footer.css,
+    plano — el markup renderiza a nivel de body vía wp_footer). El bloque
+    defensivo de ocultación del footer del tema también se movió ahí, ahora
+    global vía body class pv-pv-footer. Nada del footer se scopea aquí. */
 
 /* ── RADIOS DE TARJETAS (HOME-REDESIGN-005) — al final del <style> para
    ganar sobre las reglas específicas de cada sección (cat-bar items, hero
@@ -1596,9 +1439,8 @@ body.pv-home-native .ltms-header-access{display:none!important}
     .pv-scope.pv-home .pv-home__hero-wrap{order:0;}
     .pv-scope.pv-home .pv-home__vendors{order:5;}
 }
-@media (max-width:560px){
-    .pv-scope.pv-home .pv-home-footer__bottom-inner{flex-direction:column;align-items:center;}
-}
+/* FOOTER-GLOBAL-2026-10-24: la media query del footer (__bottom-inner en
+   móvil) se movió al CSS del componente compartido. */
 </style>
 
 <?php

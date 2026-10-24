@@ -41,6 +41,7 @@ final class HomeUxV3Test extends LTMS_Unit_Test_Case {
 	private string $js_path;
 	private string $css_path;
 	private string $plugin_path;
+	private string $pv_footer_component_path;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -50,6 +51,8 @@ final class HomeUxV3Test extends LTMS_Unit_Test_Case {
 		$this->js_path       = dirname( __DIR__, 2 ) . '/assets/js/ltms-plaza-viva.js';
 		$this->css_path      = dirname( __DIR__, 2 ) . '/assets/css/ltms-plaza-viva.css';
 		$this->plugin_path   = dirname( __DIR__, 2 ) . '/lt-marketplace-suite.php';
+		// FOOTER-GLOBAL-2026-10-24: el markup del footer vive en el componente.
+		$this->pv_footer_component_path = dirname( __DIR__, 2 ) . '/includes/frontend/class-ltms-pv-footer.php';
 	}
 
 	/**
@@ -179,9 +182,11 @@ final class HomeUxV3Test extends LTMS_Unit_Test_Case {
 	 * HOME-UX3-002: footer con las IMÁGENES reales de marca del operador
 	 * (pagos incl. OpenPay, LaCardio, CCC, CCCE) — los assets del footer del
 	 * tema que se perdieron al ocultarlo en HOME-UX2-005.
+	 * FOOTER-GLOBAL-2026-10-24: el markup vive en el componente compartido
+	 * LTMS_PV_Footer (inyectado vía wp_footer en TODAS las páginas públicas).
 	 */
 	public function test_005_footer_imagenes_de_marca_restauradas(): void {
-		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
+		$src = $this->strip_php_comments( file_get_contents( $this->pv_footer_component_path ) );
 
 		$this->assertStringContainsString( 'pv-home-footer__brands', $src, 'HOME-UX3-002: debe existir la fila de marcas del footer.' );
 		// FOOTER-BRANDS-2026-10-23: srcs a los ORIGINALES full-size (las
