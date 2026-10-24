@@ -724,6 +724,12 @@ $files = [
     'includes/frontend/class-ltms-native-templates.php',
     'includes/frontend/templates/single-product.php',
     'includes/frontend/templates/home.php',
+    // FOOTER-BRANDS-2026-10-23: logos del footer a fondo negro + responsive.
+    // Los 2 tests actualizados (chip blanco → filter invert+hue-rotate) deben
+    // viajar con home.php o el server queda con tests viejos que exigen
+    // background:#fff (lección #177: la whitelist es inventario vivo).
+    'tests/unit/HomeBrandingBriefTest.php',
+    'tests/unit/HomeUxV3Test.php',
     // HOME-SLIDER FIX (2026-09-08): carrusel de banners del home gestionado por LTMS
     // (reemplaza el widget Slides de Elementor). Clase + view admin + assets.
     'includes/frontend/class-ltms-frontend-home-slider.php',

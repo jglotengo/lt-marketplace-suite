@@ -954,16 +954,20 @@ do_action( 'ltms_before_home_plazaviva' );
         <div class="pv-section pv-home-footer__payrow">
             <ul class="pv-home-footer__brands" aria-label="<?php esc_attr_e( 'Pagos seguros, donaciones y afiliaciones', 'ltms' ); ?>">
                 <?php
+                /* FOOTER-BRANDS-2026-10-23: srcs a los ORIGINALES full-size
+                 * (640x360 / 480x178) — a los tamaños de render nuevos (hasta
+                 * 320px CSS) las variantes -300x salían blurry en retina 2x.
+                 * width/height explícitos: CLS 0 + aspect-ratio intrínseco. */
                 $pv_footer_brands = apply_filters( 'ltms_home_footer_brands', array(
-                    array( 'src' => '/wp-content/uploads/2025/10/logos-footer-4-300x169.png', 'alt' => __( 'Pagos seguros: PSE, Nequi, Daviplata, Visa, Mastercard, Amex, OpenPay', 'ltms' ) ),
-                    array( 'src' => '/wp-content/uploads/2026/09/logo-lacardio-300x111.png',  'alt' => __( 'Fundación Cardioinfantil LaCardio', 'ltms' ) ),
-                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-1-300x169.png',    'alt' => __( 'Cámara de Comercio de Cali — La CCC', 'ltms' ) ),
-                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-2-300x169.png',    'alt' => __( 'Cámara Colombiana de Comercio Electrónico', 'ltms' ) ),
+                    array( 'src' => '/wp-content/uploads/2025/10/logos-footer-4.png', 'alt' => __( 'Pagos seguros: PSE, Nequi, Daviplata, Visa, Mastercard, Amex, OpenPay', 'ltms' ), 'width' => 640, 'height' => 360 ),
+                    array( 'src' => '/wp-content/uploads/2026/09/logo-lacardio.png',  'alt' => __( 'Fundación Cardioinfantil LaCardio', 'ltms' ), 'width' => 480, 'height' => 178 ),
+                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-1.png',    'alt' => __( 'Cámara de Comercio de Cali — La CCC', 'ltms' ), 'width' => 640, 'height' => 360 ),
+                    array( 'src' => '/wp-content/uploads/2025/10/logo-foot-2.png',    'alt' => __( 'Cámara Colombiana de Comercio Electrónico', 'ltms' ), 'width' => 640, 'height' => 360 ),
                 ) );
                 foreach ( $pv_footer_brands as $pv_brand ) :
                 ?>
                     <li class="pv-home-footer__brand-item">
-                        <img src="<?php echo esc_url( home_url( $pv_brand['src'] ) ); ?>" alt="<?php echo esc_attr( $pv_brand['alt'] ); ?>" loading="lazy" decoding="async" />
+                        <img src="<?php echo esc_url( home_url( $pv_brand['src'] ) ); ?>" alt="<?php echo esc_attr( $pv_brand['alt'] ); ?>" width="<?php echo absint( $pv_brand['width'] ); ?>" height="<?php echo absint( $pv_brand['height'] ); ?>" loading="lazy" decoding="async" />
                     </li>
                 <?php endforeach; ?>
             </ul>
@@ -1477,8 +1481,9 @@ body.pv-home-native .ltms-header-access{display:none!important}
 /* ── FOOTER (HOME-UX2-005: puramente visual → BRAND-2026-001, 2026-10-15) ──
     BRAND-2026-001 (brief): fondo NEGRO #000000 (color de marca del brief —
     "footer negro"), texto blanco, hover dorado --ltms-gold. Las imágenes de
-    pagos/afiliaciones viajan sobre chips blancos redondeados (los assets del
-    operador tienen fondo claro — el chip los hace intencionales sobre negro). */
+    pagos/afiliaciones van DIRECTAS sobre el negro (FOOTER-BRANDS-2026-10-23:
+    chips blancos retirados; legibilidad vía filter invert+hue-rotate — ver
+    comentario en el bloque __brands de abajo). */
 .pv-scope.pv-home .pv-home-footer{
     margin-top:56px;background:#000000;border-top:1px solid rgba(255,255,255,.14);
 }
@@ -1503,8 +1508,16 @@ body.pv-home-native .ltms-header-access{display:none!important}
     background:var(--ltms-gold);color:#000;border-color:var(--ltms-gold);transform:translateY(-2px);
 }
 /* Fila de marcas (pagos/donaciones/afiliaciones — las imágenes reales del
-   operador) + selector de moneda (bajo la marca). HOME-UX3-002.
-   BRAND-2026-001: chips blancos sobre el footer negro. */
+    operador) + selector de moneda (bajo la marca). HOME-UX3-002.
+    FOOTER-BRANDS-2026-10-23: chips blancos ELIMINADOS por pedido del
+    operador (fondo negro). Los 4 assets son PNG TRANSPARENTES de contenido
+    OSCURO (verificado por análisis de píxeles: LaCardio luminancia media 49,
+    CCCali 80, CCCE 74, medios de pago 100 — ilegibles sobre #000 sin
+    tratamiento). El filtro invert(1) hue-rotate(180deg) es el recipe
+    dark-mode estándar: invierte la luminosidad (oscuro→claro) y devuelve el
+    tono original (~180°), preservando formas y estructura interna de cada
+    logo. El tamaño pasa a ser ancho-driven (height:auto) → responsive real
+    sin deformar (aspect-ratio natural de cada asset). */
 .pv-scope.pv-home .pv-home-footer__payrow{
     display:flex;flex-direction:column;gap:10px;
     padding-top:24px;padding-bottom:32px;
@@ -1512,15 +1525,21 @@ body.pv-home-native .ltms-header-access{display:none!important}
 }
 .pv-scope.pv-home .pv-home-footer__brands{
     display:flex;align-items:center;justify-content:center;
-    gap:18px;flex-wrap:wrap;list-style:none;margin:0;padding:0;
+    gap:20px;flex-wrap:wrap;list-style:none;margin:0;padding:0;
+}
+.pv-scope.pv-home .pv-home-footer__brand-item{
+    /* clamp: móvil ~150px legible → 30% en tablet → 320px cap en desktop
+       (4×320 + 3 gaps = 1340px ≡ ancho útil del contenedor .pv-section). */
+    width:clamp(150px,30%,320px);
 }
 .pv-scope.pv-home .pv-home-footer__brand-item img{
-    height:56px;width:auto;max-width:190px;object-fit:contain;display:block;
-    background:#fff;border-radius:8px;padding:6px 10px;
+    width:100%;height:auto;max-width:100%;display:block;
+    filter:invert(1) hue-rotate(180deg);
 }
 @media (max-width:560px){
-    .pv-scope.pv-home .pv-home-footer__brands{gap:12px;}
-    .pv-scope.pv-home .pv-home-footer__brand-item img{height:44px;max-width:150px;}
+    .pv-scope.pv-home .pv-home-footer__brands{gap:14px;}
+    /* Grid 2×2: cada logo ocupa media fila — se leen sin esfuerzo. */
+    .pv-scope.pv-home .pv-home-footer__brand-item{width:calc(50% - 14px);}
 }
 /* Selector de moneda sobre fondo negro (label legible; el select es blanco). */
 .pv-scope.pv-home .pv-home-footer__payrow .ltms-currency-switcher__label{color:rgba(255,255,255,.7);}

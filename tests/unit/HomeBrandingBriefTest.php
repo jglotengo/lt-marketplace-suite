@@ -231,7 +231,9 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 	/**
 	 * BRAND-2026-001-G: footer NEGRO de marca (#000000, brief: "footer
 	 * negro") — texto blanco, hover dorado --ltms-gold, imágenes de
-	 * pagos/afiliaciones sobre chips blancos y © en blanco atenuado.
+	 * pagos/afiliaciones DIRECTAS sobre el negro (FOOTER-BRANDS-2026-10-23:
+	 * chips blancos retirados; los PNG transparentes de contenido oscuro se
+	 * vuelven legibles vía filter invert+hue-rotate) y © en blanco atenuado.
 	 */
 	public function test_007_footer_negro_de_marca(): void {
 		$src = file_get_contents( $this->home_path );
@@ -247,10 +249,32 @@ final class HomeBrandingBriefTest extends LTMS_Unit_Test_Case {
 			'BRAND-2026-001-G: el hover de las redes debe ser dorado --ltms-gold con icono negro (acento de marca).'
 		);
 		$this->assertMatchesRegularExpression(
-			"/\.pv-scope\.pv-home \.pv-home-footer__brand-item img\{[^}]*background:#fff;[^}]*border-radius:8px;/s",
+			"/\.pv-scope\.pv-home \.pv-home-footer__brand-item img\{[^}]*filter:invert\(1\) hue-rotate\(180deg\);/s",
 			$src,
-			'BRAND-2026-001-G: las imágenes de pagos/afiliaciones viajan sobre chips blancos redondeados (assets de fondo claro sobre footer negro).'
+			'FOOTER-BRANDS-2026-10-23: los logos (PNG transparentes oscuros) viajan directos sobre el footer negro con el filtro dark-mode invert+hue-rotate para ser legibles sin esfuerzo.'
 		);
+		$this->assertDoesNotMatchRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-home-footer__brand-item img\{[^}]*background:#fff;/s",
+			$src,
+			'FOOTER-BRANDS-2026-10-23: el chip blanco fue ELIMINADO (pedido del operador: fondo negro).'
+		);
+		$this->assertMatchesRegularExpression(
+			"/\.pv-scope\.pv-home \.pv-home-footer__brand-item\{[^}]*width:clamp\(150px,30%,320px\);/s",
+			$src,
+			'FOOTER-BRANDS-2026-10-23: el tamaño de los logos es ancho-driven responsive (clamp 150px→320px).'
+		);
+		$this->assertMatchesRegularExpression(
+			"/@media \(max-width:560px\)\{[^}]*\}[^@]*\.pv-scope\.pv-home \.pv-home-footer__brand-item\{width:calc\(50% - 14px\);\}/s",
+			$src,
+			'FOOTER-BRANDS-2026-10-23: en móvil los logos ocupan media fila cada uno (grid 2×2 legible).'
+		);
+		// Whitelist del deploy webhook (lección #177: inventario vivo) — el fix
+		// viaja con sus tests o el webhook fallback deja tests viejos que
+		// exigen background:#fff contra un home.php nuevo.
+		$webhook = (string) file_get_contents( dirname( __DIR__, 2 ) . '/deploy/ltms-deploy-webhook.php' );
+		$this->assertStringContainsString( "'tests/unit/HomeBrandingBriefTest.php',", $webhook, 'FOOTER-BRANDS-2026-10-23: el test de branding debe estar en la whitelist del webhook (lección #177).' );
+		$this->assertStringContainsString( "'tests/unit/HomeUxV3Test.php',", $webhook, 'FOOTER-BRANDS-2026-10-23: el test de UX3 debe estar en la whitelist del webhook (lección #177).' );
+		$this->assertStringContainsString( "'includes/frontend/templates/home.php',", $webhook, 'FOOTER-BRANDS-2026-10-23: home.php debe seguir en la whitelist del webhook.' );
 		$this->assertMatchesRegularExpression(
 			"/\.pv-scope\.pv-home \.pv-home-footer__bottom-inner\{[^}]*color:rgba\(255,255,255,\.66\);/s",
 			$src,

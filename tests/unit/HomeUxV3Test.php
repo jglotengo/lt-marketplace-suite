@@ -184,11 +184,13 @@ final class HomeUxV3Test extends LTMS_Unit_Test_Case {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
 		$this->assertStringContainsString( 'pv-home-footer__brands', $src, 'HOME-UX3-002: debe existir la fila de marcas del footer.' );
+		// FOOTER-BRANDS-2026-10-23: srcs a los ORIGINALES full-size (las
+		// variantes -300x salían blurry a los tamaños de render nuevos).
 		foreach ( array(
-			'logos-footer-4-300x169.png' => 'logos de métodos de pago (PSE/Nequi/Daviplata/Visa/Mastercard/Amex/OpenPay)',
-			'logo-lacardio-300x111.png'  => 'Fundación Cardioinfantil LaCardio (donaciones)',
-			'logo-foot-1-300x169.png'    => 'Cámara de Comercio de Cali — La CCC',
-			'logo-foot-2-300x169.png'    => 'Cámara Colombiana de Comercio Electrónico',
+			'logos-footer-4.png' => 'logos de métodos de pago (PSE/Nequi/Daviplata/Visa/Mastercard/Amex/OpenPay)',
+			'logo-lacardio.png'  => 'Fundación Cardioinfantil LaCardio (donaciones)',
+			'logo-foot-1.png'    => 'Cámara de Comercio de Cali — La CCC',
+			'logo-foot-2.png'    => 'Cámara Colombiana de Comercio Electrónico',
 		) as $file => $why ) {
 			$this->assertStringContainsString(
 				$file,
