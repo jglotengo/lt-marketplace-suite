@@ -111,7 +111,10 @@ final class ServicePagesPqrsTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * SERVICE-PAGES-C: LTMS_Native_Templates::service_page_url() — resolución
-	 * por ID real (publish) con fallback; única fuente de verdad.
+	 * por ID real (publish) con fallback; única fuente de verdad. Además, los
+	 * templates nativos de ayuda/seguimiento deben servirse TAMBIÉN con
+	 * Elementor activo (hallazgo del deploy: las ramas vivían solo en el
+	 * camino sin Elementor — inalcanzable en producción).
 	 */
 	public function test_003_service_page_url_en_native_templates(): void {
 		$this->assertFileExists( $this->native_templates_path );
@@ -120,6 +123,17 @@ final class ServicePagesPqrsTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'public static function service_page_url( string $key, string $fallback ): string', $src, 'SERVICE-PAGES-C: el método estático debe existir en LTMS_Native_Templates (fuente única).' );
 		$this->assertStringContainsString( "'publish' === get_post_status( \$page_id )", $src, 'SERVICE-PAGES-C: solo resuelve páginas publicadas (no borradores/papelera).' );
 		$this->assertStringContainsString( 'return $fallback;', $src, 'SERVICE-PAGES-C: cae al fallback si no hay página registrada.' );
+
+		// Las ramas de Elementor: extraer el bloque de la rama Elementor y
+		// verificar que is_help_page/is_order_tracking_page están DENTRO
+		// (antes de "return $template;" que cierra esa rama).
+		if ( preg_match( '/did_action\( \'elementor\/loaded\' \) \) \{(.*?)return \$template;/s', $src, $m ) ) {
+			$elementor_branch = $m[1];
+			$this->assertStringContainsString( 'is_help_page()', $elementor_branch, 'SERVICE-PAGES-C: el template help-center.php debe servirse con Elementor activo (producción) — no solo en el camino sin Elementor.' );
+			$this->assertStringContainsString( 'is_order_tracking_page()', $elementor_branch, 'SERVICE-PAGES-C: el template order-tracking.php debe servirse con Elementor activo (producción).' );
+		} else {
+			$this->fail( 'SERVICE-PAGES-C: no se encontró la rama Elementor de maybe_override para verificar el wiring de ayuda/seguimiento.' );
+		}
 	}
 
 	/**

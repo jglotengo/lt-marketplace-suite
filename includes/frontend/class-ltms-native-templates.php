@@ -295,6 +295,29 @@ class LTMS_Native_Templates {
                 }
             }
 
+            /* SERVICE-PAGES-PQRS-2026-10-24: centro de ayuda y seguimiento
+             * nativos TAMBIÉN con Elementor activo. Misma clase segura que
+             * mi cuenta: páginas singulares detectadas por slug vía
+             * is_page() (condicional básico de WP, sin query setup de WC —
+             * el fatal histórico de Elementor era exclusivo de los archivos
+             * de shop/categoría/tag). Antes de este fix las ramas
+             * is_help_page()/is_order_tracking_page() vivían solo en el
+             * camino sin Elementor (inalcanzable en producción): las
+             * páginas /ayuda/ y /seguimiento/ recién creadas renderizaban
+             * el page.php genérico del tema sin el design system PV. */
+            if ( self::is_help_page() ) {
+                $native = self::$template_dir . 'help-center.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+            if ( self::is_order_tracking_page() ) {
+                $native = self::$template_dir . 'order-tracking.php';
+                if ( file_exists( $native ) ) {
+                    return $native;
+                }
+            }
+
             // DEAD-CODE FIX (2026-09-10): la rama vendor-store.php (design system
             // Plaza Viva) fue eliminada — is_vendor_store_page() era siempre false
             // (CPT 'ltms_vendor_store' nunca registrado, query var 'ltms_page'
