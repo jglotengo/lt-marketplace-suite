@@ -935,6 +935,10 @@ $files = [
     'includes/frontend/class-ltms-amazon-enhancements.php',
     'includes/frontend/class-ltms-quick-view.php',
     'tests/unit/ProductImagesContainTest.php',
+    // PROD-IMG-FIT-2026-10-24 fase 2 (file-level, decidido por el operador):
+    // woocommerce_thumbnail sin recorte a nivel de archivo + regeneración.
+    'deploy/ltms-wc-uncrop-thumbs-2026-10-24.php',
+    'tests/unit/WcUncropThumbsTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
