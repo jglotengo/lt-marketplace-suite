@@ -87,11 +87,10 @@ define( 'LTMS_LOADED', true );
 // CSS inline de la home (grid categorías minmax 3-col, banner natural, chips
 // fila única), plaza-viva.js regenerado (initChipsFade) y assets nuevos de la
 // barra global de categorías (ltms-catbar.css/js).
-// FOOTER-GLOBAL-2026-10-24: bump 2.9.428 → 2.9.429 — cache-busting del CSS
-// nuevo del footer compartido (ltms-pv-footer.css) en todas las páginas
-// públicas. El markup del footer dejó de viajar inline en la home y ahora
-// se inyecta vía wp_footer (LTMS_PV_Footer).
-define( 'LTMS_VERSION', '2.9.429' );
+// PROD-IMG-FIT-2026-10-24: bump 2.9.429 → 2.9.430 — cache-busting del CSS de
+// imágenes de producto (contain en 5 assets CSS: plaza-viva,
+// product-enhancements, cart, ux-enhancements, storefront).
+define( 'LTMS_VERSION', '2.9.430' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
