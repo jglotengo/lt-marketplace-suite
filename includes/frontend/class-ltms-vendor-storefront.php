@@ -120,12 +120,23 @@ class LTMS_Vendor_Storefront {
 
         $vendor = self::get_vendor_by_slug( $slug );
         if ( ! $vendor ) {
-            global $wp_query;
-            $wp_query->set_404();
-            status_header( 404 );
-            nocache_headers();
-            include get_404_template();
-            exit;
+            /* VITRINA-404-FIX-2026-10-24: vitrina no encontrada → dejar que el
+             * flujo 404 NATIVO de WordPress renderice (el template-loader
+             * resuelve la jerarquía completa: 404.php → index.php → Elementor
+             * Theme Builder 404). WP::main()->handle_404() ya marcó is_404 y
+             * send_headers() ya envió el status 404 ANTES de este hook
+             * 'template_redirect' (ver comentario de abajo).
+             *
+             * ANES (bug P0, hallado en producción): este branch hacía include
+             * directo de get_404_template(), pero hello-elementor NO trae
+             * 404.php → get_404_template() devuelve '' → include '' lanza
+             * "ValueError: Path cannot be empty" en PHP 8 → fatal silencioso
+             * HTTP 500 con 0 bytes y sin traza en error_log. Reproducible en
+             * CUALQUIER slug desconocido (/vendedor/{no-existe}/) y en los
+             * slugs huérfanos (usuarios sin rol ltms_vendor que conservan la
+             * meta ltms_store_slug — ej. user #15 'juan-guillermo', la cuenta
+             * admin de pruebas con roles vacíos). */
+            return;
         }
 
         // WordPress ya marcó esta respuesta como 404 dentro de WP::main()

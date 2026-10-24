@@ -908,6 +908,10 @@ $files = [
     'assets/css/ltms-pv-footer.min.css',
     'tests/unit/PvFooterGlobalTest.php',
     'tests/unit/HomeFooterTest.php',
+    // VITRINA-404-FIX-2026-10-24 — 500 silencioso en /vendedor/{slug}/
+    // desconocido (include '' → ValueError PHP 8). La clase ya estaba
+    // (línea de storefront, más arriba); falta el test nuevo (lección #177).
+    'tests/unit/Vitrina404FixTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
