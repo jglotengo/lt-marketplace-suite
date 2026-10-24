@@ -919,6 +919,12 @@ $files = [
     // ya estaban en la whitelist (lección #177).
     'deploy/ltms-publish-service-pages-2026-10-24.php',
     'tests/unit/ServicePagesPqrsTest.php',
+    // LEGAL-TITLES-FIX-2026-10-24 — títulos duplicados (H1 ×2) en Términos y
+    // Privacidad: el contenido del activator llevaba <h1> propio y el tema
+    // también renderiza post_title. Fuente (activator) + fixer de datos.
+    'includes/core/services/class-ltms-activator.php',
+    'deploy/ltms-fix-legal-titles-2026-10-24.php',
+    'tests/unit/LegalTitlesFixTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
