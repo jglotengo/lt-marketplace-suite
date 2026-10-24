@@ -280,6 +280,23 @@ do_action( 'ltms_before_help_center_plazaviva' );
                     <?php echo esc_html( $pv_whatsapp_number ); ?>
                 </a>
             </article>
+
+            <?php /* PQRS — SERVICE-PAGES-PQRS-2026-10-24: canal de Peticiones,
+                   * Quejas, Reclamos y Sugerencias visible (Estatuto del
+                   * Consumidor, Ley 1480/2011 art. 27 — respuesta de fondo en
+                   * máximo 15 días hábiles). */ ?>
+            <article class="pv-card pv-help__channel">
+                <span class="pv-help__channel-icon pv-help__channel-icon--brand" aria-hidden="true">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="9" y1="10" x2="15" y2="10"/></svg>
+                </span>
+                <h3 class="pv-help__channel-title"><?php esc_html_e( 'PQRS', 'ltms' ); ?></h3>
+                <p class="pv-help__channel-desc"><?php esc_html_e( 'Peticiones, quejas, reclamos y sugerencias. Respuesta de fondo en máximo 15 días hábiles (Ley 1480, art. 27).', 'ltms' ); ?></p>
+                <?php /* Página /pqrs/ si está registrada; fallback al correo del canal. */ ?>
+                <a class="pv-btn pv-btn--block pv-help__channel-cta"
+                   href="<?php echo esc_url( LTMS_Native_Templates::service_page_url( 'ltms-pqrs', 'mailto:pqrscolombia@lo-tengo.com.co' ) ); ?>">
+                    <?php esc_html_e( 'Radica tu PQRS', 'ltms' ); ?>
+                </a>
+            </article>
         </div>
     </section>
 

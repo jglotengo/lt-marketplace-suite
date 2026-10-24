@@ -940,16 +940,19 @@ final class PlazaVivaDesignSystemAuditTest extends LTMS_Unit_Test_Case {
 		$this->assertFileExists( $this->css_path );
 		$css = file_get_contents( $this->css_path );
 
-		// (1) Grids 3-col para quick links y canales.
+		// (1) Grids 3-col para quick links; canales auto-fit.
 		$this->assertMatchesRegularExpression(
 			'/__quick-grid\s*\{[^}]*grid-template-columns:repeat\(3,1fr\)/s',
 			$css,
 			'UIUX2-D02 fix: quick-grid debe ser grid 3 columnas'
 		);
+		// SERVICE-PAGES-PQRS-2026-10-24 (lección #119): la fila de canales pasó
+		// de 3 fija a auto-fit minmax(240px,1fr) — la 4ª card (PQRS) fluye sin
+		// huérfanas; tablet 2×2, móvil 1 col (media query existente).
 		$this->assertMatchesRegularExpression(
-			'/__channels-grid\s*\{[^}]*grid-template-columns:repeat\(3,1fr\)/s',
+			'/__channels-grid\s*\{[^}]*grid-template-columns:repeat\(auto-fit,minmax\(240px,1fr\)\)/s',
 			$css,
-			'UIUX2-D02 fix: channels-grid debe ser grid 3 columnas'
+			'SERVICE-PAGES-PQRS-2026-10-24: channels-grid debe ser auto-fit (4 cards: chat, email, WhatsApp, PQRS)'
 		);
 
 		// (2) CTA final con gradiente de tokens.

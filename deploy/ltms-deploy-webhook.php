@@ -912,6 +912,13 @@ $files = [
     // desconocido (include '' → ValueError PHP 8). La clase ya estaba
     // (línea de storefront, más arriba); falta el test nuevo (lección #177).
     'tests/unit/Vitrina404FixTest.php',
+    // SERVICE-PAGES-PQRS-2026-10-24 — páginas de servicio (ayuda,
+    // seguimiento, PQRS, cookies, hábeas data) + enlaces legales de la
+    // home por ID real + card PQRS del help center. home.php,
+    // help-center.php, plaza-viva.css/min y class-ltms-native-templates.php
+    // ya estaban en la whitelist (lección #177).
+    'deploy/ltms-publish-service-pages-2026-10-24.php',
+    'tests/unit/ServicePagesPqrsTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

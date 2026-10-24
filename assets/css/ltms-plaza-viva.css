@@ -1460,8 +1460,10 @@ li.product.pv-enhanced:hover {
 .pv-scope.pv-help .pv-help__quick-card:hover .pv-help__quick-arrow{transform:translateX(3px);color:var(--primary);}
 
 .pv-scope.pv-help .pv-help__channels{padding-top:34px;}
+/* SERVICE-PAGES-PQRS-2026-10-24: auto-fit — la fila de canales pasa de 3
+   (chat/email/whatsapp) a 4 cards con PQRS; tablet 2×2, móvil 1 col. */
 .pv-scope.pv-help .pv-help__channels-grid{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;
 }
 .pv-scope.pv-help .pv-help__channel{
   padding:22px;display:flex;flex-direction:column;align-items:flex-start;gap:10px;
@@ -1473,6 +1475,9 @@ li.product.pv-enhanced:hover {
 .pv-scope.pv-help .pv-help__channel-icon--primary{background:var(--primary-50);color:var(--primary);}
 .pv-scope.pv-help .pv-help__channel-icon--gold{background:var(--gold-50);color:var(--gold-700);}
 .pv-scope.pv-help .pv-help__channel-icon--accent{background:var(--accent-50);color:var(--accent);}
+/* SERVICE-PAGES-PQRS-2026-10-24: variante del icono PQRS — color de marca
+   (--brand #E80001) sobre su tinte suave. */
+.pv-scope.pv-help .pv-help__channel-icon--brand{background:rgba(232,0,1,.10);color:var(--brand);}
 .pv-scope.pv-help .pv-help__channel-title{
   font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);margin:0;
 }

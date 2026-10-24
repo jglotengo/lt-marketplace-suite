@@ -344,6 +344,11 @@ $pv_hero_cards  = array_slice( $pv_hero_slides, 0, 2 ); // slides 2-3 → tarjet
  * FOOTER-GLOBAL-2026-10-24: el helper se movió al componente compartido
  * LTMS_PV_Footer::social_icon() junto con el footer — la home ya no
  * declara iconos (una sola fuente de verdad).
+ *
+ * SERVICE-PAGES-PQRS-2026-10-24: la resolución de URLs de páginas de
+ * servicio (legal/PQRS) por ID real vive en
+ * LTMS_Native_Templates::service_page_url() — compartida por home.php y
+ * help-center.php (una sola fuente de verdad).
  * ------------------------------------------------------------------------- */
 
 get_header();
@@ -862,11 +867,15 @@ do_action( 'ltms_before_home_plazaviva' );
                 <h3 class="pv-home-policies__title"><?php esc_html_e( 'Legal', 'ltms' ); ?></h3>
                 <ul class="pv-home-policies__links">
                     <?php
+                    /* SERVICE-PAGES-PQRS-2026-10-24: URLs resueltas por la
+                     * página REAL (ltms_installed_pages) con fallback al slug
+                     * hardcodeado — antes enlazaban a /terminos, /privacidad,
+                     * /cookies y /habeas-data que NO existen (404). */
                     $pv_legal_links = apply_filters( 'ltms_home_footer_legal_links', array(
-                        array( 'label' => __( 'Términos y condiciones', 'ltms' ), 'url' => home_url( '/terminos' ) ),
-                        array( 'label' => __( 'Política de privacidad', 'ltms' ), 'url' => home_url( '/privacidad' ) ),
-                        array( 'label' => __( 'Política de cookies', 'ltms' ), 'url' => home_url( '/cookies' ) ),
-                        array( 'label' => __( 'Tratamiento de datos', 'ltms' ), 'url' => home_url( '/habeas-data' ) ),
+                        array( 'label' => __( 'Términos y condiciones', 'ltms' ), 'url' => LTMS_Native_Templates::service_page_url( 'ltms-terms', home_url( '/terminos' ) ) ),
+                        array( 'label' => __( 'Política de privacidad', 'ltms' ), 'url' => LTMS_Native_Templates::service_page_url( 'ltms-privacy', home_url( '/privacidad' ) ) ),
+                        array( 'label' => __( 'Política de cookies', 'ltms' ), 'url' => LTMS_Native_Templates::service_page_url( 'ltms-cookies', home_url( '/cookies' ) ) ),
+                        array( 'label' => __( 'Tratamiento de datos', 'ltms' ), 'url' => LTMS_Native_Templates::service_page_url( 'ltms-habeas-data', home_url( '/habeas-data' ) ) ),
                     ) );
                     foreach ( $pv_legal_links as $pv_link ) :
                     ?>
@@ -877,6 +886,10 @@ do_action( 'ltms_before_home_plazaviva' );
             <div class="pv-home-policies__group">
                 <h3 class="pv-home-policies__title"><?php esc_html_e( 'Contacto', 'ltms' ); ?></h3>
                 <ul class="pv-home-policies__links">
+                    <?php /* SERVICE-PAGES-PQRS-2026-10-24: canal PQRS visible
+                           * (Estatuto del Consumidor art. 27) — página /pqrs/
+                           * con fallback al correo del canal. */ ?>
+                    <li><a href="<?php echo esc_url( LTMS_Native_Templates::service_page_url( 'ltms-pqrs', 'mailto:pqrscolombia@lo-tengo.com.co' ) ); ?>"><?php esc_html_e( 'PQRS — peticiones, quejas y reclamos', 'ltms' ); ?></a></li>
                     <li><a href="mailto:dircomercialcol@lo-tengo.com.co">dircomercialcol@lo-tengo.com.co</a></li>
                     <li><a href="mailto:sellerscolombia@lo-tengo.com.co">sellerscolombia@lo-tengo.com.co</a></li>
                     <li><a href="tel:+5753014106251"><?php esc_html_e( '057 301 410 6251', 'ltms' ); ?></a></li>

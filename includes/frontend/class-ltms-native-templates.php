@@ -980,6 +980,35 @@ class LTMS_Native_Templates {
     }
 
     /**
+     * Resuelve la URL de una página de servicio por su key en la opción
+     * ltms_installed_pages (fuente de verdad de las páginas reales), con
+     * fallback a la URL de emergencia si no hay página registrada.
+     *
+     * SERVICE-PAGES-PQRS-2026-10-24: la sección "Legal" de la home enlazaba
+     * a slugs que no existen (/terminos, /privacidad, /cookies,
+     * /habeas-data → 404) y el canal PQRS no tenía entrada visible. Los
+     * templates (home.php, help-center.php) usan este método para enlazar
+     * a las páginas REALES (ltms-terms, ltms-privacy, ltms-cookies,
+     * ltms-habeas-data, ltms-pqrs), registradas por
+     * deploy/ltms-publish-service-pages-2026-10-24.php.
+     *
+     * @param string $key      Key en ltms_installed_pages (ej. ltms-terms).
+     * @param string $fallback URL de emergencia si no hay página registrada.
+     * @return string URL resuelta.
+     */
+    public static function service_page_url( string $key, string $fallback ): string {
+        $installed = get_option( 'ltms_installed_pages', array() );
+        $page_id   = ( is_array( $installed ) && ! empty( $installed[ $key ] ) ) ? (int) $installed[ $key ] : 0;
+        if ( $page_id && 'publish' === get_post_status( $page_id ) ) {
+            $permalink = get_permalink( $page_id );
+            if ( $permalink && ! is_wp_error( $permalink ) ) {
+                return $permalink;
+            }
+        }
+        return $fallback;
+    }
+
+    /**
      * Detecta si es la página de tracking de orden.
      */
     private static function is_order_tracking_page(): bool {
