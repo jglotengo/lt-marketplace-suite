@@ -313,7 +313,10 @@ class LTMS_Wishlist {
                         data-nonce="<?php echo esc_attr( wp_create_nonce( 'ltms_wishlist_' . $pid ) ); ?>"
                         style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:#dc2626;font-size:16px;">&times;</button>
                 <a href="<?php echo esc_url( $product->get_permalink() ); ?>">
-                    <?php echo $product->get_image( 'thumbnail', [ 'style' => 'width:100%;height:160px;object-fit:cover;border-radius:8px;' ] ); ?>
+                    <?php /* PROD-IMG-FIT-2026-10-24: caja 1:1 + contain — el
+                           * producto se ve COMPLETO (antes height:160px cover
+                           * en caja ancha recortaba arriba/abajo). */ ?>
+                    <?php echo $product->get_image( 'woocommerce_thumbnail', [ 'style' => 'width:100%;aspect-ratio:1/1;object-fit:contain;padding:8px;background:#f8f8f8;border-radius:8px;display:block;' ] ); ?>
                 </a>
                 <div style="font-size:13px;font-weight:600;margin:8px 0 4px;line-height:1.3;">
                     <a href="<?php echo esc_url( $product->get_permalink() ); ?>" style="color:#1f2937;text-decoration:none;">

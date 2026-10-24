@@ -259,7 +259,8 @@ class LTMS_Amazon_Enhancements {
                 ?>
                     <div class="ltms-addon-item" style="text-align:center;padding:10px;border:1px solid #f3f4f6;border-radius:8px;transition:all 0.2s;">
                         <a href="<?php echo esc_url( $addon->get_permalink() ); ?>" style="text-decoration:none;">
-                            <?php echo $addon->get_image( 'thumbnail', [ 'style' => 'width:100%;height:80px;object-fit:cover;border-radius:6px;' ] ); ?>
+                            <?php /* PROD-IMG-FIT-2026-10-24: contain — producto COMPLETO. */ ?>
+                            <?php echo $addon->get_image( 'thumbnail', [ 'style' => 'width:100%;height:80px;object-fit:contain;padding:4px;background:#f8f8f8;border-radius:6px;' ] ); ?>
                         </a>
                         <div style="font-size:11px;margin:6px 0 2px;line-height:1.3;">
                             <a href="<?php echo esc_url( $addon->get_permalink() ); ?>" style="color:#374151;text-decoration:none;">
@@ -427,7 +428,8 @@ class LTMS_Amazon_Enhancements {
                                 data-nonce="<?php echo esc_attr( wp_create_nonce( 'ltms_remove_browsing' ) ); ?>"
                                 style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,0.95);border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;color:#6b7280;z-index:2;line-height:1;">&times;</button>
                         <a href="<?php echo esc_url( $p->get_permalink() ); ?>" style="text-decoration:none;display:block;overflow:hidden;">
-                            <?php echo $p->get_image( 'thumbnail', [ 'style' => 'width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;display:block;margin:0 auto;' ] ); ?>
+                            <?php /* PROD-IMG-FIT-2026-10-24: contain — producto COMPLETO. */ ?>
+                            <?php echo $p->get_image( 'thumbnail', [ 'style' => 'width:120px;height:120px;object-fit:contain;padding:6px;background:#f8f8f8;border-radius:8px;border:1px solid #e5e7eb;display:block;margin:0 auto;' ] ); ?>
                             <div style="font-size:11px;margin:6px 4px 2px;line-height:1.3;color:#374151;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;overflow-wrap:anywhere;min-width:0;">
                                 <?php echo esc_html( wp_trim_words( $p->get_name(), 5 ) ); ?>
                             </div>

@@ -9292,9 +9292,11 @@ kbd {
 }
 
 .ltms-compare-bar-item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+width: 100%;
+height: 100%;
+object-fit: contain;
+padding: 2px;
+background: var(--ltms-gray-100);
 }
 
 .ltms-compare-bar-remove {
@@ -9399,7 +9401,7 @@ kbd {
 .ltms-compare-product-img img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .ltms-compare-product-name {

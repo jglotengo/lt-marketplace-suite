@@ -94,12 +94,15 @@
     padding: 12px 0;
     border-bottom: 1px solid #f3f4f6;
 }
+/* PROD-IMG-FIT-2026-10-24: contain — producto COMPLETO (patrón vitrina) */
 .ltms-drawer-item__img img {
-    width: 64px;
-    height: 64px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
+width: 64px;
+height: 64px;
+object-fit: contain;
+padding: 4px;
+background: #f8f8f8;
+border-radius: 8px;
+border: 1px solid #e5e7eb;
 }
 .ltms-drawer-item__info { flex: 1; }
 .ltms-drawer-item__name {
@@ -205,11 +208,13 @@
     box-shadow: 0 12px 32px rgba(17, 24, 39, 0.1);
 }
 .ltms-drawer-upsell-card__img img {
-    width: 72px;
-    height: 72px;
-    border-radius: 12px;
-    object-fit: cover;
-    border: 1px solid #e5e7eb;
+width: 72px;
+height: 72px;
+border-radius: 12px;
+object-fit: contain;
+padding: 4px;
+background: #f8f8f8;
+border: 1px solid #e5e7eb;
 }
 .ltms-drawer-upsell-card__content { min-width: 0; }
 .ltms-drawer-upsell-card__name {
@@ -922,11 +927,13 @@
     scroll-snap-align: start;
 }
 .ltms-browsing-item img {
-    width: 120px;
-    height: 120px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
+width: 120px;
+height: 120px;
+object-fit: contain;
+padding: 6px;
+background: #f8f8f8;
+border-radius: 8px;
+border: 1px solid #e5e7eb;
 }
 .ltms-browsing-remove {
     position: absolute;
@@ -1221,10 +1228,12 @@
     transform: translateY(-2px);
 }
 .ltms-addon-item img {
-    width: 100% !important;
-    height: 90px !important;
-    object-fit: cover !important;
-    border-radius: 8px;
+width: 100% !important;
+height: 90px !important;
+object-fit: contain !important;
+padding: 4px !important;
+background: #f8f8f8 !important;
+border-radius: 8px;
 }
 .ltms-addon-item .ltms-addon-name {
     font-size: 12px;

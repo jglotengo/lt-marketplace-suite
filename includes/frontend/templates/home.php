@@ -1164,7 +1164,7 @@ body.pv-home-native .ltms-header-access{display:none!important}
     background:var(--bg-2);
     display:flex;align-items:center;justify-content:center;
 }
-.pv-scope.pv-home .pv-cat-bar__img{width:100%;height:100%;object-fit:cover;display:block;}
+.pv-scope.pv-home .pv-cat-bar__img{width:100%;height:100%;object-fit:contain;padding:6px;background:var(--surface);display:block;}
 /* HOME-UX5-002: el emoji queda SOLO como fallback sin imagen real. */
 .pv-scope.pv-home .pv-cat-bar__icon{font-size:30px;line-height:1;}
 .pv-scope.pv-home .pv-cat-bar__name{

@@ -251,11 +251,13 @@ final class HomeCategoriesBarTest extends LTMS_Unit_Test_Case {
 			'HOME-UX5-002: la URL debe ser el tamaño woocommerce_thumbnail (no la imagen full — payload).'
 		);
 
-		// CSS de la imagen: contenida y recortada (object-fit cover).
+		// CSS de la imagen: producto COMPLETO — PROD-IMG-FIT-2026-10-24
+		// (lección #119): antes se recortaba con cover; ahora contain +
+		// letterbox (mismo estándar de la vitrina para imágenes de producto).
 		$this->assertMatchesRegularExpression(
-			'/\.pv-scope\.pv-home \.pv-cat-bar__img\{[^}]*object-fit:cover;/s',
+			'/\.pv-scope\.pv-home \.pv-cat-bar__img\{[^}]*object-fit:contain;/s',
 			$src,
-			'HOME-UX5-002: la imagen debe recortarse con object-fit:cover dentro del wrap.'
+			'PROD-IMG-FIT-2026-10-24: la imagen del producto estrella de la categoría debe verse COMPLETA (contain + letterbox dentro del wrap).'
 		);
 	}
 

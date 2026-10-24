@@ -925,6 +925,16 @@ $files = [
     'includes/core/services/class-ltms-activator.php',
     'deploy/ltms-fix-legal-titles-2026-10-24.php',
     'tests/unit/LegalTitlesFixTest.php',
+    // PROD-IMG-FIT-2026-10-24 — imágenes de producto COMPLETAS (contain)
+    // en todo el marketplace: CSS + inline de 16 puntos de render + test.
+    // Los que ya estaban no se repiten (lección #177: inventario vivo).
+    'assets/css/ltms-cart.css',
+    'assets/css/ltms-cart.min.css',
+    'assets/css/ltms-storefront.css',
+    'assets/css/ltms-storefront.min.css',
+    'includes/frontend/class-ltms-amazon-enhancements.php',
+    'includes/frontend/class-ltms-quick-view.php',
+    'tests/unit/ProductImagesContainTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

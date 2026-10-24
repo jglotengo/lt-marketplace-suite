@@ -837,7 +837,7 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 .pv-scope.pv-product-page .pv-bundle__item-label{display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;}
 .pv-scope.pv-product-page .pv-bundle__check{width:18px;height:18px;accent-color:var(--primary);flex-shrink:0;}
 .pv-scope.pv-product-page .pv-bundle__thumb{width:54px;height:54px;flex-shrink:0;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;display:block;}
-.pv-scope.pv-product-page .pv-bundle__thumb img{width:100%;height:100%;object-fit:cover;}
+.pv-scope.pv-product-page .pv-bundle__thumb img{width:100%;height:100%;object-fit:contain;padding:4px;background:var(--bg);}
 .pv-scope.pv-product-page .pv-bundle__item-body{display:flex;flex-direction:column;min-width:0;}
 .pv-scope.pv-product-page .pv-bundle__item-name{font-weight:600;font-size:14px;}
 .pv-scope.pv-product-page .pv-bundle__item-price{font-size:13.5px;color:var(--primary);font-weight:700;}

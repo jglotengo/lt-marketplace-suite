@@ -80,7 +80,8 @@ class LTMS_Quick_View {
                 if ( ! empty( $gallery_ids ) ) : ?>
                     <div class="ltms-qv-thumbnails" style="display:flex;gap:6px;margin-top:8px;overflow-x:auto;">
                         <?php foreach ( array_slice( $gallery_ids, 0, 4 ) as $gid ) :
-                            echo wp_get_attachment_image( $gid, 'thumbnail', false, [ 'style' => 'width:60px;height:60px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e5e7eb;' ] );
+                            /* PROD-IMG-FIT-2026-10-24: contain — thumbs de galería sin recorte. */
+                            echo wp_get_attachment_image( $gid, 'thumbnail', false, [ 'style' => 'width:60px;height:60px;object-fit:contain;padding:2px;background:#f8f8f8;border-radius:6px;cursor:pointer;border:1px solid #e5e7eb;' ] );
                         endforeach; ?>
                     </div>
                 <?php endif; ?>

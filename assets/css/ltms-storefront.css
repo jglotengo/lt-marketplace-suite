@@ -1034,7 +1034,7 @@ body.ltms-storefront-filters-open {
 .ltms-sf-ac-item{display:flex;align-items:center;gap:10px;padding:10px 12px;text-decoration:none;color:#242424;border-bottom:1px solid #F3F4F6;cursor:pointer}
 .ltms-sf-ac-item:hover{background:#F9FAFB}
 .ltms-sf-ac-item:last-child{border-bottom:none}
-.ltms-sf-ac-img{width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0}
+.ltms-sf-ac-img{width:40px;height:40px;border-radius:6px;object-fit:contain;padding:2px;background:#F8F8F8;flex-shrink:0}
 .ltms-sf-ac-info{min-width:0;flex:1}
 .ltms-sf-ac-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ltms-sf-ac-price{font-size:12px;color:#E80001;font-weight:700}

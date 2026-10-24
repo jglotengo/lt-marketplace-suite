@@ -488,8 +488,11 @@
 .pv-product-card__media{
   position:relative;aspect-ratio:1/1;background:var(--bg);overflow:hidden;
 }
+/* PROD-IMG-FIT-2026-10-24: object-fit:contain en TODAS las imágenes de
+   producto — el producto se ve COMPLETO (patrón ya probado de la vitrina
+   .ltms-sf-img-main: caja 1:1 + contain + letterbox). cover recortaba. */
 .pv-product-card__media img{
-  width:100%;height:100%;object-fit:cover;
+  width:100%;height:100%;object-fit:contain;padding:8px;
   transition:transform .4s cubic-bezier(.4,0,.2,1);
 }
 .pv-product-card:hover .pv-product-card__media img{transform:scale(1.06);}
@@ -745,7 +748,7 @@
   transition:transform var(--t-slow);
 }
 .pv-sticky-atc.is-visible{transform:translateY(0);}
-.pv-sticky-atc__thumb{width:48px;height:48px;border-radius:var(--r-sm);object-fit:cover;border:1px solid var(--border);}
+.pv-sticky-atc__thumb{width:48px;height:48px;border-radius:var(--r-sm);object-fit:contain;padding:2px;background:var(--bg);border:1px solid var(--border);}
 .pv-sticky-atc__info{flex:1;min-width:0;}
 .pv-sticky-atc__title{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pv-sticky-atc__price{font-family:var(--display);font-weight:700;color:var(--primary);}
@@ -798,7 +801,7 @@
 .pv-modal__body{display:grid;grid-template-columns:1fr 1fr;overflow:hidden;flex:1;}
 .pv-modal__body.is-loading{position:relative;min-height:420px;}
 .pv-modal__media{background:var(--bg);}
-.pv-modal__media img{width:100%;height:100%;object-fit:cover;max-height:90vh;}
+.pv-modal__media img{width:100%;height:100%;object-fit:contain;padding:16px;max-height:90vh;}
 .pv-modal__content{padding:30px;overflow-y:auto;}
 
 /* Countdown */
@@ -1341,7 +1344,7 @@ li.product.pv-enhanced:hover {
   align-self:flex-start;max-width:100%;
 }
 .pv-scope.pv-vendor-store .pv-vendor-store__review-product:hover{border-color:var(--primary-100);background:var(--primary-50);}
-.pv-scope.pv-vendor-store .pv-vendor-store__review-product img{width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+.pv-scope.pv-vendor-store .pv-vendor-store__review-product img{width:40px;height:40px;object-fit:contain;padding:2px;background:var(--bg);border-radius:6px;flex-shrink:0;}
 .pv-scope.pv-vendor-store .pv-vendor-store__review-product span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
 /* Sobre nosotros + Políticas */
@@ -1765,7 +1768,7 @@ li.product.pv-enhanced:hover {
     width:56px;height:56px;border-radius:var(--r-sm);overflow:hidden;
     background:var(--bg);border:1px solid var(--border);
 }
-.pv-scope.pv-tracking .pv-order-summary__item-media img{width:100%;height:100%;object-fit:cover;}
+.pv-scope.pv-tracking .pv-order-summary__item-media img{width:100%;height:100%;object-fit:contain;padding:4px;}
 .pv-scope.pv-tracking .pv-order-summary__item-info{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .pv-scope.pv-tracking .pv-order-summary__item-name{
     font-family:var(--display);font-weight:600;font-size:13.5px;color:var(--text);
