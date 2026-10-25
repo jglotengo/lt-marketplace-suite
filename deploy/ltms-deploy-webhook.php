@@ -955,6 +955,11 @@ $files = [
     'assets/css/ltms-cart-drawer.css',
     'assets/css/ltms-cart-drawer.min.css',
     'tests/unit/UIUXBatchTest.php',
+    // UIUX-BATCH-2026-10-25c — el lema viaja EN LA IMAGEN del slide #1 del
+    // Home Slider (causa raíz del 3er reporte). Script de desactivación
+    // reversible + test (lección #177).
+    'deploy/ltms-deactivate-hero-lema-slide-2026-10-25.php',
+    'tests/unit/HeroLemaSlideTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
