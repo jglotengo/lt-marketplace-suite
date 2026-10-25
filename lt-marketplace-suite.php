@@ -87,10 +87,11 @@ define( 'LTMS_LOADED', true );
 // CSS inline de la home (grid categorías minmax 3-col, banner natural, chips
 // fila única), plaza-viva.js regenerado (initChipsFade) y assets nuevos de la
 // barra global de categorías (ltms-catbar.css/js).
-// PROD-IMG-FIT-2026-10-24: bump 2.9.429 → 2.9.430 — cache-busting del CSS de
-// imágenes de producto (contain en 5 assets CSS: plaza-viva,
-// product-enhancements, cart, ux-enhancements, storefront).
-define( 'LTMS_VERSION', '2.9.430' );
+// UIUX-BATCH-2026-10-25: bump 2.9.430 → 2.9.431 — cache-busting del lote de
+// fixes UIUX (plaza-viva.js sin lema del home + bundle a carrito, upsells
+// del minicart agregan directo, header PV en funnel auth, botones del
+// producto organizados).
+define( 'LTMS_VERSION', '2.9.431' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

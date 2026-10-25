@@ -890,42 +890,63 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
     .pv-scope.pv-product-page .pv-related ul.products{grid-template-columns:1fr;}
 }
 
-/* PDP-MOBILE-SPACING FIX (2026-09-12): en móvil los controles de compra del
-   form.cart —cantidad (± stepper), "Añadir al carrito", "Comprar ahora"
-   (.ltms-buy-now-btn inyectado por PV.injectBuyNow) y wishlist— se amontonaban
-   uno sobre otro sin espacio. Se apilan en columna con gap uniforme y ancho
-   completo para una jerarquía clara: cantidad compacta arriba, ATC prominente,
-   "Comprar ahora" secundario y wishlist ghost. Scoped a productos simples
-   (:not(.variations_form)) para no romper el layout de variaciones/gift. */
-@media (max-width:560px){
+/* UIUX-BATCH-2026-10-25 (operador: los botones "Añadir al carrito" y
+   "Comprar ahora" estaban desorganizados en escritorio y móvil):
+   sistema unificado de la fila de compra del form.cart.
+     - Escritorio: flex row — [cantidad] [Añadir al carrito] [Comprar ahora
+       (outline de marca, 48px — ANTES iba SIN estilo, un <a> crudo
+       inyectado por PV.injectBuyNow pegado al ATC)] [favoritos 48px].
+     - Móvil (≤768): grid determinista — fila 1 [cantidad 96px][ATC
+       llena], fila 2 [Comprar ahora 100%], fila 3 [favoritos 100%].
+   Reemplaza PDP-MOBILE-SPACING (2026-09-12): la pila ≤560 era parcial y
+   entre 561-768px el buy-now desalineado rompía la fila. Scoped a
+   productos simples (:not(.variations_form)) para no tocar variaciones. */
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form){
+    display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:16px;
+}
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .quantity{
+    margin:0 !important;
+}
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .single_add_to_cart_button{
+    margin:0 !important;padding:0 32px !important;flex-shrink:0;
+}
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .ltms-buy-now-btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    height:48px;padding:0 28px;border:2px solid var(--brand);border-radius:10px;
+    color:var(--brand);background:var(--surface);
+    font-weight:700;font-size:15px;line-height:1;text-decoration:none;white-space:nowrap;
+    flex-shrink:0;cursor:pointer;
+    transition:background var(--t),color var(--t),transform var(--t);
+}
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .ltms-buy-now-btn:hover{
+    background:var(--brand);color:#fff;transform:translateY(-2px);
+}
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .ltms-wishlist-btn-single{
+    display:inline-flex;align-items:center;justify-content:center;
+    height:48px;min-width:48px;flex-shrink:0;margin:0 !important;
+}
+@media (max-width:768px){
     .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form){
-        display:flex;
-        flex-direction:column;
-        gap:12px;
-        align-items:stretch;
+        display:grid !important;
+        grid-template-columns:96px minmax(0,1fr);
+        gap:12px;margin-top:16px !important;
     }
-    .pv-scope.pv-product-page .pv-product-actions form.cart .quantity{
-        margin:0 !important;
-        align-self:flex-start;
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .quantity{
+        width:96px !important;height:48px !important;flex:0 0 96px !important;
+        align-self:center;
     }
-    .pv-scope.pv-product-page .pv-product-actions form.cart > .button,
-    .pv-scope.pv-product-page .pv-product-actions form.cart > button.single_add_to_cart_button{
-        margin:0 !important;
-        width:100%;
-        min-width:0;
-        max-width:none;
-        box-sizing:border-box;
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .quantity input[type="number"]{
+        width:100% !important;height:48px !important;font-size:17px !important;
     }
-    .pv-scope.pv-product-page .pv-product-actions form.cart .ltms-buy-now-btn{
-        margin:0 !important;
-        width:100%;
-        box-sizing:border-box;
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .single_add_to_cart_button{
+        width:100% !important;height:48px !important;min-height:48px !important;
+        line-height:1 !important;padding:0 10px !important;font-size:15px !important;
     }
-    .pv-scope.pv-product-page .pv-product-actions form.cart .ltms-wishlist-btn-single{
-        margin:0 !important;
-        width:100%;
-        justify-content:center;
-        box-sizing:border-box;
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .ltms-buy-now-btn{
+        grid-column:1 / -1;width:100% !important;height:48px;margin:0 !important;
+    }
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .ltms-wishlist-btn-single{
+        grid-column:1 / -1;width:100% !important;justify-content:center !important;
     }
 }
 </style>

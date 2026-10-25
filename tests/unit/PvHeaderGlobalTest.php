@@ -132,8 +132,13 @@ final class PvHeaderGlobalTest extends LTMS_Unit_Test_Case {
 	}
 
 	/**
-	 * REG-CHOICE-008-C: exclusiones de should_render — admin/AJAX, panel del
-	 * vendedor y funnel auth vendedor (decisiones HOME-CATBAR-2026-011/012).
+	 * REG-CHOICE-008-C → UIUX-BATCH-2026-10-25: exclusiones de should_render —
+	 * admin/AJAX y panel del vendedor (decisión HOME-CATBAR-2026-011). El
+	 * funnel auth del vendedor YA NO se excluye: con Elementor Pro
+	 * desactivado esas páginas quedaban con el header de respaldo del tema
+	 * casi vacío (espacio en blanco reportado por el operador) y sin la
+	 * sección "Ingresar / Registrarse" — ahora son páginas públicas
+	 * estándar con el header PV.
 	 */
 	public function test_003_exclusiones_panel_y_auth(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->class_path ) );
@@ -144,9 +149,17 @@ final class PvHeaderGlobalTest extends LTMS_Unit_Test_Case {
 			'REG-CHOICE-008-C: should_render debe excluir admin y AJAX.'
 		);
 		$this->assertMatchesRegularExpression(
+			"/LTMS_Global_Catbar::is_vendor_panel_page\(\)/",
+			$src,
+			'REG-CHOICE-008-C: el header PV NO renderiza en el panel del vendedor (decisión del operador: app con chrome propio).'
+		);
+		/* UIUX-BATCH-2026-10-25: el funnel auth YA NO se excluye del header.
+		 * El helper is_vendor_auth_page sigue existiendo (lo usa
+		 * panel_body_class del catbar) pero el header no lo consulta. */
+		$this->assertDoesNotMatchRegularExpression(
 			"/LTMS_Global_Catbar::is_vendor_auth_page\(\) \|\| LTMS_Global_Catbar::is_vendor_panel_page\(\)/",
 			$src,
-			'REG-CHOICE-008-C: el header PV NO renderiza en el panel ni en el funnel auth (decisiones del operador).'
+			'UIUX-BATCH-2026-10-25: el funnel auth (registro/login/recuperar contraseña) SÍ lleva el header PV — con Elementor Pro desactivado quedaba el espacio en blanco del header de respaldo.'
 		);
 		// did_render: flag anti-duplicado consultable por la catbar.
 		$this->assertStringContainsString( 'private static $did_render', $src, 'REG-CHOICE-008-C: debe existir el flag did_render.' );

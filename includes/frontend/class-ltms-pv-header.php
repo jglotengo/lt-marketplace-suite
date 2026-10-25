@@ -18,10 +18,12 @@
  *    no-nativas (legales, blog...).
  *  - home.php ya NO imprime su propio header: lo recibe por el mismo hook
  *    (una sola fuente de verdad). El skip link y el resto del template quedan.
- *  - Exclusiones (decisiones previas del operador): panel del vendedor
- *    (HOME-CATBAR-2026-011) y funnel auth vendedor (HOME-CATBAR-2026-012 /
- *    AUTH-LOGO-001b) conservan su chrome propio. La vitrina del vendedor
- *    (/vendedor/{slug}) imprime su HTML completo sin wp_body_open — no aplica.
+ *  - Exclusiones: panel del vendedor (HOME-CATBAR-2026-011, chrome de app).
+ *    El funnel auth del vendedor SÍ lo lleva desde UIUX-BATCH-2026-10-25
+ *    (operador: con Elementor Pro desactivado quedaba el header de respaldo
+ *    del tema casi vacío = espacio en blanco y sin sección de cuenta).
+ *  - La vitrina del vendedor (/vendedor/{slug}) imprime su HTML completo
+ *    sin wp_body_open — no aplica.
  *  - El header del tema se oculta vía body class pv-pv-header (CSS del
  *    componente, selectores precisos — NUNCA un bare `header`).
  *  - La catbar se renderiza DENTRO del header (contexto 'home_header') y el
@@ -77,8 +79,16 @@ class LTMS_PV_Header {
 
 	/**
 	 * ¿Corresponde renderizar el header PV en el request actual?
-	 * Front-end público — excluye admin, AJAX, panel del vendedor y el funnel
-	 * auth del vendedor (ambos con chrome propio por decisión del operador).
+	 * Front-end público — excluye admin, AJAX y el panel del vendedor
+	 * (app con chrome propio por decisión del operador, HOME-CATBAR-2026-011).
+	 *
+	 * UIUX-BATCH-2026-10-25 (operador): el funnel auth del vendedor
+	 * (registro/login/recuperar contraseña) YA NO se excluye. Con Elementor
+	 * Pro desactivado, esas páginas quedaban con el header de respaldo
+	 * (casi vacío) del tema Hello = espacio en blanco, y sin la sección
+	 * "Ingresar / Registrarse". Ahora llevan el header PV estándar — su
+	 * propio CSS (body.pv-pv-header) oculta el header del tema y el funnel
+	 * mantiene acceso visual a cuenta/carrito/favoritos.
 	 *
 	 * @return bool
 	 */
@@ -87,7 +97,7 @@ class LTMS_PV_Header {
 			return false;
 		}
 		if ( class_exists( 'LTMS_Global_Catbar' ) ) {
-			if ( LTMS_Global_Catbar::is_vendor_auth_page() || LTMS_Global_Catbar::is_vendor_panel_page() ) {
+			if ( LTMS_Global_Catbar::is_vendor_panel_page() ) {
 				return false;
 			}
 		}

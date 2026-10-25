@@ -167,13 +167,13 @@ class LTMS_Global_Catbar {
 			return false;
 		}
 
-		// Funnel de registro/login del vendedor: formularios de app, no
-		// páginas públicas de catálogo (HOME-CATBAR-2026-012 — el operador
-		// vio la barra en la página de registro de vendedores: "que solo
-		// se vea en las páginas públicas apropiadas"). Por ID y por slug.
-		if ( self::is_vendor_auth_page() ) {
-			return false;
-		}
+		/* UIUX-BATCH-2026-10-25 (operador): el funnel de registro/login del
+		 * vendedor YA NO se excluye. Con Elementor Pro desactivado esas
+		 * páginas quedaban con un header de respaldo casi vacío (espacio
+		 * en blanco) y sin acceso a cuenta — ahora son páginas públicas
+		 * estándar: header PV (con esta barra) + footer. El helper
+		 * is_vendor_auth_page() se conserva para panel_body_class y futuros
+		 * usos. (Antes: HOME-CATBAR-2026-012.) */
 
 		return true;
 	}

@@ -74,38 +74,41 @@ final class ShopSearchProductPageMobileTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
-	/* ── PDP-MOBILE-SPACING ───────────────────────────────────────── */
+	/* ── PDP-MOBILE-SPACING → UIUX-BATCH-2026-10-25 ──────────────── */
 
 	public function test_pdp_mobile_spacing_fix_present(): void {
 		$src = file_get_contents( self::SP_PHP_PATH );
 
+		/* UIUX-BATCH-2026-10-25 (lección #119): el apilado parcial ≤560 fue
+		 * reemplazado por el sistema unificado UIUX-BATCH (desktop flex +
+		 * grid móvil ≤768). El marcador del retiro reemplaza al del fix viejo. */
 		$this->assertStringContainsString(
-			'PDP-MOBILE-SPACING FIX',
+			'UIUX-BATCH-2026-10-25',
 			$src,
-			'PDP-MOBILE-SPACING: el fix debe tener su marcador traceable en single-product.php.'
+			'UIUX-BATCH-2026-10-25: el sistema de botones del producto lleva su marcador traceable en single-product.php (reemplaza a PDP-MOBILE-SPACING).'
 		);
 		$this->assertStringContainsString(
 			'.ltms-wishlist-btn-single',
 			$src,
-			'PDP-MOBILE-SPACING: el botón de wishlist debe estilarse en móvil.'
+			'UIUX-BATCH-2026-10-25: el botón de wishlist debe estilarse en la fila de compra.'
 		);
 		$this->assertStringContainsString(
 			'.ltms-buy-now-btn',
 			$src,
-			'PDP-MOBILE-SPACING: el botón "Comprar ahora" (inyectado por PV.injectBuyNow) debe cubrirse en móvil.'
+			'UIUX-BATCH-2026-10-25: el botón "Comprar ahora" (inyectado por PV.injectBuyNow) debe estar estilizado (antes iba crudo).'
 		);
 		$this->assertStringContainsString(
-			'flex-direction:column',
+			'display:grid !important',
 			$src,
-			'PDP-MOBILE-SPACING: los controles deben apilarse en columna con gap (sin amontonarse).'
+			'UIUX-BATCH-2026-10-25: en móvil (≤768) la fila de compra es un grid determinista (cantidad+ATC en fila 1; buy-now/favoritos a ancho completo) — sin amontonarse.'
 		);
 		$this->assertStringContainsString(
 			':not(.variations_form)',
 			$src,
-			'PDP-MOBILE-SPACING: el apilado debe scope a productos simples para no romper variaciones/gift.'
+			'UIUX-BATCH-2026-10-25: el layout debe scope a productos simples para no romper variaciones/gift.'
 		);
 		$this->assertStringContainsString(
-			'width:100%',
+			'width:100% !important',
 			$src,
 			'PDP-MOBILE-SPACING: los botones deben ocupar ancho completo en móvil.'
 		);

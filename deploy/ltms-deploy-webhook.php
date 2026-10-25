@@ -944,6 +944,17 @@ $files = [
     // herramienta WC + residuos LTMS (comisiones/billetera/saldos).
     'deploy/ltms-purge-test-orders-2026-10-24.php',
     'tests/unit/PurgeTestOrdersTest.php',
+    // UIUX-BATCH-2026-10-25 — 6 fixes de operador: lema del home fuera
+    // (injectHeroHeadline), header PV en funnel auth (espacio blanco por
+    // Elementor Pro desactivado + sección ingresar/registrar), botones
+    // del producto organizados, bundle redirige a carrito, upsells del
+    // minicart agregan directo. Los demás archivos ya estaban (lección #177).
+    'assets/js/ltms-cart-drawer.js',
+    'assets/js/ltms-cart-drawer.min.js',
+    'assets/css/ltms-catbar.min.css',
+    'assets/css/ltms-cart-drawer.css',
+    'assets/css/ltms-cart-drawer.min.css',
+    'tests/unit/UIUXBatchTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

@@ -866,29 +866,13 @@
 
   /* =========================================================================
    * v2.9.200 — Homepage hero headline injection
+   *
+   * UIUX-BATCH-2026-10-25 (operador): ELIMINADA. Inyectaba el bloque rojo
+   * con el lema del marketplace al inicio del <main> del home ("cerca al
+   * header") — legado de la era Elementor (v2.9.200) que sobrevivió al
+   * rediseño Plaza Viva. El home ya tiene su hero server-rendered y el
+   * bloque duplicaba el mensaje.
    * ========================================================================= */
-  PV.injectHeroHeadline = function () {
-    // Only on homepage
-    if (!document.body.classList.contains('home')) return;
-    // Don't double-inject
-    if (qs('.ltms-hero-headline')) return;
-
-    // Find hero section — try multiple selectors for Elementor
-    var hero = qs('.elementor-section') || qs('.e-con') || qs('.e-flex') || qs('[data-elementor-type]') || qs('main .elementor') || qs('.elementor-element');
-    if (!hero) {
-      // Fallback: inject at top of main content
-      hero = qs('main') || qs('.site-main') || qs('#content') || qs('.page-content');
-      if (!hero) return;
-    }
-
-    // Create headline
-    var headline = document.createElement('div');
-    headline.className = 'ltms-hero-headline';
-    headline.innerHTML = '<h2 style="font-family:Albert Sans,sans-serif;font-size:clamp(24px,4vw,36px);font-weight:800;color:#fff;text-align:center;padding:12px 20px;background:linear-gradient(135deg,#E80001 0%,#B80001 100%);border-radius:14px;margin:0 auto;max-width:600px;box-shadow:0 4px 14px rgba(232,0,1,0.3);line-height:1.3;letter-spacing:-0.02em">Tu Marketplace de Confianza en Colombia 🇨🇴</h2><p style="text-align:center;color:#565C66;font-size:14px;margin-top:8px;font-weight:500">Miles de productos de vendedores verificados · PSE · Nequi · Envío a todo el país</p>';
-
-    // Insert at the beginning of the hero section
-    hero.insertBefore(headline, hero.firstChild);
-  };
 
   /* =========================================================================
    * v2.9.200 — Shop page cleanup (remove duplicate search)
@@ -1084,10 +1068,6 @@
 
     // v2.9.200 — Inject "Buy Now" button next to Add to Cart on product pages.
     PV.injectBuyNow();
-
-    // v2.9.200 — Homepage hero headline injection.
-    // Delay 500ms to allow Elementor to render its containers.
-    setTimeout(function() { PV.injectHeroHeadline(); }, 500);
 
     // v2.9.200 — Shop duplicate search removal.
     setTimeout(function() { PV.cleanShopPage(); }, 500);
@@ -2333,8 +2313,12 @@
             if (!queue.length) {
               addBtn.classList.remove('pv-btn--loading');
               addBtn.disabled = false;
-              if (PV.toast) { PV.toast((PV.i18n && PV.i18n.addedToCart) || 'Añadido al carrito', { type: 'success' }); }
-              if (PV.Shopping) { try { PV.Shopping.refresh(); } catch (_) { /* noop */ } }
+              /* UIUX-BATCH-2026-10-25 (operador: "al añadir los productos
+               * complementarios no me lleva a carrito"): tras añadir todo
+               * el paquete redirige DIRECTO al carrito — misma conducta que
+               * el sticky ATC de la ficha (CART-UX-013b). Un solo
+               * comportamiento mental: añadir → carrito. */
+              window.location.href = (window.ltms_data && window.ltms_data.cart_url) || '/carrito/';
               return;
             }
             var it = queue.shift();

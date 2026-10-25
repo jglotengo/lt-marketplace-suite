@@ -168,3 +168,14 @@
    buscador FiboSearch, logo y carrito) — la vista queda como app limpia
    con su propia navegación interna. */
 body.ltms-panel-view .elementor-location-header{display:none!important;}
+
+/* UIUX-BATCH-2026-10-25: con Elementor Pro desactivado el Theme Builder no
+   renderiza su header y el tema Hello imprime su header de RESPALDO
+   (#site-header casi vacío = espacio en blanco). Se oculta también en la
+   vista de panel (sigue siendo app limpia). El funnel auth ya NO lleva
+   esta clase de exclusión — recibe el header PV estándar, cuyo propio CSS
+   (body.pv-pv-header) se encarga de tapar el del tema. Selectores precisos,
+   NUNCA un bare header. */
+body.ltms-panel-view #site-header,
+body.ltms-panel-view .site-header,
+body.ltms-panel-view .header-inner{display:none!important;}
