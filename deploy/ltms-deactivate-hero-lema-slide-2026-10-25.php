@@ -22,6 +22,14 @@
  * Uso:
  *   wp eval-file wp-content/plugins/lt-marketplace-suite/deploy/ltms-deactivate-hero-lema-slide-2026-10-25.php --allow-root
  *
+ * ESTADO: REVERTIDO (2026-10-25). El operador aclaró que el lema NO es el
+ * banner ("no es banner, los banners déjalos como estaba") — los 3 slides
+ * fueron REACTIVADOS. La causa real del texto visible era la caché
+ * heurística del navegador (ver HtmlNoCacheHeaderTest y el comentario del
+ * kernel UIUX-BATCH-2026-10-25c). Este script queda como herramienta
+ * documentada por si el operador quiere desactivar un slide específico
+ * en el futuro.
+ *
  * Idempotente — seguro correr de nuevo: si el slide ya está inactivo,
  * solo reporta.
  */

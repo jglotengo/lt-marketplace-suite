@@ -960,6 +960,10 @@ $files = [
     // reversible + test (lección #177).
     'deploy/ltms-deactivate-hero-lema-slide-2026-10-25.php',
     'tests/unit/HeroLemaSlideTest.php',
+    // UIUX-BATCH-2026-10-25c final: auditoría completa probó que el servidor
+    // NO sirve el lema — era caché heurística del navegador. Header
+    // Cache-Control: no-cache en el HTML público (kernel) + test.
+    'tests/unit/HtmlNoCacheHeaderTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

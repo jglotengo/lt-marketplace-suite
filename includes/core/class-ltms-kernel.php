@@ -455,6 +455,22 @@ final class LTMS_Core_Kernel {
             LTMS_Business_Sync_Visibility_Gate::init();
         }
 
+        // UIUX-BATCH-2026-10-25c (3er reporte del operador: "sigue viéndose el
+        // lema"): verificado con auditoría completa (HTML crudo + todos los
+        // assets + TODA la base de datos) que el servidor NO sirve el lema —
+        // el texto que el operador ve es una copia LOCAL de su navegador. El
+        // HTML de SiteGround viaja SIN Cache-Control/ETag/Last-Modified →
+        // los navegadores aplican CACHÉ HEURÍSTICA (retienen páginas viejas
+        // días enteros sin revalidar; los in-app browsers de WhatsApp/Facebook
+        // son todavía más pegajosos). Este header fuerza la revalidación en
+        // cada visita — la caché de borde de SG sigue funcionando igual.
+        add_action( 'send_headers', function () {
+            if ( is_admin() ) {
+                return;
+            }
+            header( 'Cache-Control: no-cache, must-revalidate' );
+        } );
+
         // Encolar CSS + JS de product enhancements en frontend.
         add_action( 'wp_enqueue_scripts', function() {
             $ver = defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '2.9.2';
