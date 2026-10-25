@@ -88,12 +88,11 @@
 
     // CART-UX-NEXT-UPSells (2026-09-11): render de upsells (mismo vendor) en el
     // drawer. Se piden solo al abrir (full=1); qty/remove refrescan sin upsells.
-    // UIUX-BATCH-2026-10-25 (operador: "revisa si es más apropiado que en vez
-    // de llevarme a la página del producto se agregue a carrito"): la card es
-    // un BOTÓN de add-to-cart (data-pv-add-to-cart) — el handler global del
-    // design system añade vía AJAX y este drawer escucha ese mismo atributo
-    // en fase capture (bind(), Path 2) para refrescarse. El nombre deja de
-    // ser link: la interacción completa es un solo clic.
+    // UIUX-BATCH-2026-10-25 (operador): la card agrega DIRECTO al carrito.
+    // UIUX-BATCH-2026-10-25b: la card vuelve al TAMAÑO/estructura anterior
+    // (el <button> full-card explotaba en el layout) — el add-to-cart vive en
+    // una PILL compacta sobre la imagen (data-pv-add-to-cart): mismo tamaño
+    // que siempre + affordance clara de agregar.
     function renderUpsells(upsells) {
         var host = $('.ltms-minicart__upsells');
         if (!host) return;
@@ -109,15 +108,16 @@
         for (var i = 0; i < upsells.length; i++) {
             var u = upsells[i];
             var img = u.image ? '<img src="' + esc(u.image) + '" alt="' + esc(u.name) + '" loading="lazy">' : '';
-            html += '<button type="button" class="ltms-minicart__upsell" data-pv-add-to-cart="' + esc(u.id || '') + '"'
+            html += '<div class="ltms-minicart__upsell">'
+                + '<span class="ltms-minicart__upsell-img">' + img
+                + '<button type="button" class="ltms-minicart__upsell-add" data-pv-add-to-cart="' + esc(u.id || '') + '"'
                 + ' aria-label="' + esc((u.name || '') + ' — añadir al carrito') + '">'
-                + '<span class="ltms-minicart__upsell-img">' + img + '</span>'
+                + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+                + '</button>'
+                + '</span>'
                 + '<span class="ltms-minicart__upsell-name">' + esc(u.name) + '</span>'
                 + '<span class="ltms-minicart__upsell-price">' + esc(u.price || '') + '</span>'
-                + '<span class="ltms-minicart__upsell-add" aria-hidden="true">'
-                + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
-                + '</span>'
-                + '</button>';
+                + '</div>';
         }
         list.innerHTML = html;
     }

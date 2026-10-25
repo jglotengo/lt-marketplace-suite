@@ -893,16 +893,26 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 /* UIUX-BATCH-2026-10-25 (operador: los botones "Añadir al carrito" y
    "Comprar ahora" estaban desorganizados en escritorio y móvil):
    sistema unificado de la fila de compra del form.cart.
-     - Escritorio: flex row — [cantidad] [Añadir al carrito] [Comprar ahora
-       (outline de marca, 48px — ANTES iba SIN estilo, un <a> crudo
-       inyectado por PV.injectBuyNow pegado al ATC)] [favoritos 48px].
+   UIUX-BATCH-2026-10-25b: el form.cart REAL contiene más hijos además de
+   cantidad/ATC — gift-options (🎁), mini-badges (Compra protegida),
+   wishlist y addons (📦 complementarios, verificado en el DOM en vivo).
+   Sin las reglas de ancho completo esos bloques se metían EN MEDIO de la
+   fila de botones y la desordenaban. Ahora:
+     - Fila de acciones (desktop): [cantidad] [Añadir al carrito]
+       [Comprar ahora (outline de marca 48px)] [favoritos 48px].
+     - Gift-options, mini-badges y addons: filas completas (100%).
      - Móvil (≤768): grid determinista — fila 1 [cantidad 96px][ATC
-       llena], fila 2 [Comprar ahora 100%], fila 3 [favoritos 100%].
-   Reemplaza PDP-MOBILE-SPACING (2026-09-12): la pila ≤560 era parcial y
-   entre 561-768px el buy-now desalineado rompía la fila. Scoped a
-   productos simples (:not(.variations_form)) para no tocar variaciones. */
+       llena], fila 2 [Comprar ahora 100%], fila 3 [favoritos 100%];
+       los bloques extra también a ancho completo.
+   Reemplaza PDP-MOBILE-SPACING (2026-09-12). Scoped a productos simples
+   (:not(.variations_form)) para no tocar variaciones/gift. */
 .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form){
     display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:16px;
+}
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) > .ltms-gift-options,
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) > .ltms-mini-badges,
+.pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) > .ltms-addon-items{
+    flex:1 1 100%;width:100%;margin-left:0;margin-right:0;
 }
 .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .quantity{
     margin:0 !important;
@@ -923,13 +933,18 @@ do_action( 'ltms_after_single_product_plazaviva', $product );
 }
 .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .ltms-wishlist-btn-single{
     display:inline-flex;align-items:center;justify-content:center;
-    height:48px;min-width:48px;flex-shrink:0;margin:0 !important;
+    height:48px;padding:10px 16px;flex-shrink:0;margin:0 !important;
 }
 @media (max-width:768px){
     .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form){
         display:grid !important;
         grid-template-columns:96px minmax(0,1fr);
         gap:12px;margin-top:16px !important;
+    }
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) > .ltms-gift-options,
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) > .ltms-mini-badges,
+    .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) > .ltms-addon-items{
+        grid-column:1 / -1;
     }
     .pv-scope.pv-product-page .pv-product-actions form.cart:not(.variations_form) .quantity{
         width:96px !important;height:48px !important;flex:0 0 96px !important;

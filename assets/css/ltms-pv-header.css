@@ -158,6 +158,12 @@
     }
     .pv-home-header .pv-home-header__actions{justify-self:end;}
     .pv-home-header .pv-home-header__action-label{display:none;}
+    /* UIUX-BATCH-2026-10-25b (operador: "la sección de ingresar/registrar de
+       los compradores sigue sin verse"): entre 768-1279px la acción de cuenta
+       quedaba SOLO icono — el label "Ingresar / Registrarse" (o "Cuenta")
+       permanece visible en todo ancho. */
+    .pv-home-header .pv-home-header__action--account{flex-direction:row;gap:6px;}
+    .pv-home-header .pv-home-header__action--account .pv-home-header__action-label{display:inline;}
     .pv-home-header .pv-home-header__logo{grid-area:logo;}
     .pv-home-header .pv-home-header__search{grid-area:search;}
 }

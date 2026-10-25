@@ -142,11 +142,21 @@ final class HomeHeroTest extends LTMS_Unit_Test_Case {
 	public function test_004_h1_unico(): void {
 		$src = $this->strip_php_comments( file_get_contents( $this->home_path ) );
 
+		/* UIUX-BATCH-2026-10-25b (lección #119): el operador pidió eliminar el
+		 * bloque del hero con el titular del marketplace ("cerca del header").
+		 * El head (eyebrow + h1 + sub) fue eliminado de AMBAS ramas — con
+		 * banners el hero muestra solo banner + tarjetas; sin banners la
+		 * home pasa directa al trust bar. */
 		$count = substr_count( $src, 'id="pv-home-hero-title"' );
 		$this->assertSame(
-			2,
+			0,
 			$count,
-			'HOME-REDESIGN-004-D: exactamente 1 h1 por rama if/else del hero (2 en source, 1 en runtime).'
+			'UIUX-BATCH-2026-10-25b: el h1 del hero fue eliminado de ambas ramas (pedido del operador).'
+		);
+		$this->assertStringNotContainsString(
+			'Compra con confianza, vende con libertad',
+			$src,
+			'UIUX-BATCH-2026-10-25b: el titular del hero no existe en ninguna rama de la home.'
 		);
 	}
 

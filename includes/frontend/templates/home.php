@@ -484,19 +484,11 @@ do_action( 'ltms_before_home_plazaviva' );
      */
     if ( ! empty( $pv_hero_banner ) && ! empty( $pv_hero_banner['image_desktop'] ) ) :
     ?>
-    <section class="pv-section pv-home__hero-wrap" aria-labelledby="pv-home-hero-title">
-        <div class="pv-home-hero__head">
-            <span class="pv-hero__eyebrow">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-                <?php esc_html_e( 'Marketplace protegido con Escrow', 'ltms' ); ?>
-            </span>
-            <h1 id="pv-home-hero-title" class="pv-hero__title">
-                <?php esc_html_e( 'Compra con confianza, vende con libertad', 'ltms' ); ?>
-            </h1>
-            <p class="pv-hero__sub">
-                <?php esc_html_e( 'Miles de productos de vendedores verificados. Pago seguro y envío a todo el país.', 'ltms' ); ?>
-            </p>
-        </div>
+    <section class="pv-section pv-home__hero-wrap">
+        <?php /* UIUX-BATCH-2026-10-25b: el HEAD del hero (eyebrow Escrow +
+              * h1 del marketplace + sub) fue ELIMINADO de ambas ramas por el
+              * operador — con banners configurados el hero muestra solo
+              * banner + tarjetas (sus títulos viajan en el overlay). */ ?>
         <div class="pv-home-hero__grid">
             <a class="pv-home-hero__banner"
                href="<?php echo esc_url( (string) ( $pv_hero_banner['cta_url'] ?? '' ) !== '' ? (string) $pv_hero_banner['cta_url'] : $pv_shop_url ); ?>">
@@ -546,30 +538,20 @@ do_action( 'ltms_before_home_plazaviva' );
             <?php endif; ?>
         </div>
     </section>
-    <?php else : ?>
-        <!-- Fallback: sin banners en el Home Slider — hero gradiente con CTA
-             (HOME-REDESIGN-004: una sola acción principal). -->
-        <section class="pv-section pv-home__hero-wrap" aria-labelledby="pv-home-hero-title">
-        <div class="pv-hero pv-home-hero">
-            <span class="pv-hero__eyebrow">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-                <?php esc_html_e( 'Marketplace protegido con Escrow', 'ltms' ); ?>
-            </span>
-            <h1 id="pv-home-hero-title" class="pv-hero__title">
-                <?php esc_html_e( 'Compra con confianza, vende con libertad', 'ltms' ); ?>
-            </h1>
-            <p class="pv-hero__sub">
-                <?php esc_html_e( 'Miles de productos de vendedores verificados. Pago seguro con Escrow, wallets integradas y envío a todo el país.', 'ltms' ); ?>
-            </p>
-            <div class="pv-hero__actions">
-                <a class="pv-btn pv-btn--lg" href="<?php echo esc_url( $pv_shop_url ); ?>">
-                    <?php esc_html_e( 'Explorar productos', 'ltms' ); ?>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                </a>
-            </div>
-        </div>
-    </section>
-    <?php endif; ?>
+    <?php
+    /* UIUX-BATCH-2026-10-25b (operador: "elimina lo que está en el header o
+     * cerca al header que dice 'tu marketplace de confianza en colombia'"):
+     * el BLOQUE HERO de fallback fue ELIMINADO por completo. Antes, sin
+     * banners configurados en el Home Slider, esta rama render el hero
+     * gradiente con el titular del marketplace + eyebrow de Escrow + sub
+     * justo bajo el header — era el bloque visible que el operador pidi
+     * quitar (el lema JS de la era Elementor ya se haba retirado en
+     * UIUX-BATCH-2026-10-25 y el usuario SIGUI viendo este hero de
+     * servidor). Sin banners: la home pasa directo de la barra de
+     * categoras al trust bar. Si el operador carga banners en el Home
+     * Slider, la rama if renderiza el hero con imgenes (esa rama se
+     * conserva intacta). */
+    endif; ?>
 
     <?php
     /* =====================================================================

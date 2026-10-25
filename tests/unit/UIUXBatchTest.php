@@ -47,6 +47,7 @@ final class UIUXBatchTest extends LTMS_Unit_Test_Case {
 	private string $catbar_css;
 	private string $single_path;
 	private string $drawer_css;
+	private string $home_path;
 	private string $webhook_path;
 
 	protected function setUp(): void {
@@ -60,6 +61,7 @@ final class UIUXBatchTest extends LTMS_Unit_Test_Case {
 		$this->catbar_css  = $base . '/assets/css/ltms-catbar.css';
 		$this->single_path = $base . '/includes/frontend/templates/single-product.php';
 		$this->drawer_css  = $base . '/assets/css/ltms-cart-drawer.css';
+		$this->home_path   = $base . '/includes/frontend/templates/home.php';
 		$this->webhook_path = $base . '/deploy/ltms-deploy-webhook.php';
 	}
 
@@ -170,7 +172,9 @@ final class UIUXBatchTest extends LTMS_Unit_Test_Case {
 
 	/**
 	 * BATCH-6: las cards "También te puede interesar" del minicart agregan
-	 * directo al carrito (botón data-pv-add-to-cart), no navegan a la ficha.
+	 * directo al carrito (pill data-pv-add-to-cart sobre la imagen), con el
+	 * TAMAÑO/estructura anterior (UIUX-BATCH-1025b: el button full-card
+	 * rompía el layout — el operador reportó cards gigantes).
 	 */
 	public function test_005_upsells_minicart_agregan_directo(): void {
 		$js = (string) file_get_contents( $this->drawer_js );
@@ -178,24 +182,81 @@ final class UIUXBatchTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString(
 			'data-pv-add-to-cart="' . "' + esc(u.id || '')",
 			$js,
-			'UIUX-BATCH-6: la card de upsell es un botón data-pv-add-to-cart con el id del producto.'
+			'UIUX-BATCH-6: la pill de la card de upsell lleva data-pv-add-to-cart con el id del producto.'
 		);
 		$this->assertDoesNotMatchRegularExpression(
 			'/<a class="ltms-minicart__upsell" href=/',
 			$js,
 			'UIUX-BATCH-6: la card YA NO es un link a la ficha del producto.'
 		);
+		// UIUX-BATCH-1025b: la card es un div con la estructura previa; el
+		// add vive en la pill (button) DENTRO del span de imagen.
+		$this->assertStringContainsString(
+			"html += '<div class=\"ltms-minicart__upsell\">'",
+			$js,
+			'UIUX-BATCH-1025b: la card vuelve a ser un div con el tamaño/estructura anterior (no button full-card).'
+		);
 
 		$css = (string) file_get_contents( $this->drawer_css );
 		$this->assertMatchesRegularExpression(
-			'/\.ltms-minicart__upsell\{[^}]*cursor:pointer;/s',
+			'/\.ltms-minicart__upsell\{[^}]*flex:0 0 130px;/s',
 			$css,
-			'UIUX-BATCH-6: la card tiene affordance de botón (cursor pointer).'
+			'UIUX-BATCH-1025b: la card conserva el tamaño anterior (130px).'
 		);
 		$this->assertMatchesRegularExpression(
-			'/\.ltms-minicart__upsell-add\{/',
+			'/\.ltms-minicart__upsell-add\{[^}]*cursor:pointer;/s',
 			$css,
-			'UIUX-BATCH-6: el badge "+" de agregar existe en la card.'
+			'UIUX-BATCH-6: la pill tiene affordance de botón (cursor pointer).'
+		);
+		$this->assertMatchesRegularExpression(
+			'/\.ltms-minicart__upsell-img\{[^}]*position:relative;/s',
+			$css,
+			'UIUX-BATCH-1025b: el span de imagen es el contexto de posicionamiento de la pill.'
+		);
+	}
+
+	/**
+	 * BATCH-b (UIUX-BATCH-2026-10-25b): el hero de FALLBACK del home fue
+	 * eliminado (el bloque que el operador veía bajo el header); el label
+	 * "Ingresar/Registrarse" visible en 768-1279px; los addons
+	 * "productos complementarios" llevan al carrito.
+	 */
+	public function test_007_correcciones_batch_b(): void {
+		// 1. Hero fallback eliminado de la home.
+		$home = (string) file_get_contents( $this->home_path );
+		$this->assertStringNotContainsString(
+			'Compra con confianza, vende con libertad',
+			$home,
+			'UIUX-BATCH-b: el hero de fallback ("Compra con confianza…") fue eliminado — era el bloque que el operador veía cerca del header.'
+		);
+		$this->assertStringContainsString( 'UIUX-BATCH-2026-10-25b', $home, 'UIUX-BATCH-b: trazabilidad en home.php.' );
+
+		// 2. Label de cuenta visible 768-1279px (acción con clase distintiva).
+		$hdr = (string) file_get_contents( $this->header_path );
+		$this->assertStringContainsString(
+			'pv-home-header__action pv-home-header__action--account',
+			$hdr,
+			'UIUX-BATCH-b: la acción de cuenta lleva la clase --account (para su regla CSS).'
+		);
+		$hdr_css_path = dirname( __DIR__, 2 ) . '/assets/css/ltms-pv-header.css';
+		$hdr_css = (string) file_get_contents( $hdr_css_path );
+		$this->assertMatchesRegularExpression(
+			'/\.pv-home-header__action--account \.pv-home-header__action-label\{display:inline;\}/',
+			$hdr_css,
+			'UIUX-BATCH-b: el label Ingresar/Registrarse es visible también en 768-1279px (antes solo >=1280).'
+		);
+
+		// 3. Addons "+ Añadir" llevan al carrito (handler delegado).
+		$pv = (string) file_get_contents( $this->pv_js );
+		$this->assertStringContainsString(
+			".ltms-addon-add-btn",
+			$pv,
+			'UIUX-BATCH-b: existe el handler de los botones "+ Añadir" de productos complementarios.'
+		);
+		$this->assertStringContainsString(
+			"add-to-cart=(\\d+)",
+			$pv,
+			'UIUX-BATCH-b: el handler extrae el product_id del link ?add-to-cart del addon.'
 		);
 	}
 

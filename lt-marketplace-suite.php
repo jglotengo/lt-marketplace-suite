@@ -87,11 +87,12 @@ define( 'LTMS_LOADED', true );
 // CSS inline de la home (grid categorías minmax 3-col, banner natural, chips
 // fila única), plaza-viva.js regenerado (initChipsFade) y assets nuevos de la
 // barra global de categorías (ltms-catbar.css/js).
-// UIUX-BATCH-2026-10-25: bump 2.9.430 → 2.9.431 — cache-busting del lote de
-// fixes UIUX (plaza-viva.js sin lema del home + bundle a carrito, upsells
-// del minicart agregan directo, header PV en funnel auth, botones del
-// producto organizados).
-define( 'LTMS_VERSION', '2.9.431' );
+// UIUX-BATCH-2026-10-25b: bump 2.9.431 → 2.9.432 — corrección del lote: hero
+// de fallback del home eliminado (el bloque que el operador veía), label de
+// cuenta visible en 768-1279px, form.cart con todos sus hijos organizados,
+// addons "+Añadir" llevan al carrito, upsells del minicart con tamaño
+// anterior + pill de agregar.
+define( 'LTMS_VERSION', '2.9.432' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

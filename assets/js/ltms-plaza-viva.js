@@ -736,6 +736,31 @@
           atc.classList.remove('pv-btn--loading');
           PV.toast('Error de conexión', { type: 'error' });
         });
+      return;
+    }
+
+    /* UIUX-BATCH-2026-10-25b (operador: "cuando se le da en añadir a estos
+     * productos complementarios no me lleva a carrito"): los botones
+     * "+ Añadir" de la sección "Añade estos productos complementarios"
+     * (renderizada por LTMS_Amazon_Enhancements en el form.cart de la ficha)
+     * son links ?add-to-cart=ID que añadían SIN llevar al carrito. Ahora el
+     * click añade vía AJAX y redirige DIRECTO al carrito (misma conducta que
+     * el bundle y el sticky ATC — un solo comportamiento mental). */
+    var addonAdd = e.target.closest('.ltms-addon-add-btn');
+    if (addonAdd && addonAdd.href) {
+      var m = addonAdd.href.match(/[?&]add-to-cart=(\d+)/);
+      if (m && m[1]) {
+        e.preventDefault();
+        addonAdd.textContent = 'Añadiendo…';
+        PV.ajax('ltms_plaza_viva_add_to_cart', { product_id: m[1], quantity: 1 })
+          .then(function () {
+            window.location.href = (window.ltms_data && window.ltms_data.cart_url) || '/carrito/';
+          })
+          .catch(function () {
+            addonAdd.textContent = '+ Añadir';
+            PV.toast('Error de conexión', { type: 'error' });
+          });
+      }
     }
 
     // AUDIT-FE-SF-006 FIX (Fase 1.4): follow vendor — persiste el follow

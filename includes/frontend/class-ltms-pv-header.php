@@ -228,7 +228,7 @@ class LTMS_PV_Header {
 						<?php esc_html_e( 'Vender', 'ltms' ); ?>
 						<span class="pv-home-header__sell-free"><?php esc_html_e( 'GRATIS', 'ltms' ); ?></span>
 					</a>
-					<a class="pv-home-header__action" href="<?php echo esc_url( $account_url ); ?>" aria-label="<?php echo is_user_logged_in() ? esc_attr__( 'Mi cuenta', 'ltms' ) : esc_attr__( 'Ingresar o registrarse', 'ltms' ); ?>">
+					<a class="pv-home-header__action pv-home-header__action--account" href="<?php echo esc_url( $account_url ); ?>" aria-label="<?php echo is_user_logged_in() ? esc_attr__( 'Mi cuenta', 'ltms' ) : esc_attr__( 'Ingresar o registrarse', 'ltms' ); ?>">
 						<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 						<span class="pv-home-header__action-label"><?php echo is_user_logged_in() ? esc_html__( 'Cuenta', 'ltms' ) : esc_html__( 'Ingresar / Registrarse', 'ltms' ); ?></span>
 					</a>
