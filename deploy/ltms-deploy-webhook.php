@@ -939,6 +939,11 @@ $files = [
     // woocommerce_thumbnail sin recorte a nivel de archivo + regeneración.
     'deploy/ltms-wc-uncrop-thumbs-2026-10-24.php',
     'tests/unit/WcUncropThumbsTest.php',
+    // PURGE-TEST-ORDERS-2026-10-24 — borrado de todos los pedidos de
+    // prueba (operador) con protocolo: inventario + backup obligatorio +
+    // herramienta WC + residuos LTMS (comisiones/billetera/saldos).
+    'deploy/ltms-purge-test-orders-2026-10-24.php',
+    'tests/unit/PurgeTestOrdersTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';
