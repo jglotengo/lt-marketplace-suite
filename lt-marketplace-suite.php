@@ -92,7 +92,7 @@ define( 'LTMS_LOADED', true );
 // cuenta visible en 768-1279px, form.cart con todos sus hijos organizados,
 // addons "+Añadir" llevan al carrito, upsells del minicart con tamaño
 // anterior + pill de agregar.
-define( 'LTMS_VERSION', '2.9.432' );
+define( 'LTMS_VERSION', '2.9.433' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

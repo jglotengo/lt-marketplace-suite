@@ -964,6 +964,13 @@ $files = [
     // NO sirve el lema — era caché heurística del navegador. Header
     // Cache-Control: no-cache en el HTML público (kernel) + test.
     'tests/unit/HtmlNoCacheHeaderTest.php',
+    // HEADER-WIDTH-2026-10-28 (operador): topbar de la app a todo el ancho
+    // (ltms-dashboard.css NO estaba en la whitelist) + vitrina con el header
+    // PV estandar (wp_body_open + ocultar topbar legacy). Los demas archivos
+    // tocados ya estaban en la whitelist (leccion #177).
+    'assets/css/ltms-dashboard.css',
+    'assets/css/ltms-dashboard.min.css',
+    'tests/unit/HeaderWidthAuditTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

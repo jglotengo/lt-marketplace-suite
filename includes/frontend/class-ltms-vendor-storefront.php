@@ -541,11 +541,16 @@ window.elementor=window.elementor||{modules:{}};
    1. #ltms-floating-access (ltms-header-nav.js) — botones VENDER / MI CUENTA
       con position:fixed z-index:99997, se appenda a <body> cuando no hay
       .site-header del tema.
-   Solución: ocultar el acceso flotante en la vitrina (la vitrina tiene su
-   propio topbar con logo, volver y carrito), más selectores del tema por
-   defensa. LEGACY-CSS FIX (2026-09-08): #ltms-welcome-banner se removió —
-   el banner fue eliminado (REMOVE-PROMO-POPUP-001) y su selector no
-   matcheaba nada. */
+   Solución: ocultar el acceso flotante en la vitrina, más selectores del
+   tema por defensa. LEGACY-CSS FIX (2026-09-08): #ltms-welcome-banner se
+   removió — el banner fue eliminado (REMOVE-PROMO-POPUP-001) y su selector
+   no matcheaba nada. */
+
+/* HEADER-WIDTH-2026-10-28 (operador): la vitrina usa el header PV estándar
+   (negro, full-width) inyectado por wp_body_open. La topbar blanca propia
+   se oculta cuando el header PV está presente; si el componente no está
+   disponible queda como chrome de respaldo (logo/volver/carrito). */
+body.pv-pv-header .ltms-sf-topbar{display:none!important}
 body.ltms-storefront-page #ltms-floating-access,
 body.ltms-storefront-page #ltms-hello-access,
 body.ltms-storefront-page #ltms-header-access,
@@ -567,10 +572,19 @@ body.ltms-storefront-page .wh-header{display:none!important}
 </style>
 </head>
 <body <?php body_class( 'ltms-storefront-page' ); ?>>
-<!-- HEADER-UX (2026-09-11/12): topbar de la vitrina en 3 zonas (volver / logo /
-     acciones). Desktop: volver a la izquierda, logo centrado, acciones a la
-     derecha (grid 1fr auto 1fr en ltms-storefront.css). Carrito con SVG (antes un
-     emoji) y touch targets 40x40. -->
+<?php
+/* HEADER-WIDTH-2026-10-28 (operador): la vitrina deja de tener chrome propio
+ * y recibe el header PV compartido (negro, full-width) + catbar por el hook
+ * estándar. El body ya lleva pv-pv-header (filtro de body_class), de modo
+ * que el CSS crítico oculta la topbar legacy que sigue abajo como respaldo
+ * si LTMS_PV_Header no está disponible. */
+wp_body_open();
+?>
+<!-- HEADER-UX (2026-09-11/12): topbar legacy de la vitrina en 3 zonas (volver /
+     logo / acciones). Desktop: volver a la izquierda, logo centrado, acciones a
+     la derecha (grid 1fr auto 1fr en ltms-storefront.css). Carrito con SVG (antes
+     un emoji) y touch targets 40x40. Oculto bajo body.pv-pv-header desde
+     HEADER-WIDTH-2026-10-28 (el header PV lo reemplaza). -->
 <header class="ltms-sf-topbar">
     <div class="ltms-sf-topbar-inner">
         <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ltms-sf-topbar-back" aria-label="<?php esc_attr_e( 'Volver a la tienda', 'ltms' ); ?>">

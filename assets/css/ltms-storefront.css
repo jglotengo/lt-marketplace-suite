@@ -39,6 +39,11 @@
   z-index: 50;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
+/* HEADER-WIDTH-2026-10-28 (operador): el header PV compartido (negro,
+   full-width) reemplaza la topbar de la vitrina. Se conserva el markup como
+   respaldo si el header PV no está disponible. Misma regla en el CSS crítico
+   inline de class-ltms-vendor-storefront.php (AGENTS: sincronizar ambos). */
+body.pv-pv-header .ltms-sf-topbar { display: none !important; }
 .ltms-sf-topbar-inner {
   max-width: 1280px;
   margin: 0 auto;
