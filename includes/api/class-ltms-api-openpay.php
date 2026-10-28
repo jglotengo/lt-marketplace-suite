@@ -43,11 +43,22 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
     private string $country;
 
     /**
+     * Entorno de operación resuelto ('sandbox'|'live').
+     *
+     * @var string
+     */
+    private string $environment;
+
+    /**
      * Constructor.
      *
+     * @param string|null $country_override     País ('CO'|'MX'); default config global.
+     * @param string|null $environment_override 'sandbox'|'live'; default = testmode
+     *                                          del gateway WooCommerce correspondiente
+     *                                          (fuente única de verdad, ver PAY-13).
      * @throws \RuntimeException Si las credenciales no están configuradas.
      */
-    public function __construct( ?string $country_override = null ) {
+    public function __construct( ?string $country_override = null, ?string $environment_override = null ) {
         $this->provider_slug = 'openpay';
         $this->country       = $country_override
                              ?? LTMS_Core_Config::get_country();
@@ -71,17 +82,26 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
 
         $this->timeout       = 45; // Openpay puede tomar hasta 30s
 
-        $environment = LTMS_Core_Config::is_production() ? 'live' : 'sandbox';
-        $env_key     = "ltms_openpay_{$environment}";
+        // AUDIT-FUNNEL-PAY-13 FIX (P1, triple verdad del testmode): antes la URL
+        // (sandbox vs producción) dependía SOLO de LTMS_Core_Config::is_production(),
+        // mientras el SDK JavaScript del checkout se inicializa con el testmode del
+        // gateway WooCommerce (`is_sandbox`). Si ambos flags discrepaban (default de
+        // fábrica: testmode=yes en gateway + LTMS_ENVIRONMENT=production), el cliente
+        // tokenizaba la tarjeta contra sandbox y el servidor cobraba contra producción
+        // → el token no existe en esa cuenta → todo cobro falla. Ahora la fuente
+        // única es el testmode del gateway WC (mismo flag que usa el JS), con
+        // override explícito del caller y fallback al flag global solo si el
+        // gateway no tiene settings guardados.
+        $this->environment = $this->resolve_environment( $environment_override );
 
         // URLs según país y entorno
         if ( $this->country === 'MX' ) {
-            $this->api_url = LTMS_Core_Config::is_production()
+            $this->api_url = $this->environment === 'live'
                 ? 'https://api.openpay.mx/v1'
                 : 'https://sandbox-api.openpay.mx/v1';
         } else {
             // Colombia
-            $this->api_url = LTMS_Core_Config::is_production()
+            $this->api_url = $this->environment === 'live'
                 ? 'https://api.openpay.co/v1'
                 : 'https://sandbox-api.openpay.co/v1';
         }
@@ -98,17 +118,60 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             );
         }
 
-        // merchant_id no se cifra; private_key solo se descifra si tiene formato 'v1:...'
+        // merchant_id no se cifra; private_key puede llegar cifrada (LTMS Admin
+        // Settings, formatos v1/v2) o en texto plano (settings WC del gateway).
+        // AUDIT-FUNNEL-PAY-03 FIX: el guard anterior solo cubría 'v1:' e ignoraba
+        // el formato v2/GCM que emite encrypt() → key v2 tratada como plaintext
+        // → Basic Auth con basura → 401 en todos los cobros. Helper centralizado.
         $this->merchant_id = (string) $merchant_raw;
-        $this->private_key = str_starts_with( (string) $private_raw, 'v1:' )
-            ? LTMS_Core_Security::decrypt( $private_raw )
-            : (string) $private_raw;
+        $this->private_key = LTMS_Core_Security::maybe_decrypt( (string) $private_raw );
 
         // INTEGRATIONS-AUDIT P1 FIX: call parent::__construct() so the admin-
         // configurable timeout / retries / retry_delay apply. Re-apply the
         // Openpay-specific 45s timeout afterwards (parent may reset to 30s).
         parent::__construct();
         $this->timeout = 45;
+    }
+
+    /**
+     * Resuelve el entorno operativo de forma determinista (AUDIT-FUNNEL-PAY-13).
+     *
+     * Orden de precedencia:
+     *   1. Override explícito del caller ('sandbox'|'live').
+     *   2. testmode del gateway WooCommerce del país (mismo flag que inicializa
+     *      el SDK JS que tokeniza la tarjeta → garantiza que token y cobro
+     *      apuntan al MISMO entorno).
+     *   3. LTMS_Core_Config::is_production() (fallback legado).
+     *
+     * @param string|null $override Entorno explícito.
+     * @return string 'sandbox'|'live'
+     */
+    private function resolve_environment( ?string $override ): string {
+        if ( null !== $override && '' !== $override ) {
+            return strtolower( $override ) === 'live' ? 'live' : 'sandbox';
+        }
+
+        if ( function_exists( 'get_option' ) ) {
+            $settings_option = $this->country === 'MX'
+                ? 'woocommerce_ltms_openpay_mx_settings'
+                : 'woocommerce_ltms_openpay_settings';
+
+            $settings = get_option( $settings_option, [] );
+            if ( is_array( $settings ) && array_key_exists( 'testmode', $settings ) ) {
+                return ( 'yes' === $settings['testmode'] ) ? 'sandbox' : 'live';
+            }
+        }
+
+        return LTMS_Core_Config::is_production() ? 'live' : 'sandbox';
+    }
+
+    /**
+     * Entorno operativo resuelto ('sandbox'|'live').
+     *
+     * @return string
+     */
+    public function get_environment(): string {
+        return $this->environment;
     }
 
     /**
@@ -372,7 +435,9 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
      * @return array Lista de bancos [ ['name' => ..., 'code' => ...] ]
      */
     public function get_pse_banks(): array {
-        $cache_key = 'ltms_pse_banks_' . strtolower( $this->country );
+        // AUDIT-FUNNEL-PAY-13: el entorno forma parte del cache key — antes un
+        // cambio sandbox↔live servía hasta 6h la lista del entorno anterior.
+        $cache_key = 'ltms_pse_banks_' . strtolower( $this->country ) . '_' . $this->environment;
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) && ! empty( $cached ) ) {
             return $cached;

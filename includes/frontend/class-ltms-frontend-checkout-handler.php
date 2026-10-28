@@ -455,10 +455,16 @@ final class LTMS_Frontend_Checkout_Handler {
             $this->checkout_lock_key = 'ltms_checkout_lock_guest_anon';
         }
 
-        if ( get_transient( $this->checkout_lock_key ) ) {
+        // AUDIT-FUNNEL-PAY-09 FIX (P1): el lock anterior era get_transient()
+        // seguido de set_transient() — check y set SEPARADOS (TOCTOU). En hosting
+        // con múltiples workers PHP (SiteGround) un doble click pasa ambos checks
+        // antes de que el primero escriba → doble procesamiento simultáneo del
+        // pago. add_option() es un INSERT atómico en MySQL (fallo si ya existe) —
+        // primitiva real de check-and-set. Stale-takeover tras crash del proceso
+        // (PHP muerto sin release) a los 60s.
+        if ( ! $this->acquire_checkout_lock() ) {
             wp_send_json_error( [ 'message' => __( 'Checkout already in progress', 'ltms' ) ], 409 );
         }
-        set_transient( $this->checkout_lock_key, true, 60 );
 
         // Release the lock on every exit path — wp_send_json_* calls wp_die,
         // and register_shutdown_function runs after the response is sent.
@@ -556,9 +562,13 @@ final class LTMS_Frontend_Checkout_Handler {
 
         $amount      = (float) $order->get_total();
         $currency    = get_woocommerce_currency();
-        // ME-7 FIX: include a random suffix so concurrent checkouts in the same
-        // second do not collide on order_ref (which Openpay uses to dedupe charges).
-        $order_ref   = 'LTMS-' . $order->get_id() . '-' . gmdate( 'YmdHis' ) . '-' . wp_generate_password( 6, false );
+        // AUDIT-FUNNEL-PAY-08 FIX (P1): el order_ref llevaba sufijo aleatorio
+        // (timestamp + password) regenerado en cada request → Idempotency-Key
+        // `ltms_charge_{order_ref}` DISTINTO por intento → un timeout de red
+        // después de que Openpay procesó + reintento del usuario = SEGUNDO
+        // cargo real. La deduplicación de Openpay requiere una key ESTABLE por
+        // orden: mismos pedidos → misma key → Openpay devuelve el cargo original.
+        $order_ref   = 'LTMS-' . $order->get_id();
         $description = sprintf(
             __( 'Pedido #%d en Lo Tengo', 'ltms' ),
             $order->get_id()
@@ -742,7 +752,10 @@ final class LTMS_Frontend_Checkout_Handler {
         );
 
         return [
-            'success'        => isset( $charge['id'] ) && in_array( $charge['status'] ?? '', [ 'completed', 'in_progress' ], true ),
+            // AUDIT-FUNNEL-PAY-04 FIX (mismo patrón que gateway WC): 'in_progress'
+            // (3DS/antifraude) NO debe reportarse como success — el caller haría
+            // payment_complete() de un cargo sin confirmar. Solo 'completed'.
+            'success'        => isset( $charge['id'] ) && 'completed' === ( $charge['status'] ?? '' ),
             'transaction_id' => $charge['id'] ?? '',
             'gateway_used'   => 'openpay',
             'error'          => $charge['error_message'] ?? __( 'Error al procesar la tarjeta.', 'ltms' ),
@@ -787,7 +800,13 @@ final class LTMS_Frontend_Checkout_Handler {
         $customer['document_type']   = sanitize_text_field( $_POST['document_type'] ?? 'CC' );
         $customer['person_type']     = sanitize_text_field( $_POST['person_type'] ?? 'natural' );
 
-        $openpay = new LTMS_Api_Openpay();
+        // AUDIT-FUNNEL-PAY-13 FIX (P1): el cliente PSE debe operar en el MISMO
+        // entorno que el gateway PSE (su propio testmode), no en el que dicte el
+        // flag global de producción — antes un sandbox de gateway con site en
+        // producción cobraba contra la URL live con credenciales sandbox (401).
+        $pse_settings = function_exists( 'get_option' ) ? get_option( 'woocommerce_ltms_pse_settings', [] ) : [];
+        $pse_env      = ( is_array( $pse_settings ) && ( $pse_settings['testmode'] ?? 'yes' ) === 'yes' ) ? 'sandbox' : 'live';
+        $openpay = new LTMS_Api_Openpay( null, $pse_env );
         $charge  = $openpay->create_pse_charge(
             $amount,
             $description,
@@ -838,7 +857,10 @@ final class LTMS_Frontend_Checkout_Handler {
         string   $description,
         string   $order_ref
     ): array {
-        $openpay = new LTMS_Api_Openpay();
+        // AUDIT-FUNNEL-PAY-13 FIX (P1): OXXO solo existe en México — antes se
+        // instanciaba el cliente SIN país y tomaba el país global del sitio
+        // (CO en lo-tengo.com.co) → cargo OXXO contra la cuenta/URL de Colombia.
+        $openpay = new LTMS_Api_Openpay( 'MX' );
         $charge  = $openpay->create_oxxo_charge( $amount, $description, $customer, $order_ref );
 
         $reference   = $charge['payment_method']['reference'] ?? '';
@@ -1525,9 +1547,49 @@ final class LTMS_Frontend_Checkout_Handler {
      */
     public function release_checkout_lock(): void {
         if ( ! empty( $this->checkout_lock_key ) ) {
+            // AUDIT-FUNNEL-PAY-09 FIX: liberar la fila atómica (option) y limpiar
+            // el transient legado por si quedó de una ejecución anterior.
+            delete_option( self::lock_option_name( $this->checkout_lock_key ) );
             delete_transient( $this->checkout_lock_key );
             $this->checkout_lock_key = '';
         }
+    }
+
+    /**
+     * Nombre de la option que materializa el lock atómico de checkout.
+     *
+     * @param string $lock_key Clave lógica del lock.
+     * @return string
+     */
+    private static function lock_option_name( string $lock_key ): string {
+        return 'ltms_cklock_' . md5( $lock_key );
+    }
+
+    /**
+     * Adquiere el lock de checkout de forma ATÓMICA.
+     *
+     * AUDIT-FUNNEL-PAY-09 FIX: add_option() ejecuta un INSERT único en MySQL —
+     * si dos requests concurrentes llegan, solo uno inserta. Devuelve false si
+     * el lock existe Y no está vencido (crash del proceso dueño hace >60s).
+     *
+     * @return bool true si el lock fue adquirido.
+     */
+    private function acquire_checkout_lock(): bool {
+        $option = self::lock_option_name( $this->checkout_lock_key );
+        $stamp  = (string) time();
+
+        if ( add_option( $option, $stamp, '', false ) ) {
+            return true;
+        }
+
+        // Lock existente — takeover solo si está vencido (crash sin release).
+        $acquired_at = (int) get_option( $option, '0' );
+        if ( $acquired_at > 0 && ( time() - $acquired_at ) > 60 ) {
+            delete_option( $option );
+            return (bool) add_option( $option, (string) time(), '', false );
+        }
+
+        return false;
     }
 
     // =========================================================================

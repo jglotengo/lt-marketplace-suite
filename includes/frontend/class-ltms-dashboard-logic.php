@@ -1598,6 +1598,25 @@ final class LTMS_Dashboard_Logic {
             wp_send_json_error( __( 'Esa transición de estado no está permitida desde el estado actual.', 'ltms' ) );
         }
 
+        // AUDIT-FUNNEL-POST-05 FIX (P0 — fraude vendor): un vendedor podía pasar
+        // un pedido on-hold/pending (impago) a 'processing' → 'completed' desde su
+        // panel; 'completed' dispara el listener de comisiones → acreditación de
+        // dinero que nunca entró (el pago del gateway nunca se confirmó) → con
+        // producto digital el hold se libera a los 5 días y es retirable.
+        // Bloquear processing/completed sobre pedidos impagos con pasarela ONLINE
+        // (los métodos offline cod/bacs/cheque SÍ se marcan manualmente por
+        // diseño de WooCommerce — el admin confirma la recepción del dinero).
+        // Los administradores quedan exentos (current_user_can manage_woocommerce).
+        if ( in_array( $new_status, [ 'processing', 'completed' ], true )
+             && ! $order->is_paid()
+             && ! in_array( (string) $order->get_payment_method(), [ 'cod', 'bacs', 'cheque' ], true )
+             && ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error(
+                __( 'No puedes marcar como en proceso o completado un pedido que aún no ha sido pagado. Espera la confirmación del pago.', 'ltms' ),
+                403
+            );
+        }
+
         $order->update_status( $new_status, __( 'Cambiado por el vendedor desde el panel.', 'ltms' ) );
 
         wp_send_json_success( [

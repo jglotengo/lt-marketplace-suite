@@ -60,8 +60,12 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
 
     /**
      * Constructor.
+     *
+     * @param string|null $environment_override 'sandbox'|'live'. Default: testmode
+     *                                          del gateway WooCommerce Addi (fuente
+     *                                          única de verdad, AUDIT-FUNNEL-PAY-13).
      */
-    public function __construct() {
+    public function __construct( ?string $environment_override = null ) {
         $this->country       = LTMS_Core_Config::get_country();
         // AUDIT-API-ADDI-001 (Ciclo 1.4 P1): usar LTMS_Core_Config::is_production()
         // para consistencia con el resto del codebase (Openpay, Stripe, etc.). Antes
@@ -69,15 +73,46 @@ class LTMS_Api_Addi extends LTMS_Abstract_API_Client {
         // plugin la define siempre en lt-marketplace-suite.php:98 y tests/bootstrap.php
         // provee fallback, pero rompia el patron uniforme de acceso a configuracion
         // y haria morir al cliente Addi si un tercer caller lo carga fuera del bootstrap.
-        $environment         = LTMS_Core_Config::is_production() ? 'live' : 'sandbox';
+        // AUDIT-FUNNEL-PAY-13 FIX (P1): la URL ya no se decide solo por el flag global
+        // — se alinea con el testmode del gateway WC Addi (mismo flag que configura
+        // el flujo de checkout del comprador) para evitar sandbox/live cruzados.
+        $environment         = $this->resolve_environment( $environment_override );
         $this->api_url       = self::API_URLS[ $this->country ][ $environment ] ?? self::API_URLS['CO']['sandbox'];
-        $this->client_id     = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_id', '' ) );
-        $this->client_secret = LTMS_Core_Security::decrypt( LTMS_Core_Config::get( 'ltms_addi_client_secret', '' ) );
+        // AUDIT-FUNNEL-PAY-06 FIX: decrypt() incondicional mataba el constructor
+        // cuando client_id/client_secret se guardaron en texto plano (p.ej. via
+        // settings WC, que no cifra — client_id no está en $encrypted_fields).
+        // mismo helper tolerant que Openpay.
+        $this->client_id     = LTMS_Core_Security::maybe_decrypt( (string) LTMS_Core_Config::get( 'ltms_addi_client_id', '' ) );
+        $this->client_secret = LTMS_Core_Security::maybe_decrypt( (string) LTMS_Core_Config::get( 'ltms_addi_client_secret', '' ) );
         // INTEGRATIONS-AUDIT P1 FIX: set provider_slug so log_api_call() writes
         // provider='addi' in lt_api_logs (previously '' empty).
         $this->provider_slug = 'addi';
 
         parent::__construct();
+    }
+
+    /**
+     * Resuelve el entorno operativo (AUDIT-FUNNEL-PAY-13).
+     *
+     * Precedencia: override explícito → testmode del gateway WC Addi →
+     * LTMS_Core_Config::is_production().
+     *
+     * @param string|null $override Entorno explícito ('sandbox'|'live').
+     * @return string 'sandbox'|'live'
+     */
+    private function resolve_environment( ?string $override ): string {
+        if ( null !== $override && '' !== $override ) {
+            return strtolower( $override ) === 'live' ? 'live' : 'sandbox';
+        }
+
+        if ( function_exists( 'get_option' ) ) {
+            $settings = get_option( 'woocommerce_ltms_addi_settings', [] );
+            if ( is_array( $settings ) && array_key_exists( 'testmode', $settings ) ) {
+                return ( 'yes' === $settings['testmode'] ) ? 'sandbox' : 'live';
+            }
+        }
+
+        return LTMS_Core_Config::is_production() ? 'live' : 'sandbox';
     }
 
     /**

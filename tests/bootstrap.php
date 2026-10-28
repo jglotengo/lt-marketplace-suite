@@ -168,6 +168,36 @@ if ( ! class_exists( 'LTMS_Core_Security', false ) ) {
             return $decrypted;
         }
 
+        /**
+         * Stub inline de maybe_decrypt()/encrypt_if_plain() para modo UNIT_ONLY
+         * (AUDIT-FUNNEL-PAY-03). El stub de LTMS_Core_Security de este bootstrap
+         * previene que Composer cargue la clase real de
+         * includes/core/class-ltms-security.php, que ahora define estos helpers
+         * (usados por el webhook Openpay, LTMS_Api_Openpay, LTMS_Api_Addi,
+         * LTMS_Api_Stripe y los gateways WC). Sin este stub, esas rutas mueren
+         * con "Call to undefined method" en UNIT_ONLY — mismo patrón que el
+         * stub de get_client_ip_safe() (líneas siguientes).
+         */
+        public static function maybe_decrypt( string $value ): string {
+            if ( '' === $value ) {
+                return '';
+            }
+            if ( str_starts_with( $value, 'v1:' ) || str_starts_with( $value, 'v2:' ) ) {
+                return self::decrypt( $value );
+            }
+            return $value;
+        }
+
+        public static function encrypt_if_plain( string $secret ): string {
+            if ( '' === $secret ) {
+                return '';
+            }
+            if ( str_starts_with( $secret, 'v1:' ) || str_starts_with( $secret, 'v2:' ) ) {
+                return $secret;
+            }
+            return self::encrypt( $secret );
+        }
+
         public static function hash( string $value, string $pepper = '' ): string {
             if ( defined( 'SECURE_AUTH_SALT' ) && '' !== SECURE_AUTH_SALT ) {
                 $salt = SECURE_AUTH_SALT;

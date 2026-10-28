@@ -196,6 +196,54 @@ final class LTMS_Core_Security {
     }
 
     /**
+     * Descifra SOLO si el valor tiene formato cifrado ('v1:'/'v2:' + payload);
+     * si no, lo retorna tal cual (texto plano).
+     *
+     * AUDIT-FUNNEL-PAY-03 FIX (loop comprador): patrón centralizado para
+     * credenciales que pueden llegar cifradas (vía LTMS Admin Settings, que
+     * cifra con encrypt()) o en texto plano (vía settings WC del gateway, que
+     * guarda tal cual). Llamar decrypt() incondicional sobre texto plano lanza
+     * InvalidArgumentException — bug que mataba el webhook Openpay (500 en cada
+     * evento → PSE/Nequi/Daviplata/OXXO/SPEI nunca confirmados) y el
+     * constructor de LTMS_Api_Addi. Reemplaza los guards parciales v1-only
+     * (api-openpay:103, que ignora el formato v2/GCM que emite encrypt()).
+     *
+     * @param string $value Valor posiblemente cifrado.
+     * @return string Texto plano.
+     * @throws \RuntimeException Si el valor está marcado como cifrado pero el descifrado falla.
+     */
+    public static function maybe_decrypt( string $value ): string {
+        if ( '' === $value ) {
+            return '';
+        }
+        if ( str_starts_with( $value, 'v1:' ) || str_starts_with( $value, 'v2:' ) ) {
+            return self::decrypt( $value );
+        }
+        return $value;
+    }
+
+    /**
+     * Cifra un secreto solo si aún no tiene formato de ciphertext (v1:/v2:) —
+     * helper inverso de maybe_decrypt() para el lado escritor (persistencia de
+     * credenciales en options). Evita el doble cifrado.
+     *
+     * AUDIT-FUNNEL-PAY-03 FIX: centraliza el patrón que antes estaba duplicado
+     * (y con guard parcial v1-only) en los gateways.
+     *
+     * @param string $secret Secreto posiblemente en texto plano.
+     * @return string Secreto cifrado (o vacío).
+     */
+    public static function encrypt_if_plain( string $secret ): string {
+        if ( '' === $secret ) {
+            return '';
+        }
+        if ( str_starts_with( $secret, 'v1:' ) || str_starts_with( $secret, 'v2:' ) ) {
+            return $secret;
+        }
+        return self::encrypt( $secret );
+    }
+
+    /**
      * Descifra un valor cifrado con AES-256-CBC.
      *
      * @param string $ciphertext Texto cifrado (formato version:iv:cipher).

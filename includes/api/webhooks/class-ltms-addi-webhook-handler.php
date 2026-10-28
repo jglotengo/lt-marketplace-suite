@@ -89,16 +89,23 @@ class LTMS_Addi_Webhook_Handler {
             return new WP_REST_Response( [ 'error' => 'Order not found' ], 404 );
         }
 
-        switch ( $status ) {
-            case 'APPROVED':
+        // AUDIT-FUNNEL-PAY-05 FIX (loop comprador): $status viene de sanitize_key()
+        // (línea 42) que lo normaliza a MINÚSCULAS ('APPROVED' → 'approved'), pero
+        // los case comparaban en MAYÚSCULAS → el switch nunca matcheaba y las
+        // órdenes Addi jamás se marcaban pagadas ni canceladas vía webhook.
+        // Comparación en minúsculas + fallback a mayúsculas por si un caller
+        // futuro pasa el status sin sanitize_key().
+        $status_lower = strtolower( trim( $status ) );
+        switch ( $status_lower ) {
+            case 'approved':
                 if ( $order->needs_payment() ) {
                     $order->payment_complete( sanitize_text_field( $body['transactionId'] ?? '' ) );
                     $order->add_order_note( __( 'Pago Addi aprobado vía webhook.', 'ltms' ) );
                 }
                 break;
 
-            case 'REJECTED':
-            case 'CANCELLED':
+            case 'rejected':
+            case 'cancelled':
                 if ( ! $order->has_status( [ 'cancelled', 'refunded' ] ) ) {
                     $order->update_status( 'cancelled', __( 'Pago Addi rechazado/cancelado vía webhook.', 'ltms' ) );
                 }

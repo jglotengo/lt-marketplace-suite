@@ -143,6 +143,18 @@ class LTMS_Stripe_Webhook_Handler {
                 [ 'event_type' => $event_type, 'log_id' => $log_id ]
             );
             self::update_webhook_log( $log_id, 'failed', $e->getMessage() );
+
+            // AUDIT-FUNNEL-PAY-11 FIX (P1): antes el catch tragaba el error y
+            // respondía 200 → Stripe NO reintentaba → un fallo transitorio de DB
+            // procesando payment_intent.succeeded = evento PERDIDO para siempre
+            // (dinero cobrado, orden on-hold indefinida). Ahora: borrar el
+            // transient de idempotencia (para que el reintento reprocese) y
+            // responder 500 → Stripe re-entrega el evento (hasta 72h).
+            delete_transient( $seen_key );
+            return new WP_REST_Response(
+                [ 'error' => 'Internal processing error' ],
+                500
+            );
         }
 
         return new WP_REST_Response( [ 'received' => true ], 200 );

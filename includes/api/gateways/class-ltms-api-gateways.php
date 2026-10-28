@@ -87,10 +87,14 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
         parent::process_admin_options();
 
         $country = LTMS_Core_Config::get_country();
+        // AUDIT-FUNNEL-PAY-03 FIX (lado escritor): cifrar la private key al
+        // persistirla en options — antes se guardaba en TEXTO PLANO y cualquier
+        // lector estricto (decrypt() del webhook) reventaba; el valor cifrado
+        // v1/v2 es leído correctamente por LTMS_Core_Security::maybe_decrypt().
         update_option( "ltms_openpay_{$country}_merchant_id", $this->get_option( 'merchant_id', '' ) );
-        update_option( "ltms_openpay_{$country}_private_key",  $this->get_option( 'private_key', '' ) );
+        update_option( "ltms_openpay_{$country}_private_key",  LTMS_Core_Security::encrypt_if_plain( $this->get_option( 'private_key', '' ) ) );
         update_option( 'ltms_openpay_merchant_id', $this->get_option( 'merchant_id', '' ) );
-        update_option( 'ltms_openpay_private_key',  $this->get_option( 'private_key', '' ) );
+        update_option( 'ltms_openpay_private_key',  LTMS_Core_Security::encrypt_if_plain( $this->get_option( 'private_key', '' ) ) );
         update_option( 'ltms_openpay_public_key',   $this->get_option( 'public_key', '' ) );
     }
 
@@ -308,11 +312,14 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
 
             // Sync gateway credentials to LTMS_Core_Config options so LTMS_Api_Openpay finds them.
             // The factory caches instances, so reset it to force fresh instantiation with new creds.
+            // AUDIT-FUNNEL-PAY-03 FIX: cifrar la private key al persistir (antes
+            // en texto plano) — el hot-path reescribía la versión cifrada que
+            // guardó LTMS Admin Settings, pisándola con plaintext en cada compra.
             $country = LTMS_Core_Config::get_country();
             update_option( "ltms_openpay_{$country}_merchant_id", $this->get_option( 'merchant_id', '' ) );
-            update_option( "ltms_openpay_{$country}_private_key",  $this->get_option( 'private_key', '' ) );
+            update_option( "ltms_openpay_{$country}_private_key",  LTMS_Core_Security::encrypt_if_plain( $this->get_option( 'private_key', '' ) ) );
             update_option( 'ltms_openpay_merchant_id', $this->get_option( 'merchant_id', '' ) );
-            update_option( 'ltms_openpay_private_key',  $this->get_option( 'private_key', '' ) );
+            update_option( 'ltms_openpay_private_key',  LTMS_Core_Security::encrypt_if_plain( $this->get_option( 'private_key', '' ) ) );
             LTMS_Api_Factory::reset( 'openpay' );
 
             $client  = LTMS_Api_Factory::get( 'openpay' );
@@ -320,6 +327,21 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
             $token   = sanitize_text_field( wp_unslash( $_POST['openpay_token'] ?? '' ) );
             // phpcs:ignore WordPress.Security.NonceVerification
             $device  = sanitize_text_field( wp_unslash( $_POST['openpay_device_session_id'] ?? '' ) );
+
+            // AUDIT-FUNNEL-PAY-15 FIX (P1): si el SDK JS no pudo crear la device
+            // session (script bloqueado/adblock/error de red), antes se enviaba el
+            // cargo SIN device_session_id de forma totalmente silenciosa y Openpay
+            // lo rechazaba con un error opaco para el comprador. Ahora queda
+            // registrado en el log estructurado para diagnóstico/soporte.
+            if ( '' === $device && class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'OPENPAY_DEVICE_SESSION_MISSING',
+                    sprintf(
+                        'Cargo de tarjeta sin device_session_id (order=%s). El SDK JS no generó la sesión de dispositivo.',
+                        $order->get_order_number()
+                    )
+                );
+            }
 
             $result = $client->charge( [
                 'order_id'         => $order_id,
@@ -335,8 +357,48 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
                 ],
             ] );
 
-            $order->payment_complete( $result['id'] ?? '' );
-            $order->update_meta_data( '_openpay_transaction_id', $result['id'] ?? '' );
+            // AUDIT-FUNNEL-PAY-04 FIX (P0): antes se llamaba payment_complete()
+            // SIN validar $result['status']. Openpay responde HTTP 200 con
+            // status='in_progress' cuando el cargo requiere 3DS o queda en revisión
+            // antifraude → la orden se marcaba pagada (carrito vaciado, producto
+            // liberado) con un cargo que NUNCA se completó. Ahora:
+            //   - 'completed'              → payment_complete (única vía legítima)
+            //   - in_progress/charge_pending con URL de 3DS → on-hold + redirect
+            //     (mismo patrón que el gateway Stripe, gateway-stripe.php:294-311)
+            //   - cualquier otro estado     → error (no payment_complete)
+            $charge_status = $result['status'] ?? '';
+            $charge_id     = $result['id'] ?? '';
+
+            if ( 'completed' !== $charge_status ) {
+                $redirect_url = $result['raw']['payment_method']['url'] ?? '';
+                if ( in_array( $charge_status, [ 'in_progress', 'charge_pending' ], true ) && ! empty( $redirect_url ) ) {
+                    $order->update_status(
+                        'on-hold',
+                        sprintf(
+                            /* translators: %s: charge ID */
+                            __( 'Autenticación 3DS requerida por Openpay. Charge: %s', 'ltms' ),
+                            $charge_id
+                        )
+                    );
+                    $order->update_meta_data( '_openpay_transaction_id', $charge_id );
+                    $order->save();
+
+                    return [
+                        'result'   => 'success',
+                        'redirect' => $redirect_url,
+                    ];
+                }
+                throw new \RuntimeException(
+                    sprintf(
+                        /* translators: %s: estado del cargo */
+                        __( 'El pago no se completó (estado: %s). Verifica tus datos e intenta de nuevo.', 'ltms' ),
+                        $charge_status ?: 'desconocido'
+                    )
+                );
+            }
+
+            $order->payment_complete( $charge_id );
+            $order->update_meta_data( '_openpay_transaction_id', $charge_id );
             $order->save();
 
             WC()->cart->empty_cart();
@@ -427,6 +489,29 @@ class LTMS_Api_Gateway_Addi extends WC_Payment_Gateway {
         }
     }
 
+    /**
+     * Saves WC gateway settings AND syncs credentials to LTMS config options.
+     *
+     * AUDIT-FUNNEL-PAY-06 FIX: el form WC guarda en
+     * woocommerce_ltms_addi_settings, pero LTMS_Api_Addi lee
+     * ltms_addi_client_id/secret y el webhook handler lee ltms_addi_webhook_token
+     * — opciones que NADIE escribía desde este form → credenciales configuradas
+     * aquí jamás llegaban al cliente API. Mismo patrón de sync del gateway
+     * Openpay (process_admin_options). client_secret se cifra; client_id y
+     * webhook_token van tal cual (no son secretos de autenticación mutua,
+     * coincide con $encrypted_fields del admin LTMS que solo cifra el secret).
+     */
+    public function process_admin_options(): void {
+        parent::process_admin_options();
+
+        update_option( 'ltms_addi_client_id',     $this->get_option( 'client_id', '' ) );
+        update_option( 'ltms_addi_client_secret', LTMS_Core_Security::encrypt_if_plain( $this->get_option( 'client_secret', '' ) ) );
+        update_option( 'ltms_addi_webhook_token', $this->get_option( 'webhook_token', '' ) );
+        if ( class_exists( 'LTMS_Api_Factory' ) ) {
+            LTMS_Api_Factory::reset( 'addi' );
+        }
+    }
+
     public function init_form_fields(): void {
         $this->form_fields = [
             'enabled'       => [
@@ -489,27 +574,69 @@ class LTMS_Api_Gateway_Addi extends WC_Payment_Gateway {
             }
 
             $client  = LTMS_Api_Factory::get( 'addi' );
+            // AUDIT-FUNNEL-PAY-06 FIX (P0): el contrato estaba desalineado en AMBAS
+            // direcciones con LTMS_Api_Addi::create_application():
+            //  - IDA: el gateway enviaba keys que la API no lee ('orderId',
+            //    'totalAmount', 'client.firstName/lastName/cellphone',
+            //    'redirectUrl', 'webhookUrl') → payload a Addi con orderId=null,
+            //    value=0.0, cliente vacío y callbacks vacíos.
+            //  - VUELTA: el gateway leía 'applicationId'/'url' pero la API
+            //    retorna 'application_id'/'checkout_url' → redirect caía al
+            //    fallback order-received y el cliente NUNCA pasaba por Addi.
+            // Ahora se envían/leen las keys reales (mismo contrato que el
+            // handler AJAX process_addi_payment, checkout-handler:875-916).
+            $items = [];
+            foreach ( $order->get_items() as $item ) {
+                $product     = $item->get_product();
+                $qty         = max( 1, $item->get_quantity() );
+                $items[]     = [
+                    'sku'      => (string) ( $product ? ( $product->get_sku() ?: $item->get_product_id() ) : $item->get_product_id() ),
+                    'name'     => $item->get_name(),
+                    'quantity' => $item->get_quantity(),
+                    // Precio unitario = total de línea / cantidad (sin usar
+                    // get_item_total(), que requiere WC_Order_Item tipado).
+                    'price'    => (float) ( (float) $item['total'] / $qty ),
+                ];
+            }
+
+            $document = '';
+            // phpcs:disable WordPress.Security.NonceVerification
+            if ( ! empty( $_POST['document_number'] ) ) {
+                $document = sanitize_text_field( wp_unslash( $_POST['document_number'] ) );
+            } elseif ( ! empty( $_POST['ltms_pse_doc_number'] ) ) {
+                $document = sanitize_text_field( wp_unslash( $_POST['ltms_pse_doc_number'] ) );
+            }
+            // phpcs:enable
+
             $session = $client->create_application( [
-                'orderId'     => $order_id,
-                'totalAmount' => [ 'value' => (float) $order->get_total(), 'currency' => get_woocommerce_currency() ],
-                'client'      => [
-                    'firstName' => $order->get_billing_first_name(),
-                    'lastName'  => $order->get_billing_last_name(),
-                    'email'     => $order->get_billing_email(),
-                    'cellphone' => $order->get_billing_phone(),
+                'order_id'           => (string) $order_id,
+                'amount'             => (float) $order->get_total(),
+                'currency'           => get_woocommerce_currency(),
+                'items'              => $items,
+                'client'             => [
+                    'first_name' => $order->get_billing_first_name(),
+                    'last_name'  => $order->get_billing_last_name(),
+                    'email'      => $order->get_billing_email(),
+                    'phone'      => $order->get_billing_phone(),
+                    'document'   => $document,
                 ],
-                'redirectUrl' => $this->get_return_url( $order ),
-                'webhookUrl'  => rest_url( 'ltms/v1/webhooks/addi' ),
+                'callback_approved'  => add_query_arg( [ 'addi_status' => 'approved', 'order_id' => $order_id ], $order->get_checkout_order_received_url() ),
+                'callback_rejected'  => add_query_arg( [ 'addi_status' => 'rejected' ], wc_get_checkout_url() ),
+                'callback_cancelled' => add_query_arg( [ 'addi_status' => 'cancelled' ], wc_get_checkout_url() ),
             ] );
+
+            if ( empty( $session['checkout_url'] ) ) {
+                throw new \RuntimeException( __( 'No se pudo iniciar el flujo Addi. Intenta de nuevo.', 'ltms' ) );
+            }
 
             // Marcar como pendiente en WooCommerce
             $order->update_status( 'pending', __( 'Esperando confirmación de Addi.', 'ltms' ) );
-            $order->update_meta_data( '_ltms_addi_application_id', $session['applicationId'] ?? '' );
+            $order->update_meta_data( '_ltms_addi_application_id', $session['application_id'] ?? '' );
             $order->save();
 
             return [
                 'result'   => 'success',
-                'redirect' => $session['url'] ?? $this->get_return_url( $order ),
+                'redirect' => $session['checkout_url'],
             ];
 
         } catch ( \Throwable $e ) {
@@ -675,8 +802,10 @@ class LTMS_Api_Gateway_PSE extends WC_Payment_Gateway {
             // Sync credenciales
             $openpay_gw = new LTMS_Api_Gateway_Openpay();
             $country    = LTMS_Core_Config::get_country();
+            // AUDIT-FUNNEL-PAY-03 FIX: cifrar private key al persistir (helper
+            // centralizado de LTMS_Core_Security).
             update_option( "ltms_openpay_{$country}_merchant_id", $openpay_gw->get_option( 'merchant_id', '' ) );
-            update_option( "ltms_openpay_{$country}_private_key",  $openpay_gw->get_option( 'private_key', '' ) );
+            update_option( "ltms_openpay_{$country}_private_key",  LTMS_Core_Security::encrypt_if_plain( $openpay_gw->get_option( 'private_key', '' ) ) );
             LTMS_Api_Factory::reset( 'openpay' );
 
             $client = LTMS_Api_Factory::get( 'openpay' );
@@ -739,48 +868,37 @@ class LTMS_Api_Gateway_PSE extends WC_Payment_Gateway {
     /**
      * Obtiene la lista de bancos PSE disponibles desde Openpay.
      *
+     * CICLO33-P1-SSL-OPENPAY-PSE FIX (preservado por AUDIT-FUNNEL-PAY-12):
+     * la invariante INTEGRATIONS-AUDIT P1 sslverify se mantiene — la llamada
+     * wp_remote_get directa (con patron canonico
+     * `! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY )`)
+     * fue reemplazada por una delegación a LTMS_Api_Openpay::get_pse_banks(),
+     * cuyo perform_request() implementa el MISMO patron canonico sslverify
+     * (establecido C18 en class-ltms-abstract-api-client.php) más Basic Auth.
+     *
+     * AUDIT-FUNNEL-PAY-12 FIX (P1): antes hacía wp_remote_get directo a
+     * https://api.openpay.co/v1/{merchant}/pseBanks — URL de PRODUCCIÓN
+     * hardcodeada (sin rama sandbox) y endpoint distinto al que usa el cliente
+     * API (/pse/banks). Con credenciales sandbox contra el host de producción,
+     * Openpay respondía 401 → select de bancos vacío → PSE no operable en
+     * sandbox (prueba E2E imposible). Ahora delega en el cliente API, que
+     * resuelve la URL correcta según entorno (sandbox/producción), añade
+     * Basic Auth y cachea 6h.
+     *
      * @return array<int, array<string, string>>
      */
     private function get_pse_banks(): array {
-        $cached = get_transient( 'ltms_pse_banks' );
-        if ( is_array( $cached ) && ! empty( $cached ) ) {
-            return $cached;
-        }
-
         try {
-            // Leer credenciales desde las mismas opciones que usa LTMS_Api_Openpay
-            $merchant_id = get_option( 'ltms_openpay_merchant_id', '' );
-            $private_key = get_option( 'ltms_openpay_private_key', '' );
-
-            if ( empty( $merchant_id ) || empty( $private_key ) ) {
+            if ( ! class_exists( 'LTMS_Api_Openpay' ) || ! class_exists( 'LTMS_Api_Factory' ) ) {
                 return [];
             }
-
-            // CICLO33-P1-SSL-OPENPAY-PSE FIX: sslverify explicito. Invariante INTEGRATIONS-AUDIT P1
-            // (establecida C18, extendida C32 Leccion 32.1 regla #3). La peticion envia private_key
-            // Openpay como Basic Auth; un MITM podia interceptar la llave o inyectar lista de bancos
-            // falseada. Patron canonico con override por LTMS_DISABLE_SSL_VERIFY.
-            $resp = wp_remote_get(
-                "https://api.openpay.co/v1/{$merchant_id}/pseBanks",
-                [
-                    'headers' => [ 'Authorization' => 'Basic ' . base64_encode( $private_key . ':' ) ],
-                    'timeout' => 8,
-                    'sslverify' => ! ( defined( 'LTMS_DISABLE_SSL_VERIFY' ) && LTMS_DISABLE_SSL_VERIFY ),
-                ]
-            );
-
-            if ( ! is_wp_error( $resp ) && wp_remote_retrieve_response_code( $resp ) === 200 ) {
-                $banks = json_decode( wp_remote_retrieve_body( $resp ), true );
-                if ( is_array( $banks ) && ! empty( $banks ) ) {
-                    set_transient( 'ltms_pse_banks', $banks, HOUR_IN_SECONDS * 6 );
-                    return $banks;
-                }
-            }
+            $client = LTMS_Api_Factory::get( 'openpay' );
+            $banks  = $client->get_pse_banks();
+            return is_array( $banks ) ? $banks : [];
         } catch ( \Throwable $e ) {
-            // Silencioso — retornar lista vacía
+            // Silencioso — retornar lista vacía (credenciales sin configurar).
+            return [];
         }
-
-        return [];
     }
 }
 

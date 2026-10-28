@@ -42,12 +42,23 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
     /**
      * Constructor.
      *
-     * @param string $secret_key Clave secreta de Stripe.
+     * AUDIT-FUNNEL-PAY-02 FIX (P0): LTMS_Api_Factory::get('stripe') instanciaba
+     * `new $class_name()` SIN argumentos → ArgumentCountError (TypeError fatal
+     * en PHP 8) → el fallback Stripe del orquestador NUNCA funcionó. Los args
+     * ahora son opcionales: si no se pasan, se autoconfiguran desde los
+     * settings del gateway WC (woocommerce_ltms_stripe_settings) — mismo
+     * patrón self-configuring de LTMS_Api_Openpay/LTMS_Api_Addi.
+     *
+     * @param string $secret_key Clave secreta de Stripe (vacía = auto-config).
      * @param bool   $is_live    true = producción, false = sandbox.
      */
-    public function __construct( string $secret_key, bool $is_live = false ) {
+    public function __construct( string $secret_key = '', bool $is_live = false ) {
         $this->provider_slug = 'stripe';
         $this->api_url       = 'https://api.stripe.com/v1'; // No usado directamente; requerido por padre.
+
+        if ( '' === $secret_key ) {
+            [ $secret_key, $is_live ] = self::resolve_config_keys();
+        }
         $this->secret_key    = $secret_key;
         $this->is_live       = $is_live;
 
@@ -73,6 +84,67 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
         // the abstract client's max_retries was completely irrelevant since
         // Stripe SDK bypasses perform_request().
         \Stripe\Stripe::setMaxNetworkRetries( 3 );
+    }
+
+    /**
+     * Resuelve las claves de Stripe desde configuración cuando el constructor
+     * se invoca sin argumentos (vía LTMS_Api_Factory).
+     *
+     * Orden de precedencia (mirrors class-ltms-gateway-stripe.php:469-475):
+     *   1. Settings del gateway WC (`woocommerce_ltms_stripe_settings`):
+     *      testmode=yes → secret_key (sandbox); testmode=no → secret_key_live.
+     *   2. Opciones LTMS (ltms_stripe_secret_key / ltms_stripe_secret_key_live).
+     *
+     * @return array{0: string, 1: bool} [secret_key, is_live]
+     */
+    private static function resolve_config_keys(): array {
+        $settings = get_option( 'woocommerce_ltms_stripe_settings', [] );
+        $settings = is_array( $settings ) ? $settings : [];
+        $testmode = ( $settings['testmode'] ?? 'yes' ) === 'yes';
+
+        $secret_key = $testmode
+            ? (string) ( $settings['secret_key'] ?? '' )
+            : (string) ( $settings['secret_key_live'] ?? '' );
+        $is_live   = ! $testmode;
+
+        if ( '' === $secret_key ) {
+            // Fallback a opciones LTMS (pantalla "Pasarelas de Pago" del admin).
+            if ( $testmode ) {
+                $secret_key = (string) LTMS_Core_Config::get( 'ltms_stripe_secret_key', '' );
+            } else {
+                $secret_key = (string) LTMS_Core_Config::get( 'ltms_stripe_secret_key_live', '' )
+                    ?: (string) LTMS_Core_Config::get( 'ltms_stripe_secret_key', '' );
+            }
+        }
+
+        // Tolerar valores cifrados (v1:/v2:) o en texto plano.
+        $secret_key = LTMS_Core_Security::maybe_decrypt( $secret_key );
+
+        return [ $secret_key, $is_live ];
+    }
+
+    /**
+     * Resuelve la URL de retorno post-3DS desde el metadata del PaymentIntent.
+     *
+     * AUDIT-FUNNEL-PAY-10: usa la order-received URL del pedido cuando el
+     * metadata trae order_id; fallback a la URL de checkout si no se puede
+     * resolver la orden (paridad con el comportamiento anterior).
+     *
+     * @param array $metadata Metadatos del intent (order_id, ...).
+     * @return string
+     */
+    private static function resolve_return_url( array $metadata ): string {
+        $order_id = absint( $metadata['order_id'] ?? 0 );
+        if ( $order_id ) {
+            $order = wc_get_order( $order_id );
+            if ( $order instanceof WC_Order ) {
+                $received = $order->get_checkout_order_received_url();
+                if ( ! empty( $received ) ) {
+                    return $received;
+                }
+            }
+        }
+        return wc_get_checkout_url();
     }
 
     /**
@@ -116,7 +188,12 @@ final class LTMS_Api_Stripe extends LTMS_Abstract_API_Client {
                 // 'requires_action' si necesita 3DS) sin llamada extra de confirm().
                 $params['payment_method']       = sanitize_text_field( $payment_method_id );
                 $params['confirm']              = true;
-                $params['return_url']           = wc_get_checkout_url();
+                // AUDIT-FUNNEL-PAY-10 FIX (P1): el return_url del 3DS apuntaba al
+                // CHECKOUT (wc_get_checkout_url) — al completar la autenticación
+                // bancaria el cliente volvía a un checkout vacío/confuso con la
+                // orden on-hold. Debe ser la página de pedido recibido (el webhook
+                // payment_intent.succeeded la marca pagada en paralelo).
+                $params['return_url']           = self::resolve_return_url( $metadata );
                 $params['payment_method_types'] = [ 'card' ];
             } else {
                 // Fallback sin payment_method (ej. Apple Pay desde frontend).

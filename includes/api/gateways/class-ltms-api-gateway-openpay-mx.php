@@ -96,45 +96,89 @@ class LTMS_Api_Gateway_Openpay_MX extends WC_Payment_Gateway {
         if ( ! $order ) { wc_add_notice( __( 'Pedido no encontrado.', 'ltms' ), 'error' ); return [ 'result' => 'fail' ]; }
         $merchant_id = $this->get_option( 'merchant_id', '' );
         $private_key = $this->get_option( 'private_key', '' );
-        $public_key  = $this->get_option( 'public_key', '' );
-        $sandbox     = $this->get_option( 'testmode', 'yes' ) === 'yes';
         if ( empty( $merchant_id ) || empty( $private_key ) ) {
             wc_add_notice( __( 'Openpay MX no está configurado.', 'ltms' ), 'error' );
             return [ 'result' => 'fail' ];
         }
-        $method  = sanitize_text_field( wp_unslash( $_POST['_ltms_openpay_mx_method'] ?? 'card' ) );
-        $openpay = new LTMS_Api_Openpay( $merchant_id, $private_key, $public_key, 'MX', $sandbox );
-        $amount  = (float) $order->get_total();
+        $method = sanitize_text_field( wp_unslash( $_POST['_ltms_openpay_mx_method'] ?? 'card' ) );
+
+        // AUDIT-FUNNEL-PAY-07 FIX (P0 MX): antes instanciaba
+        // `new LTMS_Api_Openpay( $merchant_id, $private_key, $public_key, 'MX', $sandbox )`
+        // pero la firma real del constructor es `__construct( ?string $country_override )`
+        // → el merchant_id llegaba como $country_override →
+        // InvalidArgumentException('País no soportado: mABC123...') en TODO intento.
+        // Además create_charge() se llamaba con array (firma real: 7 args
+        // posicionales), create_oxxo_charge() con $nombre string donde espera
+        // array $customer, y SPEI vía create_pse_charge() (Colombia-only, lanza
+        // 'PSE solo disponible en Colombia' — bug M-114 solo corregido en el
+        // checkout MX custom, no aquí). Ahora: sync de credenciales al patrón
+        // de opciones del kernel + factory (igual que el gateway CO) y firmas
+        // reales de cada método.
+        try {
+            update_option( 'ltms_openpay_MX_merchant_id', $merchant_id );
+            update_option( 'ltms_openpay_MX_private_key', LTMS_Core_Security::encrypt_if_plain( $private_key ) );
+            LTMS_Api_Factory::reset( 'openpay' );
+            /** @var LTMS_Api_Openpay $openpay */
+            $openpay = LTMS_Api_Factory::get( 'openpay' );
+        } catch ( \Throwable $e ) {
+            wc_add_notice( esc_html( $e->getMessage() ), 'error' );
+            return [ 'result' => 'fail' ];
+        }
+
+        $amount = (float) $order->get_total();
+        // phpcs:disable WordPress.Security.NonceVerification
+        $card_token = sanitize_text_field( wp_unslash( $_POST['openpay_mx_token'] ?? '' ) );
+        $device_id  = sanitize_text_field( wp_unslash( $_POST['openpay_mx_device_session_id'] ?? '' ) );
+        // phpcs:enable
+        $customer = [
+            'name'  => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'email' => $order->get_billing_email(),
+        ];
+        $description = sprintf( __( 'Pedido #%d — lo-tengo.com.co', 'ltms' ), $order_id );
+
         try {
             if ( 'card' === $method ) {
-                $result = $openpay->create_charge( [
-                    'method'            => 'card',
-                    'source_id'         => sanitize_text_field( wp_unslash( $_POST['openpay_mx_token'] ?? '' ) ),
-                    'amount'            => $amount,
-                    'currency'          => 'MXN',
-                    'description'       => sprintf( __( 'Pedido #%d — lo-tengo.com.co', 'ltms' ), $order_id ),
-                    'device_session_id' => sanitize_text_field( wp_unslash( $_POST['openpay_mx_device_session_id'] ?? '' ) ),
-                    'customer'          => [ 'name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), 'last_name' => '', 'phone_number' => $order->get_billing_phone() ?: '0000000000', 'email' => $order->get_billing_email() ],
-                    'redirect_url'      => $order->get_checkout_order_received_url(),
-                ] );
+                $result = $openpay->create_charge(
+                    $card_token,
+                    $amount,
+                    $description,
+                    array_merge( $customer, [ 'phone_number' => $order->get_billing_phone() ?: '0000000000' ] ),
+                    (string) $order_id,
+                    $device_id,
+                    true
+                );
             } elseif ( 'oxxo' === $method ) {
-                $result = $openpay->create_oxxo_charge( $amount, $order->get_billing_email(), $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), sprintf( __( 'Pedido #%d', 'ltms' ), $order_id ) );
+                $result = $openpay->create_oxxo_charge( $amount, $description, $customer, (string) $order_id );
             } else {
-                $result = $openpay->create_pse_charge( $amount, $order->get_billing_email(), $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(), '', $order->get_checkout_order_received_url() );
+                $result = $openpay->create_spei_reference( $amount, $description, $customer, (string) $order_id );
             }
         } catch ( \Throwable $e ) {
             LTMS_Core_Logger::error( 'OPENPAY_MX_PROCESS_FAIL', $e->getMessage(), [ 'order_id' => $order_id ] );
             wc_add_notice( esc_html( $e->getMessage() ), 'error' );
             return [ 'result' => 'fail' ];
         }
-        if ( empty( $result['id'] ) && empty( $result['success'] ) ) {
+        $charge_id = (string) ( $result['id'] ?? '' );
+        if ( '' === $charge_id ) {
             wc_add_notice( esc_html( $result['error_message'] ?? $result['error'] ?? __( 'Error en Openpay MX.', 'ltms' ) ), 'error' );
             return [ 'result' => 'fail' ];
         }
-        $charge_id = $result['id'] ?? ( $result['data']['id'] ?? '' );
         $order->update_meta_data( '_ltms_openpay_mx_charge_id', $charge_id );
         $order->update_meta_data( '_ltms_openpay_mx_method', $method );
         if ( 'card' === $method ) {
+            // AUDIT-FUNNEL-PAY-04 FIX (mismo patrón que gateway CO): no llamar
+            // payment_complete() sin validar status — in_progress (3DS) debe
+            // quedar on-hold con redirect a payment_method.url.
+            $charge_status = $result['status'] ?? '';
+            if ( 'completed' !== $charge_status ) {
+                $redirect_url = $result['raw']['payment_method']['url'] ?? '';
+                if ( in_array( $charge_status, [ 'in_progress', 'charge_pending' ], true ) && ! empty( $redirect_url ) ) {
+                    $order->update_status( 'on-hold', sprintf( __( 'Autenticación 3DS requerida por Openpay MX. Charge: %s', 'ltms' ), $charge_id ) );
+                    $order->save();
+                    return [ 'result' => 'success', 'redirect' => $redirect_url ];
+                }
+                wc_add_notice( __( 'El pago no se completó. Verifica tus datos e intenta de nuevo.', 'ltms' ), 'error' );
+                return [ 'result' => 'fail' ];
+            }
             $order->payment_complete( $charge_id );
             $order->add_order_note( sprintf( __( 'Pago tarjeta Openpay MX. Charge: %s', 'ltms' ), $charge_id ) );
         } else {
@@ -152,8 +196,9 @@ class LTMS_Api_Gateway_Openpay_MX extends WC_Payment_Gateway {
         if ( ! $order ) { return new WP_Error( 'ltms_openpay_mx_refund', __( 'Pedido no encontrado.', 'ltms' ) ); }
         $charge_id = $order->get_meta( '_ltms_openpay_mx_charge_id', true );
         if ( empty( $charge_id ) ) { return new WP_Error( 'ltms_openpay_mx_refund', __( 'No se encontró el cargo de Openpay MX.', 'ltms' ) ); }
-        $openpay = new LTMS_Api_Openpay( $this->get_option( 'merchant_id', '' ), $this->get_option( 'private_key', '' ), $this->get_option( 'public_key', '' ), 'MX', $this->get_option( 'testmode', 'yes' ) === 'yes' );
+        // AUDIT-FUNNEL-PAY-07 FIX: misma instanciación correcta que process_payment.
         try {
+            $openpay = LTMS_Api_Factory::get( 'openpay' );
             $result = $openpay->create_refund( $charge_id, $amount ?? (float) $order->get_total(), $reason ?: 'Reembolso solicitado' );
         } catch ( \Throwable $e ) {
             return new WP_Error( 'ltms_openpay_mx_refund', esc_html( $e->getMessage() ) );

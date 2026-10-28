@@ -287,8 +287,10 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
         $order->update_meta_data( '_ltms_stripe_payment_method_id', $payment_method_id );
         $order->save();
 
-        // Vaciar el carrito ahora — el stock se reduce cuando el webhook confirme.
-        WC()->cart->empty_cart();
+        // AUDIT-FUNNEL-PAY-20 FIX (P2): empty_cart() se ejecutaba ANTES de evaluar
+        // el status del PI — en card_error (result fail) el cliente perdía el
+        // carrito y debía re-armarlo manualmente. Ahora el carrito se vacía solo
+        // en las rutas de éxito (3DS redirect y pago confirmado).
 
         // Caso 1: Pago requiere autenticación 3DS — redirigir al next_action URL.
         if ( $pi_status === 'requires_action' || $pi_status === 'requires_source_action' ) {
@@ -304,6 +306,7 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
                         $intent_id
                     )
                 );
+                WC()->cart->empty_cart();
                 return [
                     'result'   => 'success',
                     'redirect' => $next_action_url,
@@ -335,6 +338,8 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
                     )
                 );
             }
+            // AUDIT-FUNNEL-PAY-20 FIX: vaciar carrito solo en pago confirmado.
+            WC()->cart->empty_cart();
             return [
                 'result'   => 'success',
                 'redirect' => $order->get_checkout_order_received_url(),
@@ -352,6 +357,10 @@ class LTMS_Gateway_Stripe extends WC_Payment_Gateway {
             )
         );
 
+        // AUDIT-FUNNEL-PAY-20 FIX: vaciar carrito también en el caso on-hold —
+        // el PI fue creado y quedará confirmado por webhook; conservar el carrito
+        // aquí permitiría un segundo pedido fantasma del mismo checkout.
+        WC()->cart->empty_cart();
         return [
             'result'   => 'success',
             'redirect' => $order->get_checkout_order_received_url(),

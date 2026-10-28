@@ -107,11 +107,26 @@ if ( ! class_exists( 'LTMS_Openpay_Test_Stub' ) ) {
         public bool   $should_fail = false;
         public string $provider_slug = 'openpay';
 
+        /**
+         * AUDIT-FUNNEL-PAY-01: el contrato REAL de LTMS_Api_Openpay::charge() es
+         * ['id','status','amount','authorization','raw'] — sin keys 'success'/'data'.
+         * El stub anterior inventaba ['success'=>true,'data'=>['id'=>...]] y
+         * mantenía en verde un orquestador que en producción rompía DESPUÉS de
+         * que Openpay cobró (empty($result['success']) siempre true → throw).
+         */
+        public string $charge_status = 'completed';
+
         public function charge( array $data ): array {
             if ( $this->should_fail ) {
                 throw new \RuntimeException( 'Openpay error' );
             }
-            return [ 'success' => true, 'data' => [ 'id' => 'op_test_456' ] ];
+            return [
+                'id'            => 'op_test_456',
+                'status'        => $this->charge_status,
+                'amount'        => 100.0,
+                'authorization' => 'AUTH-123',
+                'raw'           => [ 'id' => 'op_test_456', 'status' => $this->charge_status ],
+            ];
         }
 
         public function health_check(): array {

@@ -481,35 +481,56 @@ final class LTMS_Payment_Orchestrator {
 		/** @var LTMS_Api_Openpay $openpay */
 		$openpay = LTMS_Api_Factory::get( 'openpay' );
 
-		$result = $openpay->charge( [
-			'amount'      => $amount,
-			'currency'    => strtolower( $currency ),
-			'description' => sprintf(
-				/* translators: %d: WooCommerce order ID */
-				__( 'Pedido #%d', 'ltms' ),
-				$order->get_id()
-			),
-			'order_id'    => (string) $order->get_id(),
-			'method'      => $payment_data['method'] ?? 'card',
-			'source_id'   => $payment_data['token_id'] ?? '',
-			'customer'    => [
-				'name'         => trim(
-					$order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
-				),
-				'email'        => $order->get_billing_email(),
-				'phone_number' => $order->get_billing_phone(),
-			],
-		] );
+        $result = $openpay->charge( [
+            'amount'      => $amount,
+            'currency'    => strtolower( $currency ),
+            'description' => sprintf(
+                /* translators: %d: WooCommerce order ID */
+                __( 'Pedido #%d', 'ltms' ),
+                $order->get_id()
+            ),
+            'order_id'    => (string) $order->get_id(),
+            'method'      => $payment_data['method'] ?? 'card',
+            'source_id'   => $payment_data['token_id'] ?? '',
+            // AUDIT-FUNNEL-PAY-01: el caller del endpoint AJAX pasa la clave como
+            // 'device_session' (checkout-handler:722) — tolerar ambas grafías.
+            'device_session_id' => $payment_data['device_session_id'] ?? $payment_data['device_session'] ?? '',
+            'customer'    => [
+                'name'         => trim(
+                    $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
+                ),
+                'email'        => $order->get_billing_email(),
+                'phone_number' => $order->get_billing_phone(),
+            ],
+        ] );
 
-		if ( empty( $result['success'] ) ) {
-			throw new \RuntimeException( $result['error'] ?? __( 'Error desconocido en Openpay.', 'ltms' ) );
-		}
+        // AUDIT-FUNNEL-PAY-01 FIX (P0): el contrato real de LTMS_Api_Openpay::charge()
+        // es ['id','status','amount','authorization','raw'] — NO ['success','data'].
+        // Antes: empty($result['success']) era SIEMPRE true → RuntimeException
+        // DESPUÉS de que Openpay ya cobró → fallback a Stripe (que también fallaba
+        // por PAY-02) → orden 'failed' con dinero cobrado + evento 'error' en
+        // lt_provider_health → a la 3ª compra el circuit breaker abría Openpay.
+        // Además validamos status: 'in_progress' (3DS) NO debe reportarse como
+        // éxito — el caller (checkout-handler:607) haría payment_complete() de un
+        // cargo sin confirmar.
+        $charge_status = (string) ( $result['status'] ?? '' );
+        $charge_id     = (string) ( $result['id'] ?? '' );
 
-		return [
-			'success'        => true,
-			'transaction_id' => $result['data']['id'] ?? '',
-		];
-	}
+        if ( 'completed' !== $charge_status || '' === $charge_id ) {
+            throw new \RuntimeException(
+                sprintf(
+                    /* translators: %s: estado reportado por Openpay */
+                    __( 'El pago no se completó en Openpay (estado: %s).', 'ltms' ),
+                    $charge_status ?: 'desconocido'
+                )
+            );
+        }
+
+        return [
+            'success'        => true,
+            'transaction_id' => $charge_id,
+        ];
+    }
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Utilidades internas

@@ -54,6 +54,36 @@ final class LTMS_Order_Paid_Listener {
             return;
         }
 
+        // AUDIT-FUNNEL-POST-05 FIX (P0 — fuga de dinero): este listener se dispara
+        // tanto por woocommerce_payment_complete (confianza: el gateway confirmó)
+        // como por woocommerce_order_status_completed (cualquier proceso puede
+        // forzar la transición: vendor desde el panel de dashboard-logic, crons
+        // de tracking, webhooks de carriers). Antes, una orden IMPAGA marcada
+        // 'completed' acreditaba comisiones + creaba hold → con producto digital
+        // el hold se libera a los 5 días → retirable → fraude directo del vendor.
+        // Regla: en el path status_completed, solo procesar si el pedido está
+        // pagado O usa un método offline legítimo (cod/bacs/cheque) cuyo flujo WC
+        // estándar ES marcar manualmente (el admin confirma la entrega del dinero).
+        // El check corre ANTES del claim atómico: si bloquea, el flag queda en '0'
+        // y el trigger legítimo posterior (webhook → payment_complete) procesa.
+        $current_hook = function_exists( 'current_filter' ) ? (string) current_filter() : '';
+        if ( 'woocommerce_order_status_completed' === $current_hook ) {
+            $payment_method = (string) $order->get_payment_method();
+            $is_offline     = in_array( $payment_method, [ 'cod', 'bacs', 'cheque' ], true );
+            if ( ! $order->is_paid() && ! $is_offline ) {
+                LTMS_Core_Logger::critical(
+                    'ORDER_PAID_UNPAID_ORDER_BLOCKED',
+                    sprintf(
+                        'Pedido #%s marcado completed SIN pago (método: %s) — split de comisiones BLOQUEADO para prevenir acreditación sobre dinero no recibido.',
+                        $order->get_order_number(),
+                        $payment_method ?: '(none)'
+                    ),
+                    [ 'order_id' => $order_id ]
+                );
+                return;
+            }
+        }
+
         // H-4 FIX: atomic SQL claim to prevent double-processing race condition.
         // The previous get_post_meta() + update_meta_data() pattern was
         // non-atomic: two concurrent processes (e.g. woocommerce_payment_complete

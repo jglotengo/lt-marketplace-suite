@@ -45,8 +45,20 @@ class LTMS_Openpay_Webhook_Handler {
         // (fail-closed). Antes, si no había key configurada, se omitía la validación
         // de firma → cualquier atacante podía forjar webhooks y completar pedidos.
         $country     = LTMS_Core_Config::get_country();
-        $enc_key     = LTMS_Core_Config::get( "ltms_openpay_{$country}_private_key", '' );
-        $private_key = $enc_key ? LTMS_Core_Security::decrypt( $enc_key ) : '';
+        // AUDIT-FUNNEL-PAY-03/PAY-17 FIX (loop comprador): antes se llamaba
+        // LTMS_Core_Security::decrypt() INCONDICIONALMENTE sobre la private key.
+        // El gateway WC de Openpay guarda la key en TEXTO PLANO (update_option en
+        // process_admin_options y en cada process_payment), y decrypt() lanza
+        // InvalidArgumentException para valores sin formato 'v1:'/'v2:' → todo
+        // webhook moría con 500 → PSE/Nequi/Daviplata/OXXO/SPEI (que dependen 100%
+        // del webhook para confirmar el pago) quedaban 'pending' para siempre con
+        // dinero cobrado. maybe_decrypt() tolera ambos formatos + fallback a la
+        // key genérica (el cliente API lo tiene, el webhook no — PAY-17).
+        $raw_key     = (string) LTMS_Core_Config::get( "ltms_openpay_{$country}_private_key", '' );
+        if ( '' === $raw_key ) {
+            $raw_key = (string) LTMS_Core_Config::get( 'ltms_openpay_private_key', '' );
+        }
+        $private_key = LTMS_Core_Security::maybe_decrypt( $raw_key );
 
         if ( empty( $private_key ) ) {
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
@@ -76,7 +88,17 @@ class LTMS_Openpay_Webhook_Handler {
 
         $body = $request->get_json_params();
 
-        $event_type  = sanitize_key( $body['type'] ?? '' );
+        // AUDIT-FUNNEL-PAY-23 FIX (P0, re-auditoría del ciclo): antes se usaba
+        // sanitize_key() sobre el tipo de evento — pero sanitize_key ELIMINA los
+        // PUNTOS ('charge.succeeded' → 'chargesucceeded', 'payout.failed' →
+        // 'payoutfailed') → el switch de eventos y el str_starts_with('payout.')
+        // NUNCA matcheaban → TODO el dispatch del webhook Openpay estaba muerto:
+        // ni charge.succeeded (confirmación PSE/Nequi/Daviplata/OXXO/SPEI),
+        // ni refund.succeeded, ni payout.* se procesaban. Los eventos de Openpay
+        // usan PUNTOS (a diferencia de Alegra con guiones o ZapSign con
+        // underscores, donde sanitize_key sí funciona). lowercase+sanitize_text
+        // preserva el formato real del evento.
+        $event_type  = strtolower( sanitize_text_field( (string) ( $body['type'] ?? '' ) ) );
         $transaction = $body['transaction'] ?? [];
 
         if ( empty( $event_type ) || empty( $transaction ) ) {
@@ -116,6 +138,19 @@ class LTMS_Openpay_Webhook_Handler {
         }
 
         if ( ! $order_id ) {
+            // AUDIT-FUNNEL-PAY-21 FIX: un charge.succeeded sin orden vinculada
+            // desaparecía con 200 silencioso y sin rastro — dinero cobrado que
+            // ninguna orden refleja. Log CRITICAL + warning para reconciliación.
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'OPENPAY_WEBHOOK_ORPHAN_EVENT',
+                    sprintf(
+                        'Evento %s con transacción %s no vinculó a ninguna orden (order_id ausente y meta no encontrada). Requiere reconciliación manual.',
+                        $event_type,
+                        $openpay_id
+                    )
+                );
+            }
             return new WP_REST_Response( [ 'ok' => true ], 200 );
         }
 
@@ -424,6 +459,12 @@ Equipo Lo Tengo",
             '_ltms_daviplata_charge_id',
             '_ltms_oxxo_charge_id',
             '_ltms_spei_charge_id',
+            // AUDIT-FUNNEL-PAY-16 FIX: el gateway PSE nativo WC guarda el charge_id
+            // en _ltms_openpay_pse_transaction_id (class-ltms-api-gateways.php
+            // process_payment) — meta que NO estaba en esta lista → si Openpay no
+            // devolvía order_id en el webhook, estas órdenes nunca se encontraban.
+            '_ltms_openpay_pse_transaction_id',
+            '_ltms_openpay_mx_charge_id',
         ];
 
         foreach ( $meta_keys as $key ) {
