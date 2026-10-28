@@ -6,6 +6,56 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-10-28
 
+### Fixed — `HEADER-WIDTH-2026-10-28` (ancho del header: panel vendedor full-width + vitrina con header PV estándar)
+
+> **Ciclo reanudado del checkpoint 2026-10-25 (UIUX-BATCH-2026-10-25d).**
+> Renders locales reconstruidos con TODO el CSS de LTMS: `build-renders.php`
+> solo inlineaba el bundle combinado de SG y descartaba `ltms-*.css`, por eso
+> las 4 mediciones previas no concluían (lección #200). Medición real a 1920px:
+> home y checkout ya estaban full-width (sin defecto); los defectos eran panel
+> y vitrina.
+>
+> - **Panel vendedor**: `.ltms-topbar` pasa a `position:fixed` contra el viewport
+>   (antes empezaba en x=260, detrás del sidebar); `.ltms-sidebar` arranca debajo
+>   (`top:var(--ltms-header-h)`) y `.ltms-main-content` se compensa con
+>   `padding-top`. ≤768 conserva el layout móvil (sidebar off-canvas).
+>   `assets/css/ltms-dashboard.css` NO estaba en la whitelist del webhook:
+>   agregado (lección #177).
+> - **Vitrina `/vendedor/{slug}/`**: `wp_body_open()` dispara el header PV
+>   compartido (negro, full-width + catbar); la topbar blanca legacy se oculta
+>   bajo `body.pv-pv-header` y queda como respaldo. La vitrina conserva
+>   Favoritos vía el header PV (`/favoritos` + badge real).
+> - **Tests:** `HeaderWidthAuditTest` (grupo `header-width`, 6 tests). Suite
+>   completa **5,371 tests / 11,994 assertions / 0 fallas** (3 skips).
+> - **Deploy SG validado:** `9b409c5f` (ff-only) + OPcache reset + plugin reload
+>   + `wp cache flush` + `wp sg purge`; vitrina live 1903px header negro,
+>   topbar legacy `display:none`, móvil 390 sin overflow; panel sirve
+>   `ltms-dashboard.css?ver=2.9.433`.
+
+### Security — `DEPLOY-WH-CAPTCHA-2026-10-28` (deploy silencioso bloqueado por sgcaptcha + tokens fuera del repo)
+
+> **Hallazgo:** el workflow "Deploy" reportaba success sin desplegar: SG
+> respondía `202` + `sgcaptcha` (bot protection) a los runners de GitHub y el
+> step trataba 202 como éxito. El servidor seguía en `2.9.432`.
+>
+> - **Deploy por SSH** (`.github/workflows/deploy.yml`): `git fetch` con el PAT
+>   de `LTMS_GH_TOKEN` solo como `http.extraheader` (sin persistirlo), remote
+>   del servidor sin credenciales, `git merge --ff-only origin/main`, y el job
+>   FALLA si el SHA desplegado no es el commit pusheado (`DEPLOY-FAILED`).
+>   Se eliminan los pasos de backfill/report vía webhook (one-off/diagnóstico,
+>   bloqueados por captcha); el webhook sigue disponible para uso manual.
+> - **Webhook** (`deploy/ltms-deploy-webhook.php`): el `DEPLOY_TOKEN` ya no se
+>   commitea; se resuelve desde `getenv('LTMS_DEPLOY_TOKEN')` o la constante en
+>   `wp-config.php`. Se eliminó el PAT partido en `$gh_tok_a/$b/$c` que seguía
+>   vivo en la copia del webroot (el repo decía que se había quitado; lección
+>   #201).
+> - **Acción de servidor:** `LTMS_DEPLOY_TOKEN` agregado a wp-config (backup
+>   previo, 48 hex); copia del webroot reemplazada por la versión del repo;
+>   report manual validado (CLI) y token inválido rechazado (Forbidden).
+> - **Tests:** `DeploySecurityTest` (grupo `deploy-security`, 5 tests).
+> - **Pendiente del operador:** rotar el PAT del remote local (expuesto en
+>   sesión) y el PAT viejo del webhook; actualizar `LTMS_GH_TOKEN` si se rota.
+
 ### Fixed — `AUDIT-FUNNEL-2026-10-28` (funnel del comprador, foco pagos E2E sandbox: 24 fixes, 9 P0)
 
 > **Alcance:** auditoría completa del funnel comprador (pre-checkout PC-01..21,

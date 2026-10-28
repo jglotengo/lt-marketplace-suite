@@ -2,7 +2,37 @@
 /**
  * LTMS Deploy Webhook v5 — self-updating + QA mode
  */
-define('DEPLOY_TOKEN', 'ltms_deploy_2026_s3cur3_t0k3n_x9z');
+/*
+ * SEC-2026-10-28 (HEADER-WIDTH-2026-10-28): el token del webhook ya NO se
+ * commitea. Se resuelve en runtime, en orden:
+ *   1. getenv('LTMS_DEPLOY_TOKEN')  -> env del runtime del servidor web
+ *   2. constante LTMS_DEPLOY_TOKEN en wp-config.php (se incluye si hace falta)
+ * Sin valor -> 500 con instruccion, en vez de comparar contra un literal
+ * hardcodeado que queda expuesto en el repo y en el historial.
+ */
+$ltms_deploy_token = getenv('LTMS_DEPLOY_TOKEN');
+if ($ltms_deploy_token === false) {
+    $ltms_deploy_token = defined('LTMS_DEPLOY_TOKEN') ? constant('LTMS_DEPLOY_TOKEN') : '';
+}
+$ltms_deploy_token = trim((string) $ltms_deploy_token);
+if ($ltms_deploy_token === '') {
+    // Webroot (caso A) o deploy/ del plugin (caso B): incluir wp-config.php.
+    foreach (array(__DIR__ . '/wp-config.php', dirname(__DIR__, 4) . '/wp-config.php') as $ltms_wp_config) {
+        if (file_exists($ltms_wp_config)) {
+            @include_once $ltms_wp_config;
+            if (defined('LTMS_DEPLOY_TOKEN')) {
+                $ltms_deploy_token = trim((string) constant('LTMS_DEPLOY_TOKEN'));
+                break;
+            }
+        }
+    }
+}
+if ($ltms_deploy_token === '') {
+    http_response_code(500);
+    echo "ERROR: LTMS_DEPLOY_TOKEN no definido. Definir en wp-config.php: define('LTMS_DEPLOY_TOKEN', '<NEW_TOKEN>');\n";
+    exit;
+}
+define('DEPLOY_TOKEN', $ltms_deploy_token);
 
 // DEPLOY-WH-PATH-001 FIX (2026-07-30): PLUGIN_PATH y WP_LOAD_PATH robustos,
 // compatibles con ambas ubicaciones posibles del webhook en el servidor:
@@ -971,6 +1001,9 @@ $files = [
     'assets/css/ltms-dashboard.css',
     'assets/css/ltms-dashboard.min.css',
     'tests/unit/HeaderWidthAuditTest.php',
+    // DEPLOY-WH-CAPTCHA-2026-10-28: deploy por SSH con verificacion de SHA +
+    // token del webhook fuera del repo.
+    'tests/unit/DeploySecurityTest.php',
 ];
 // Deploy diag to webroot
 $diag_src = PLUGIN_PATH . '/../../../lt-marketplace-suite/deploy/ltms-panel-diag.php';

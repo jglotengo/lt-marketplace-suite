@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -33,44 +33,52 @@ jobs:
             "$SSH_USER@$SSH_HOST:/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/deploy/ltms-publish-legal-pages-2026-07-22.php" \
             2>&1 || echo "SCP legal-pages failed (non-critical)"
 
-      - name: Trigger deploy webhook
+      # DEPLOY-WH-CAPTCHA-2026-10-28: el webhook HTTP quedo inutilizable desde
+      # los runners de GitHub porque SiteGround responde 202 + sgcaptcha (bot
+      # protection) y el step viejo trataba 202 como exito: el deploy reportaba
+      # verde sin desplegar nada. El deploy ahora va por SSH (credenciales que
+      # el job ya usaba), usa el PAT de LTMS_GH_TOKEN solo como header de git
+      # (sin persistirlo en .git/config) y FALLA si el SHA del servidor no
+      # coincide con el commit pusheado.
+      - name: Deploy via SSH (git ff-only + purge + SHA verification)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PASS: ${{ secrets.SSH_PASS }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
-          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
-            --max-time 45 --retry 3 --retry-delay 5 \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-            -H "Accept: text/plain,application/json" \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-            "https://lo-tengo.com.co/ltms-deploy-webhook.php?token=${{ secrets.DEPLOY_TOKEN }}")
-          echo "HTTP status: $HTTP_CODE"
-          cat /tmp/response.txt
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "202" ]; then
-            echo "Deploy triggered successfully"
-          else
-            echo "Webhook failed with status $HTTP_CODE"
-            exit 0
+          sudo apt-get install -y sshpass 2>/dev/null || true
+          sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" \
+            "$SSH_USER@$SSH_HOST" "EXPECTED_SHA=$EXPECTED_SHA bash -s" <<'REMOTE'
+          set -euo pipefail
+          PLUGIN=/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite
+          WP=/home/customer/www/lo-tengo.com.co/public_html
+          GH_TOKEN=$(/usr/local/bin/wp eval 'echo defined("LTMS_GH_TOKEN") ? LTMS_GH_TOKEN : "";' --allow-root --path="$WP")
+          if [ -z "$GH_TOKEN" ]; then
+            echo "DEPLOY-FAILED: LTMS_GH_TOKEN no definido en wp-config"
+            exit 1
           fi
-
-      - name: Trigger backfill (webhook self-updated on previous call)
-        run: |
-          sleep 5
-          HTTP_CODE=$(curl -s -o /tmp/backfill_response.txt -w "%{http_code}" \
-            --max-time 60 --retry 2 --retry-delay 10 \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-            -H "Accept: text/plain,application/json" \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-            "https://lo-tengo.com.co/ltms-deploy-webhook.php?token=${{ secrets.DEPLOY_TOKEN }}&backfill=1")
-          echo "Backfill HTTP status: $HTTP_CODE"
-          cat /tmp/backfill_response.txt
-
-      - name: Trigger diagnostic report
-        run: |
-          sleep 3
-          HTTP_CODE=$(curl -s -o /tmp/report_response.txt -w "%{http_code}" \
-            --max-time 60 --retry 2 --retry-delay 10 \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-            -H "Accept: text/plain,application/json" \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-            "https://lo-tengo.com.co/ltms-deploy-webhook.php?token=${{ secrets.DEPLOY_TOKEN }}&report=1")
-          echo "Report HTTP status: $HTTP_CODE"
-          echo "=== DIAGNOSTIC REPORT ==="
-          cat /tmp/report_response.txt
+          cd "$PLUGIN"
+          git remote set-url origin https://github.com/jglotengo/lt-marketplace-suite.git
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
+          GIT_TERMINAL_PROMPT=0 git -c http.extraheader="Authorization: Basic $AUTH" fetch origin main --quiet
+          git merge --ff-only origin/main
+          DEPLOYED=$(git rev-parse HEAD)
+          echo "deployed=$DEPLOYED expected=$EXPECTED_SHA"
+          if [ "$DEPLOYED" != "$EXPECTED_SHA" ]; then
+            echo "DEPLOY-FAILED: SHA mismatch (el servidor no recibio el commit pusheado)"
+            exit 1
+          fi
+          find ~/.opcache -type f -delete 2>/dev/null || true
+          find /tmp/php-opcache-* -type f -delete 2>/dev/null || true
+          echo "OPCACHE-RESET-OK"
+          /usr/local/bin/wp plugin deactivate lt-marketplace-suite --allow-root --path="$WP" || true
+          /usr/local/bin/wp plugin activate lt-marketplace-suite --allow-root --path="$WP"
+          /usr/local/bin/wp cache flush --allow-root --path="$WP"
+          /usr/local/bin/wp sg purge --allow-root --path="$WP" || true
+          /usr/local/bin/wp eval 'echo "LTMS_VERSION=".LTMS_VERSION."\n";' --allow-root --path="$WP"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" https://lo-tengo.com.co/)
+          echo "home=$CODE"
+          [ "$CODE" = "200" ]
+          REMOTE

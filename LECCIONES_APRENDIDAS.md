@@ -4524,3 +4524,68 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (2) Los ❌ esperados por guard de entorno se documentan (no se "arreglan"
    en el test sin verificar el guard). (3) Los ❌ reales se convierten en fix
    + test en el MISMO ciclo (aquí: commit `e655dd65`).
+
+---
+
+## 33. v2.9.433 — HEADER-WIDTH-2026-10-28 + DEPLOY-WH-CAPTCHA-2026-10-28
+
+### Lección #199: un deploy "verde" no prueba que desplegó — el 202 de sgcaptcha y el `exit 0` del workflow (DEPLOY-WH-CAPTCHA, 2026-10-28)
+
+1. **Caso real:** el job "Deploy LTMS to Production" de GitHub Actions terminó
+   en verde tras cada push, pero el servidor seguía en `2.9.432` y sin los
+   archivos del commit. El webhook respondía `HTTP 202` con un HTML de
+   `sgcaptcha` (bot protection de SiteGround) al runner; el step aceptaba
+   `200 || 202` como éxito y además hacía `exit 0` ante cualquier otro código.
+
+2. **Diagnóstico:** se verificó el color del run, no el efecto en el servidor.
+   Un proxy/WAF puede devolver 2xx con una página de challenge; el webhook HTTP
+   no es un destino confiable desde IPs de CI. La única prueba válida es el
+   artefacto desplegado (SHA/version en el servidor).
+
+3. **Regla preventiva:** (1) Todo deploy debe verificar el efecto real
+   (`git rev-parse HEAD` == `$GITHUB_SHA` o `grep LTMS_VERSION` en disco) y
+   FALLAR el job si no coincide. (2) Nunca aceptar un 2xx de un endpoint
+   intermedio como prueba de deploy; loguear el cuerpo de la respuesta.
+   (3) Preferir SSH/git con las credenciales que el job ya usa, en vez de un
+   webhook público detrás de un WAF. (4) Un `exit 0` en una rama de error
+   convierte el workflow en un adorno: la rama de error debe salir != 0.
+
+### Lección #200: medir layouts con el CSS REAL del plugin — `build-renders.php` solo inlinea el bundle de SG y descarta `ltms-*.css` (HEADER-WIDTH, 2026-10-28)
+
+1. **Caso real:** 4 renders locales de home/checkout/vitrina/panel "no
+   reproducían" el defecto de ancho. El harness inlineaba el
+   `siteground-optimizer-combined-*.css` de producción, que no contiene los
+   `ltms-*.css` (SG los excluye de la combinación desde SG-COMBINE-EXCLUDE),
+   así que las mediciones se hacían sin el CSS que define el layout.
+
+2. **Diagnóstico:** un render offline es tan válido como los assets que
+   incluye. Medir `getBoundingClientRect` sobre un DOM sin el CSS real produce
+   conclusiones falsas (y puede "confirmar" un bug inexistente o esconder uno
+   real).
+
+3. **Regla preventiva:** (1) El harness debe incluir TODOS los stylesheets que
+   la página encola (o medir la página live). (2) Separar siempre el ancho del
+   header (viewport) del ancho del contenedor interno (`max-width`): un header
+   full-width con inner centrado NO es un defecto. (3) Antes de declarar "no se
+   reproduce", verificar que el CSS del módulo esté presente en el render.
+
+### Lección #201: el archivo LIVE puede tener secretos que el repo ya "eliminó" — auditar la copia del webroot, no solo el tracked (DEPLOY-WH-CAPTCHA, 2026-10-28)
+
+1. **Caso real:** el webhook del repo documentaba que el PAT de GitHub partido
+   en `$gh_tok_a/$b/$c` había sido eliminado tras una rotación. La copia que
+   realmente servía `https://lo-tengo.com.co/ltms-deploy-webhook.php` era otra
+   (v6, 5 KB, webroot) que seguía con el PAT partido, un `$token` hardcodeado y
+   `git reset --hard`. El archivo tracked (v5, 49 KB) no era el que corría.
+
+2. **Diagnóstico:** para endpoints standalone (webhooks, cron, QA) el archivo
+   vivo puede divergir del repo. Un grep en el repo no prueba nada sobre el
+   servidor. Además, `git reset --hard` en un webhook borra cualquier cambio
+   local sin aviso.
+
+3. **Regla preventiva:** (1) Comparar hash/contenido del archivo live contra el
+   tracked y reemplazarlo cuando el source cambie. (2) Rotar cualquier secreto
+   que haya estado hardcodeado (aunque el repo lo haya "limpiado" después: el
+   historial y las copias live lo conservan). (3) Tokens en `wp-config.php`
+   (`LTMS_*`) o env, nunca literales; el webhook debe devolver 500 explícito si
+   falta la constante. (4) En deploys, preferir `git merge --ff-only` sobre
+   `git reset --hard` para no destruir estado del servidor.
