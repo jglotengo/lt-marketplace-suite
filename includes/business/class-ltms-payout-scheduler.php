@@ -1338,16 +1338,24 @@ Puedes enviar una nueva solicitud desde tu panel.
         $bank_account   = get_user_meta( $vendor_id, 'ltms_kyc_bank_account', true );
 
         if ( empty( $file_banco ) || empty( $bank_rep_legal ) || empty( $bank_account ) ) {
-            LTMS_Logger::warning(
-                sprintf(
-                    'Payout bloqueado para vendedor #%d: certificación bancaria incompleta (file_banco=%s, rep_legal=%s, account=%s)',
-                    $vendor_id,
-                    empty( $file_banco ) ? 'FALTA' : 'ok',
-                    empty( $bank_rep_legal ) ? 'FALTA' : 'ok',
-                    empty( $bank_account ) ? 'FALTA' : 'ok'
-                ),
-                [ 'vendor_id' => $vendor_id, 'check' => 'kyc_bank_cert' ]
-            );
+            // DEPLOY-VALIDATION FIX (2026-10-28): LTMS_Logger no existe — la clase
+            // real es LTMS_Core_Logger y su firma es (event, msg, ctx). El guard
+            // referenciaba una clase inexistente con firma de 2 args → fatal
+            // "Class LTMS_Logger not found" justo cuando debía bloquear el payout
+            // y registrar el motivo (detectado por bin/ltms-integration-tests.php).
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::warning(
+                    'PAYOUT_BANK_CERT_MISSING',
+                    sprintf(
+                        'Payout bloqueado para vendedor #%d: certificación bancaria incompleta (file_banco=%s, rep_legal=%s, account=%s)',
+                        $vendor_id,
+                        empty( $file_banco ) ? 'FALTA' : 'ok',
+                        empty( $bank_rep_legal ) ? 'FALTA' : 'ok',
+                        empty( $bank_account ) ? 'FALTA' : 'ok'
+                    ),
+                    [ 'vendor_id' => $vendor_id, 'check' => 'kyc_bank_cert' ]
+                );
+            }
             return false;
         }
 

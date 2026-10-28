@@ -560,12 +560,15 @@ class LTMS_Deprisa_Order_Split {
         return $weight * $qty;
     }
 
-    /** Logger interno (usa LTMS_Logger si existe, si no error_log). */
+    /** Logger interno (usa LTMS_Core_Logger si existe, si no error_log). */
     private static function log( int $order_id, string $msg ): void {
         $entry = "[LTMS_Deprisa_Order_Split] Order #{$order_id}: {$msg}";
 
-        if ( class_exists( 'LTMS_Logger' ) ) {
-            LTMS_Logger::info( $entry );
+        // DEPLOY-VALIDATION FIX (2026-10-28): LTMS_Logger no existe (la clase
+        // real es LTMS_Core_Logger con firma (event, msg, ctx)) → el fallback
+        // a error_log SIEMPRE se ejecutaba.
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info( 'DEPRISA_ORDER_SPLIT', $entry );
         } else {
             error_log( $entry );
         }

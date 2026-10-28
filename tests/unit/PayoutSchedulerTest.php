@@ -266,6 +266,65 @@ class PayoutSchedulerTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     }
 
     // -----------------------------------------------------------------------
+    // create_request() — guard: certificación bancaria incompleta
+    // (DEPLOY-VALIDATION 2026-10-28: antes llamaba LTMS_Logger — clase
+    // inexistente — con firma de 2 args → fatal en vez de bloquear + loguear)
+    // -----------------------------------------------------------------------
+
+    public function test_create_request_fails_without_fatal_when_bank_cert_missing(): void {
+        // Stub del logger real (mismo patrón que AdminPayoutsTest): la clase
+        // real bufferea y hace flush por shutdown; el fake la neutraliza.
+        if ( ! class_exists( 'LTMS_Core_Logger', false ) ) {
+            eval( 'final class LTMS_Core_Logger {
+                public static function info( string $e, string $m, array $c = [] ): void {}
+                public static function warning( string $e, string $m, array $c = [] ): void {}
+                public static function error( string $e, string $m, array $c = [] ): void {}
+                public static function security( string $e, string $m, array $c = [] ): void {}
+            }' );
+        }
+
+        Functions\when( '__' )->returnArg();
+        Functions\when( 'sanitize_text_field' )->returnArg();
+        Functions\when( 'get_user_meta' )->alias(
+            static function ( $user_id, $key, $single ) {
+                if ( in_array( $key, [ 'ltms_kyc_file_banco', 'ltms_kyc_bank_rep_legal', 'ltms_kyc_bank_account' ], true ) ) {
+                    return '';
+                }
+                return 'approved';
+            }
+        );
+
+        $GLOBALS['wpdb'] = $this->make_payout_wpdb( balance: 1000000.0, pending_count: 0 );
+
+        // Antes: Error "Class LTMS_Logger not found" (fatal). Ahora: bloqueo limpio.
+        $result = LTMS_Payout_Scheduler::create_request( 5, 50000.0, 'acct_789' );
+
+        $this->assertFalse( $result['success'] );
+    }
+
+    public function test_no_references_to_nonexistent_ltms_logger_class(): void {
+        // Anti-regresión transversal: LTMS_Logger no existe — la clase real es
+        // LTMS_Core_Logger. Cualquier referencia reintroduce un fatal latente.
+        $dir = dirname( __DIR__, 2 ) . '/includes';
+        $it  = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS )
+        );
+
+        $offenders = [];
+        foreach ( $it as $file ) {
+            if ( 'php' !== strtolower( $file->getExtension() ) ) {
+                continue;
+            }
+            $src = (string) file_get_contents( $file->getPathname() );
+            if ( preg_match( '/\bLTMS_Logger::/', $src ) || preg_match( '/[\'"]LTMS_Logger[\'"]/', $src ) ) {
+                $offenders[] = $file->getPathname();
+            }
+        }
+
+        $this->assertSame( [], $offenders, 'Referencias a la clase inexistente LTMS_Logger.' );
+    }
+
+    // -----------------------------------------------------------------------
     // create_request() — flujo exitoso completo
     // -----------------------------------------------------------------------
 
