@@ -12,23 +12,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ltms_ci
+          chmod 600 ~/.ssh/ltms_ci
+          ssh-keygen -y -f ~/.ssh/ltms_ci > /dev/null
+          echo "SSH key OK"
+
       - name: Copy QA script to server via SSH
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PASS: ${{ secrets.SSH_PASS }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
         run: |
-          sudo apt-get install -y sshpass 2>/dev/null || true
-          sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no -P "$SSH_PORT" \
+          scp -i ~/.ssh/ltms_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -P "$SSH_PORT" \
             deploy/ltms-qa.php \
             "$SSH_USER@$SSH_HOST:/home/customer/www/lo-tengo.com.co/public_html/ltms-qa.php" \
             2>&1 || echo "SCP failed (non-critical)"
-          sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no -P "$SSH_PORT" \
+          scp -i ~/.ssh/ltms_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -P "$SSH_PORT" \
             deploy/ltms-fix-sellers-now.php \
             "$SSH_USER@$SSH_HOST:/home/customer/www/lo-tengo.com.co/public_html/ltms-fix-sellers-now.php" \
             2>&1 || echo "SCP fix-sellers failed (non-critical)"
-          sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no -P "$SSH_PORT" \
+          scp -i ~/.ssh/ltms_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -P "$SSH_PORT" \
             deploy/ltms-publish-legal-pages-2026-07-22.php \
             "$SSH_USER@$SSH_HOST:/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite/deploy/ltms-publish-legal-pages-2026-07-22.php" \
             2>&1 || echo "SCP legal-pages failed (non-critical)"
@@ -36,20 +44,18 @@ jobs:
       # DEPLOY-WH-CAPTCHA-2026-10-28: el webhook HTTP quedo inutilizable desde
       # los runners de GitHub porque SiteGround responde 202 + sgcaptcha (bot
       # protection) y el step viejo trataba 202 como exito: el deploy reportaba
-      # verde sin desplegar nada. El deploy ahora va por SSH (credenciales que
-      # el job ya usaba), usa el PAT de LTMS_GH_TOKEN solo como header de git
+      # verde sin desplegar nada. El deploy ahora va por SSH con la clave
+      # dedicada del CI, usa el PAT de LTMS_GH_TOKEN solo como header de git
       # (sin persistirlo en .git/config) y FALLA si el SHA del servidor no
       # coincide con el commit pusheado.
       - name: Deploy via SSH (git ff-only + purge + SHA verification)
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PASS: ${{ secrets.SSH_PASS }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
-          sudo apt-get install -y sshpass 2>/dev/null || true
-          sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no -p "$SSH_PORT" \
+          ssh -i ~/.ssh/ltms_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" "EXPECTED_SHA=$EXPECTED_SHA bash -s" <<'REMOTE'
           set -euo pipefail
           PLUGIN=/home/customer/www/lo-tengo.com.co/public_html/wp-content/plugins/lt-marketplace-suite
