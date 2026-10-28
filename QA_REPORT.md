@@ -1,11 +1,23 @@
 # LT Marketplace Suite — QA Report
 
-**Version:** 2.9.346
-**Report Date:** 2026-09-07
+**Version:** 2.9.432
+**Report Date:** 2026-10-28
 **Environment:** Ubuntu 22.04 · PHP 8.1+ · MySQL 8.0 · WordPress 6.3+ · WooCommerce 8.0+
-**Tester:** Automated CI + Manual Review + 30+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX)
-**Commits:** 1,500+ (HEAD@v2.9.346)
-**Audits completed:** 30+ (all 100% resolved for P0+P1+P2)
+**Tester:** Automated CI + Manual Review + 31+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, AUDIT-FUNNEL-2026-10-28, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX)
+**Commits:** 1,500+ (HEAD@v2.9.432)
+**Audits completed:** 31+ (all 100% resolved for P0+P1+P2)
+
+---
+
+## 0.15. v2.9.432 — AUDIT-FUNNEL-2026-10-28 (funnel del comprador: 24 fixes, 9 P0, validación E2E sandbox)
+
+**Scope:** auditoría completa del funnel del comprador — pre-checkout (PC-01..21), pagos E2E (PAY-01..22) y post-pago (POST-01..13) — con foco en pruebas sandbox de Openpay/Addi/Stripe/PSE. 3 agentes de exploración + verificación manual de cada P0 contra el código real.
+**Fixes P0:** PAY-01 (contrato inventado de `charge()` → cobro exitoso reportado fallido), PAY-02 (factory Stripe sin args), PAY-03/17 (webhook Openpay 500 por `decrypt()` incondicional), PAY-04 (3DS marcado pagado), PAY-05 (webhook Addi case), PAY-06 (gateway Addi contrato desalineado), PAY-07 (gateway Openpay MX constructor 5 args), PAY-23 (re-auditoría: `sanitize_key` eliminaba los puntos de los event types → dispatch del webhook muerto), POST-05 (comisiones acreditadas sin verificar pago). P1/P2: PAY-08..13, 15, 16, 20, 21.
+**Deploy-validation:** la suite de integración en SG detectó un fatal pre-existente (`LTMS_Logger` inexistente en el guard de certificación bancaria de payouts, desde 2026-06-02) → corregido en `e655dd65` + 2 tests (lección #196).
+**Verificación:** suite unit **5,360 tests / 11,961 assertions / 0 failures** (3 skips preexistentes). SG: pull `e655dd65`, OPcache reset, `php -l` 17 archivos, plugin reload, cache flush, integración **102 OK** (4 ❌ MX esperados por guard de país), `error_log` limpio, home HTTP 200.
+**Tests:** `AuditFunnelBuyerPaymentsFixesTest` (41), `PayoutSchedulerTest` (+2), `PaymentOrchestratorTest` corregido, `tests/bootstrap.php` (+stub Security).
+**Lecciones:** #194-198 (event types con puntos, stubs con contrato inventado, `class_exists` mentiroso, triple verdad del testmode, triage de integración post-deploy).
+**Backlog (decisión de negocio):** POST-01 refunds vs wallet/comisión/hold, POST-02/03 disputes y chargebacks, PC-01..PC-16.
 
 ---
 

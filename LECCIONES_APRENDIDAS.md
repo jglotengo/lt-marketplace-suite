@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-09-10
-> **Versión del plugin:** 2.9.356
-> **Total de lecciones:** 161 (…+ 1 del ciclo DEAD-CODE vendor-store.php "declared, awaiting wiring" #161)
+> **Última actualización:** 2026-10-28
+> **Versión del plugin:** 2.9.432
+> **Total de lecciones:** 198 (… + 5 del ciclo AUDIT-FUNNEL-2026-10-28, #194-198)
 
 ---
 
@@ -4386,3 +4386,141 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    <nuevo>` (no `--filter`) — "No tests executed" = anotación mal puesta.
    (3) La validación SSH de un ciclo con grupo nuevo DEBE correr `--group
    <nuevo>` en el server: es exactamente donde el grupo vacío se manifiesta.
+
+---
+
+## 32. v2.9.432 - AUDIT-FUNNEL-2026-10-28: ciclo de auditoría del funnel del comprador (pagos E2E sandbox) — 5 lecciones nuevas (#194-198)
+
+> Ciclo de auditoría completa del funnel (pre-checkout, pagos, post-pago) con
+> 24 fixes (9 P0) + 41 tests, commits `c86c49b8` y `e655dd65`. Estas lecciones
+> se extraen de los hallazgos que la suite NO detectaba y de la validación
+> post-deploy en SiteGround.
+
+### Lección #194: `sanitize_key()` ELIMINA los puntos — los event types de webhook con formato `dominio.evento` quedan muertos en silencio (AUDIT-FUNNEL PAY-23, 2026-10-28)
+
+1. **Caso real:** el webhook de Openpay hacía
+   `$event_type = sanitize_key( $body['type'] )`. `sanitize_key()` aplica
+   `preg_replace('/[^a-z0-9_\-]/', '', ...)` → `charge.succeeded` se convierte
+   en `chargesucceeded` y `payout.failed` en `payoutfailed`. El `switch` de
+   eventos y el `str_starts_with($event_type, 'payout.')` NUNCA matcheaban →
+   todo el dispatch del webhook estaba muerto: ni `charge.succeeded`
+   (confirmación PSE/Nequi/Daviplata/OXXO/SPEI), ni `refund.succeeded`, ni
+   `payout.*`. Sobrevivía porque el cobro de tarjeta se confirma en
+   `process_payment`, no por webhook; los métodos que SOLO dependen del
+   webhook (PSE) fallaban sin rastro evidente.
+   Alegra usa guiones (`new-invoice`) y ZapSign underscores (`doc_signed`) —
+   ahí `sanitize_key()` sí funciona, lo que hace el bug dependiente del
+   proveedor y fácil de pasar por alto.
+
+2. **Diagnóstico:** ningún test ejercía el dispatch con los strings REALES del
+   proveedor. Los tests source-based verificaban la presencia del `switch`
+   pero no que un evento real llegara a su `case`. Regla de desempate:
+   `php -r 'echo sanitize_key("charge.succeeded");'` (o leer el código WP).
+
+3. **Regla preventiva:** (1) Los tipos de evento de webhooks se normalizan con
+   `strtolower( sanitize_text_field( ... ) )`, NUNCA `sanitize_key()`.
+   (2) Todo webhook con dispatch necesita un test con los strings reales del
+   proveedor (fixture del payload) que verifique el mapeo evento → handler.
+   (3) Al integrar un proveedor nuevo, listar sus event types y contrastarlos
+   contra el sanitizador usado antes de dar el webhook por operativo.
+
+### Lección #195: un stub de test con un contrato INVENTADO mantiene el P0 invisible — el verde de la suite no prueba alineación de contratos (AUDIT-FUNNEL PAY-01, 2026-10-28)
+
+1. **Caso real:** `LTMS_Payment_Orchestrator::charge_via_openpay()` leía
+   `$result['success']`/`$result['data']` — un contrato que
+   `LTMS_Api_Openpay::charge()` jamás devolvió (el real es
+   `['id','status','amount','authorization','raw']`). Consecuencia: cada cobro
+   exitoso se registraba como fallido DESPUÉS de cobrar (dinero cobrado,
+   orden no confirmada por el orquestador). `PaymentOrchestratorTest` pasaba
+   en verde porque su stub devolvía exactamente el contrato inventado:
+   el test y el código estaban mal de la misma forma.
+
+2. **Diagnóstico:** el stub fue escrito desde la suposición del consumidor, no
+   desde el productor. Al cambiar el stub al contrato real, el test falló
+   inmediatamente — señal de que el test era una tautología.
+
+3. **Regla preventiva:** (1) Los fixtures de tests de integración entre clases
+   propias se copian de la implementación REAL del productor (leer su
+   `return`/docblock/`@return array{...}`), nunca de lo que el consumidor
+   "espera". (2) Si un test stubea un cliente, el stub debe construirse con
+   la MISMA forma que el código real produce — y el test debe importar/ejercer
+   el productor real cuando sea posible. (3) Ante un bug de "cobro ejecutado
+   pero reportado fallido", revisar la ASIMETRÍA de contratos antes que la
+   red o el gateway.
+
+### Lección #196: `class_exists()` sobre una clase que NUNCA existió es una guarda mentirosa — y una referencia sin guarda es un fatal latente en el path de dinero (DEPLOY-VALIDATION, LTMS_Logger, 2026-10-28)
+
+1. **Caso real (doble):** (a) `class-ltms-payout-scheduler.php:1341` llamaba
+   `LTMS_Logger::warning($msg, $ctx)` SIN guarda. La clase `LTMS_Logger` no
+   existe (la real es `LTMS_Core_Logger`, firma `(event, msg, ctx)`) → al
+   bloquear un payout por certificación bancaria incompleta, el guard lanzaba
+   `Error: Class "LTMS_Logger" not found` en vez de bloquear y loguear
+   (bug desde 2026-06-02, 4 meses). (b) `class-ltms-deprisa-order-split.php`
+   usaba `if ( class_exists( 'LTMS_Logger' ) )` — siempre false → el fallback
+   a `error_log` corría siempre y el "logger" nunca logueó al sistema.
+
+2. **Diagnóstico:** ningún test unitario ejercía la rama del guard (los tests
+   existentes stubeaban `get_user_meta` con `'approved'` para TODAS las keys,
+   incluidas las de certificación → la rama `empty(...)` nunca se alcanzaba).
+   La suite de integración post-deploy en SG (`bin/ltms-integration-tests.php`)
+   sí ejecuta `create_request()` con un vendor aprobado sin certificación →
+   detectó el fatal. El `class_exists` de Deprisa era además
+   estructuralmente inútil: una clase inexistente nunca puede existir.
+
+3. **Regla preventiva:** (1) Antes de dar por buena una referencia a clase,
+   verificar que el nombre exista en el classmap/archivo real
+   (`grep -r "class LTMS_X"`); los typos de clase son fatales SOLO en runtime.
+   (2) `class_exists()` solo tiene sentido para clases OPCIONALES de terceros;
+   usarlo con una clase propia inexistente es deuda muerta — corregir el
+   nombre, no la guarda. (3) Toda rama de guard temprana (return false antes
+   del flujo principal) necesita un test que la EJECUTE: la cobertura de
+   "happy path" no toca los guards. (4) La suite de integración post-deploy
+   no es un formalismo: cada ❌ se triagea (¿guard de país esperado? ¿bug
+   real?) y los bugs reales entran al ciclo como P0/P1 con test unitario.
+
+### Lección #197: la "triple verdad" del modo sandbox (flag global vs testmode del gateway vs SDK JS) rompe todo cobro con la configuración default (AUDIT-FUNNEL PAY-13, 2026-10-28)
+
+1. **Caso real:** Openpay decidía la URL con
+   `LTMS_Core_Config::is_production()` (constante/opción `LTMS_ENVIRONMENT`),
+   mientras el SDK JavaScript del checkout se inicializaba con el `testmode`
+   del gateway WooCommerce (`is_sandbox`). El default de fábrica del gateway
+   es `testmode=yes` y el de `LTMS_ENVIRONMENT` es `production` → el cliente
+   tokenizaba la tarjeta contra SANDBOX y el servidor cobraba contra
+   PRODUCCIÓN → el token no existe en esa cuenta → todo cobro falla (o peor,
+   credenciales cruzadas según dónde se hayan guardado las keys). Addi tenía
+   el mismo patrón. Además el cache de bancos PSE (`ltms_pse_banks_CO`) no
+   incluía el entorno y servía hasta 6h la lista del entorno anterior.
+
+2. **Diagnóstico:** tres fuentes de verdad para una sola decisión:
+   (a) flag global de entorno, (b) testmode por gateway, (c) credenciales
+   sincronizadas entre admin LTMS y settings WC. La que el comprador "ve"
+   (el SDK que tokeniza) no era la que decide el servidor.
+
+3. **Regla preventiva:** (1) Cuando un componente cliente (JS/SDK) y el
+   servidor deben apuntar al mismo entorno, la fuente única es el flag que
+   usa el componente cliente — el servidor lo lee, no lo re-decide con otro
+   flag. (2) Override explícito por caller (`'sandbox'|'live'`) con
+   precedencia documentada (override > gateway > fallback global). (3) Todo
+   cache/transient de datos dependientes de entorno DEBE incluir el entorno
+   en la key. (4) Probar la configuración DEFAULT de fábrica, no solo la
+   configuración "correcta" que el operador cree tener.
+
+### Lección #198: un ciclo de auditoría no está cerrado hasta correr la suite de integración en el SERVER y triagear cada ❌ (AUDIT-FUNNEL, deploy 2026-10-28)
+
+1. **Caso real:** al deployar el ciclo en SG, la suite de integración reportó
+   `102 OK` + `5 ❌`: 4 eran hooks MX no registrados (ESPERADO: el handler
+   tiene guard `country === 'MX'` y la tienda es CO) y 1 era un fatal real
+   pre-existente (`LTMS_Logger`, lección #196) que 5,360 tests unitarios
+   locales no podían ver porque la rama no estaba cubierta. Sin el triage
+   explícito, el ciclo se habría cerrado con un fatal vivo en payouts.
+
+2. **Diagnóstico:** la distinción "esperado vs bug" no la hace el número de
+   ❌ sino el contexto (guard de país, feature flag, entorno). Documentar el
+   triage en el reporte del ciclo evita que el próximo operador "arregle" un
+   ❌ esperado o ignore uno real.
+
+3. **Regla preventiva:** (1) Todo ciclo con deploy corre la integración SG y
+   deja el conteo OK/❌ + el triage de cada ❌ en el CHANGELOG/QA_REPORT.
+   (2) Los ❌ esperados por guard de entorno se documentan (no se "arreglan"
+   en el test sin verificar el guard). (3) Los ❌ reales se convierten en fix
+   + test en el MISMO ciclo (aquí: commit `e655dd65`).

@@ -4,6 +4,68 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-28
+
+### Fixed — `AUDIT-FUNNEL-2026-10-28` (funnel del comprador, foco pagos E2E sandbox: 24 fixes, 9 P0)
+
+> **Alcance:** auditoría completa del funnel comprador (pre-checkout PC-01..21,
+> pagos PAY-01..22, post-pago POST-01..13) con 3 agentes de exploración +
+> verificación manual de cada P0 contra el código real. Commits `c86c49b8`
+> (24 fixes + 41 tests) y `e655dd65` (fatal de payouts detectado por la
+> validación post-deploy).
+>
+> **P0 (dinero/datos):**
+> - **PAY-01** orquestador consumía un contrato inventado de `charge()`
+>   (`['success','data']`) → todo cobro exitoso se reportaba fallido DESPUÉS
+>   de cobrar. El stub de `PaymentOrchestratorTest` mentía y lo hacía
+>   invisible a la suite.
+> - **PAY-02** `LTMS_Api_Factory::get('stripe')` instanciaba sin args →
+>   `ArgumentCountError`; el fallback Stripe del orquestador jamás funcionó.
+>   Constructor con auto-config desde `woocommerce_ltms_stripe_settings`.
+> - **PAY-03/17** webhook Openpay llamaba `decrypt()` incondicional sobre la
+>   private key que el gateway guarda en texto plano → 500 en cada evento →
+>   PSE/Nequi/Daviplata/OXXO/SPEI nunca confirmados. Nuevo
+>   `LTMS_Core_Security::maybe_decrypt()`/`encrypt_if_plain()` + cifrado al
+>   persistir (incluye hot-path) + fallback a la key genérica.
+> - **PAY-04** gateway Openpay CO marcaba la orden pagada sin validar el
+>   status del cargo (3DS/in_progress = pagado sin dinero). Solo `completed`
+>   confirma; 3DS con URL → on-hold + redirect.
+> - **PAY-05** webhook Addi comparaba `'APPROVED'` contra
+>   `sanitize_key('APPROVED')` → nunca matcheaba.
+> - **PAY-06** gateway Addi con contrato desalineado en AMBAS direcciones
+>   (payload con monto 0 y callbacks vacíos; vuelta leía keys inexistentes).
+> - **PAY-07** gateway Openpay MX instanciaba el cliente con 5 args (firma
+>   real: 2) → "País no soportado: mXXXX" en todo pago MX.
+> - **PAY-23** (re-auditoría) `sanitize_key()` elimina los PUNTOS de los
+>   event types de Openpay → el dispatch completo del webhook estaba muerto.
+> - **POST-05** comisiones acreditadas por `status_completed` sin verificar
+>   pago (listener + `ajax_update_order_status` del vendor).
+> - **DEPLOY-VALIDATION** `LTMS_Logger` (clase inexistente) en el guard de
+>   certificación bancaria de payouts → fatal justo al bloquear el desembolso
+>   (commit `e655dd65`; bug desde 2026-06-02).
+>
+> **P1/P2:** PAY-08 (idempotency key estable por orden), PAY-09 (lock de
+> checkout atómico con `add_option`), PAY-10 (return_url 3DS → order-received),
+> PAY-11 (webhook Stripe 500 + reset de idempotencia), PAY-12 (bancos PSE por
+> entorno vía cliente API), PAY-13 (fuente única de entorno: testmode del
+> gateway WC — antes token en sandbox y cobro en producción; OXXO con país MX;
+> cache de bancos PSE por entorno), PAY-15 (device_session ausente ya no es
+> silencioso), PAY-16/20/21.
+>
+> **Tests:** `AuditFunnelBuyerPaymentsFixesTest` (41) + `PayoutSchedulerTest`
+> (+2) + `PaymentOrchestratorTest` corregido al contrato real + stub de
+> `LTMS_Core_Security` en `tests/bootstrap.php`. Suite completa **5,360 tests
+> / 11,961 assertions / 0 fallas** (3 skips preexistentes).
+>
+> **Deploy SG validado:** pull `e655dd65` + OPcache reset + `php -l` de los 17
+> archivos + plugin reload + cache flush + integración **102 OK** (los 4 hooks
+> MX son esperados en tienda CO por el guard de país). Sin errores en
+> `error_log`. Nota: rotar el PAT embebido en el remote `origin` de GitHub.
+>
+> **Backlog con decisión de negocio pendiente:** POST-01 (refunds no revierten
+> wallet/comisión/hold), POST-02/03 (disputes y chargebacks), PC-01..PC-16
+> (pre-checkout, detalle parcial).
+
 ## [Unreleased] — 2026-10-23 (2)
 
 ### Changed — `REG-CHOICE-008` (header Plaza Viva compartido en TODAS las páginas públicas + header viejo del tema oculto)
