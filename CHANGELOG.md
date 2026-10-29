@@ -10,20 +10,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 > **Hallazgo:** el `deploy.yml` quedó sin commitear con el heredoc del reload
 > sin indentar (`WP=...` en columna 0 dentro de un block scalar `run: |`), por
-> lo que GitHub Actions no podía parsear el workflow. Además el step SSH
-> ejecutaba `wp plugin deactivate/activate` + `wp sg purge` de forma síncrona:
-> si el purge se colgaba, el job (timeout 15 min) moría después de haber
-> mergeado el commit.
+> lo que GitHub Actions no podía parsear el workflow. Además el run anterior
+> (`5318e912`) terminó en `failure` en el step SSH después de mergear: el
+> `wp plugin deactivate/activate` síncrono podía abortar con `set -e` o colgar
+> el job (timeout 15 min).
 >
-> - `.github/workflows/deploy.yml`: el reload corre en background en el
->   servidor (`nohup setsid /tmp/ltms-reload.sh`) — migraciones
+> - `.github/workflows/deploy.yml`: el reload corre dentro del step SSH
+>   (sincrónico) con `timeout` por comando — migraciones
 >   (`LTMS_DB_Migrations::run()`), `wp rewrite flush`, `wp cache flush`,
->   `wp sg purge` y versión — sin el downtime del deactivate/activate. Se
->   conserva la verificación de SHA (`DEPLOY-FAILED` si el servidor no recibió
->   el commit) y se agregan reintentos de HTTP 200 + tail no bloqueante del
->   log `/tmp/ltms-reload.log`.
-> - **Validación:** `yaml.safe_load` OK + `bash -n` de los 5 steps y del
->   heredoc remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`).
+>   `wp sg purge` y versión — sin el downtime del deactivate/activate. Si las
+>   migraciones fallan o la home no responde 200, el step FALLA; rewrite/cache/
+>   purge quedan como best-effort logueado. Se conserva la verificación de SHA
+>   (`DEPLOY-FAILED` si el servidor no recibió el commit) + reintentos HTTP 200.
+> - **Background descartado:** `nohup setsid` no sobrevive al cierre de la
+>   sesión SSH en SiteGround (el proceso muere y el log queda vacío). El reload
+>   se ejecuta en la misma sesión y se verifica en `/tmp/ltms-reload.log`.
+> - **Validación:** `yaml.safe_load` OK + `bash -n` de los steps y del heredoc
+>   remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`) + deploy
+>   real `70cda69b` (run success; migraciones/rewrite/cache/purge OK, home=200).
 
 ## [Unreleased] — 2026-10-28
 

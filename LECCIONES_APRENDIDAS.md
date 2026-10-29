@@ -4589,3 +4589,28 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (`LTMS_*`) o env, nunca literales; el webhook debe devolver 500 explícito si
    falta la constante. (4) En deploys, preferir `git merge --ff-only` sobre
    `git reset --hard` para no destruir estado del servidor.
+
+### Lección #202: en SiteGround, `nohup setsid` NO sobrevive al cierre de la sesión SSH — el reload "background" queda en cero y el deploy reporta verde (DEPLOY-RELOAD, 2026-10-29)
+
+1. **Caso real:** para evitar que un `wp sg purge` lento bloqueara el step SSH,
+   el reload del deploy se movió a un script lanzado con
+   `nohup setsid /tmp/ltms-reload.sh &`. El workflow terminó `success` y el SHA
+   del servidor coincidía, pero `/tmp/ltms-reload.log` quedó en 0 bytes y no
+   había proceso: SG mata el proceso al cerrar la sesión SSH (aunque esté
+   detachado). El único indicio fue el log vacío; el job "verde" no lo detectó
+   porque el step de log era no bloqueante.
+
+2. **Diagnóstico:** un `nohup`/`setsid` que funciona en un VPS no garantiza
+   supervivencia en hosting compartido (cgroups/KillUserProcesses). La prueba
+   es el artefacto: archivo de log con START/DONE, proceso vivo, y el efecto
+   observable (caché purgada, versión). El SHA desplegado solo prueba el git
+   merge, no el reload.
+
+3. **Regla preventiva:** (1) En SG, ejecutar el reload DENTRO de la misma
+   sesión SSH, con `timeout` por comando (migraciones fatal; rewrite/cache/
+   purge best-effort logueado). (2) El step debe imprimir el log y fallar si
+   migraciones o `home=200` fallan; nunca declarar éxito solo por el SHA.
+   (3) Si se usa background por necesidad, verificar en el mismo run que el
+   proceso sobrevivió y que el log tiene `DONE` — un log vacío es un fallo
+   silencioso, no un "todavía corriendo". (4) Misma clase que #199: el color
+   del run no es evidencia; el efecto en el servidor sí.
