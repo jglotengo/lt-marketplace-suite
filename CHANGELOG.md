@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-10-29
+
+### Fixed — `DEPLOY-RELOAD-2026-10-29` (workflow de deploy: YAML inválido + reload bloqueante)
+
+> **Hallazgo:** el `deploy.yml` quedó sin commitear con el heredoc del reload
+> sin indentar (`WP=...` en columna 0 dentro de un block scalar `run: |`), por
+> lo que GitHub Actions no podía parsear el workflow. Además el step SSH
+> ejecutaba `wp plugin deactivate/activate` + `wp sg purge` de forma síncrona:
+> si el purge se colgaba, el job (timeout 15 min) moría después de haber
+> mergeado el commit.
+>
+> - `.github/workflows/deploy.yml`: el reload corre en background en el
+>   servidor (`nohup setsid /tmp/ltms-reload.sh`) — migraciones
+>   (`LTMS_DB_Migrations::run()`), `wp rewrite flush`, `wp cache flush`,
+>   `wp sg purge` y versión — sin el downtime del deactivate/activate. Se
+>   conserva la verificación de SHA (`DEPLOY-FAILED` si el servidor no recibió
+>   el commit) y se agregan reintentos de HTTP 200 + tail no bloqueante del
+>   log `/tmp/ltms-reload.log`.
+> - **Validación:** `yaml.safe_load` OK + `bash -n` de los 5 steps y del
+>   heredoc remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`).
+
 ## [Unreleased] — 2026-10-28
 
 ### Fixed — `HEADER-WIDTH-2026-10-28` (ancho del header: panel vendedor full-width + vitrina con header PV estándar)
