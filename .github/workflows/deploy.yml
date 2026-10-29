@@ -120,12 +120,8 @@ jobs:
           exit $RC
           REMOTE
 
-      - name: Verify production responds
-        run: |
-          for i in 1 2 3 4 5 6; do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" https://lo-tengo.com.co/)
-            echo "home=$CODE (intento $i)"
-            [ "$CODE" = "200" ] && exit 0
-            sleep 5
-          done
-          exit 1
+      # Sin step de verificacion desde el runner: SiteGround responde 202 +
+      # sgcaptcha a las IPs de GitHub Actions (falso negativo; el sitio esta
+      # 200 desde el server y desde un cliente normal). La verificacion real
+      # es el curl home=200 DENTRO del servidor en el reload, que ya hace
+      # fallar el step si no da 200.

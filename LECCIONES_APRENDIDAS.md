@@ -4641,3 +4641,23 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    para git y `cd "$WP"` antes de WP-CLI. (3) Si un comando devuelve 255 sin
    output, sospechar fatal PHP silencioso y probar `--debug`/otro cwd antes de
    tocar el código de negocio.
+
+### Lección #204: no verificar disponibilidad pública desde el runner de GitHub si SiteGround tiene bot protection — el 202/sgcaptcha es un falso negativo; verificar desde el servidor (DEPLOY-RELOAD, 2026-10-29)
+
+1. **Caso real:** tras lograr que el deploy y el reload pasaran (`DONE`,
+   `home=200`, `LTMS_VERSION=2.9.433`), el job seguía rojo por el step
+   `Verify production responds`, que hacía `curl` a la home desde el runner de
+   GitHub. SiteGround responde 202 + sgcaptcha a esas IPs; el sitio estaba 200
+   desde el servidor y desde un cliente normal. El step reintentaba 6 veces y
+   fallaba siempre.
+
+2. **Diagnóstico:** el mismo URL puede dar 200 desde un cliente y 202/403 desde
+   otro por bot protection/WAF. Un health check externo solo es válido si el
+   cliente de prueba es representativo; el runner de CI no lo es para SG.
+
+3. **Regla preventiva:** (1) La verificación de disponibilidad del deploy se
+   hace desde el propio servidor (curl a la home dentro del script de reload,
+   fatal si no es 200), no desde el runner. (2) Si se quiere un check externo,
+   usar un cliente/IP no bloqueada o aceptar el challenge de SG de forma
+   explícita, nunca reintentar 200 a ciegas. (3) Misma clase que #199/#202: el
+   color del job no es la verdad; el efecto medido en el entorno real sí.

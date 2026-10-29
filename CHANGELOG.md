@@ -33,6 +33,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   mensaje** (fallan hasta `wp eval 'echo "X";'` y `wp option get`). El reload
 >   ahora hace `cd "$WP"` (raíz de WP, sin `vendor/autoload.php`) antes de
 >   invocar `wp`.
+> - **Tercer fallo (944e9197):** deploy y reload OK (`DONE`, `home=200`), pero
+>   falló el step `Verify production responds` del runner: SiteGround responde
+>   202 + sgcaptcha a las IPs de GitHub Actions. Se eliminó ese step; la
+>   verificación `home=200` desde el servidor dentro del reload es la
+>   autoritativa.
 > - **Validación:** `yaml.safe_load` OK + `bash -n` de los steps y del heredoc
 >   remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`) + step
 >   remoto exacto ejecutado por SSH (`bash -s`) con el SHA real: migraciones,
