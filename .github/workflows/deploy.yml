@@ -51,8 +51,10 @@ jobs:
       # DEPLOY-RELOAD-2026-10-29: el reload (migraciones + rewrite flush +
       # cache flush + sg purge) corre DENTRO del step SSH con timeout por
       # comando y log en /tmp/ltms-reload.log; si las migraciones fallan o la
-      # home no responde 200, el step FALLA. El background (nohup/setsid) NO
-      # sirve en SG: el proceso muere al cerrar la sesion SSH (log vacio).
+      # home no responde 200, el step FALLA. /tmp en SG es noexec: el script
+      # se invoca con /bin/bash (ejecutarlo directo da EACCES 126). El intento
+      # anterior con nohup/setsid fallo por lo mismo (error silenciado a
+      # /dev/null: el log quedaba vacio y el job verde).
       - name: Deploy via SSH (git ff-only + reload + SHA verification)
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -106,10 +108,10 @@ jobs:
             echo "DONE $(date -u +%FT%TZ)"
           } >> /tmp/ltms-reload.log 2>&1
           EOS
-          chmod +x /tmp/ltms-reload.sh
           : > /tmp/ltms-reload.log
           RC=0
-          timeout 400 /tmp/ltms-reload.sh || RC=$?
+          # /tmp en SG es noexec: invocar con bash (ejecutar el archivo da EACCES 126).
+          timeout 400 /bin/bash /tmp/ltms-reload.sh || RC=$?
           cat /tmp/ltms-reload.log
           exit $RC
           REMOTE

@@ -22,12 +22,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   migraciones fallan o la home no responde 200, el step FALLA; rewrite/cache/
 >   purge quedan como best-effort logueado. Se conserva la verificación de SHA
 >   (`DEPLOY-FAILED` si el servidor no recibió el commit) + reintentos HTTP 200.
-> - **Background descartado:** `nohup setsid` no sobrevive al cierre de la
->   sesión SSH en SiteGround (el proceso muere y el log queda vacío). El reload
->   se ejecuta en la misma sesión y se verifica en `/tmp/ltms-reload.log`.
+> - **Causa raíz del intento background (70cda69b):** `/tmp` en SiteGround es
+>   `noexec`; ejecutar `/tmp/ltms-reload.sh` directamente da `EACCES` (exit
+>   126) aunque tenga `+x`. El `nohup setsid ... >/dev/null 2>&1` ocultó el
+>   error: el job quedó verde con `/tmp/ltms-reload.log` vacío. El fix invoca
+>   el script con `/bin/bash` (no requiere el bit de ejecución) y imprime el
+>   log; el run `a97cc827` falló con 126 y confirmó el diagnóstico.
 > - **Validación:** `yaml.safe_load` OK + `bash -n` de los steps y del heredoc
->   remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`) + deploy
->   real `70cda69b` (run success; migraciones/rewrite/cache/purge OK, home=200).
+>   remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`) + script
+>   ejecutado manualmente (migraciones/rewrite/cache/purge OK, home=200).
 
 ## [Unreleased] — 2026-10-28
 
