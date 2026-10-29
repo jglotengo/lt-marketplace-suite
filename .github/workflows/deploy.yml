@@ -89,6 +89,10 @@ jobs:
           cat > /tmp/ltms-reload.sh <<'EOS'
           #!/bin/bash
           WP=/home/customer/www/lo-tengo.com.co/public_html
+          # WP-CLI carga el vendor/autoload.php del cwd; lanzado desde el
+          # directorio del plugin (que tiene vendor/autoload.php) `wp` muere
+          # con exit 255 sin mensaje. Correr desde la raiz de WP.
+          cd "$WP"
           {
             echo "START $(date -u +%FT%TZ)"
             # Migraciones: activate() ya no se ejecuta en cada deploy (evita el

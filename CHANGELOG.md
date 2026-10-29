@@ -28,9 +28,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   error: el job quedó verde con `/tmp/ltms-reload.log` vacío. El fix invoca
 >   el script con `/bin/bash` (no requiere el bit de ejecución) y imprime el
 >   log; el run `a97cc827` falló con 126 y confirmó el diagnóstico.
+> - **Segundo fallo (26fe854a):** el step remoto hace `cd "$PLUGIN"`; WP-CLI
+>   carga el `vendor/autoload.php` del cwd y `wp` muere con **exit 255 sin
+>   mensaje** (fallan hasta `wp eval 'echo "X";'` y `wp option get`). El reload
+>   ahora hace `cd "$WP"` (raíz de WP, sin `vendor/autoload.php`) antes de
+>   invocar `wp`.
 > - **Validación:** `yaml.safe_load` OK + `bash -n` de los steps y del heredoc
->   remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`) + script
->   ejecutado manualmente (migraciones/rewrite/cache/purge OK, home=200).
+>   remoto + `DeploySecurityTest` (5 tests, grupo `deploy-security`) + step
+>   remoto exacto ejecutado por SSH (`bash -s`) con el SHA real: migraciones,
+>   rewrite/cache/purge OK, home=200, `DONE` y exit 0.
 
 ## [Unreleased] — 2026-10-28
 

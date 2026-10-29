@@ -4616,3 +4616,28 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    un proceso crítico con `>/dev/null 2>&1 &` sin verificar después que el
    log tiene START/DONE; un log vacío es un fallo silencioso. (4) Misma clase
    que #199: el color del run no es evidencia; el efecto en el servidor sí.
+
+### Lección #203: `wp` ejecutado desde el directorio de un plugin con `vendor/autoload.php` muere con exit 255 sin mensaje — correr WP-CLI desde la raíz de WP (DEPLOY-RELOAD, 2026-10-29)
+
+1. **Caso real:** tras corregir el `noexec` (lección #202), el deploy falló en
+   migraciones con `MIGRATIONS-FAILED` y exit 255, sin ningún error en el log.
+   El step remoto hacía `cd "$PLUGIN"` para el `git fetch/merge` y ejecutaba
+   el reload desde ahí. Reproducido por SSH: cualquier `wp` desde el
+   directorio del plugin (incluso `wp eval 'echo "X";'` o
+   `wp option get home`) devuelve 255; desde `/home/customer` o la raíz de WP
+   devuelve 0. Causa: WP-CLI carga el `vendor/autoload.php` del cwd (el
+   comando `IncludePackageAutoloader`), y el autoloader del plugin —con sus
+   dependencias de Composer— fatala dentro de WP-CLI. Sin `display_errors` el
+   fatal no imprime nada, solo el 255.
+
+2. **Diagnóstico:** exit 255 inmediato + silencio = fatal PHP, no timeout ni
+   error de red. Aislar por cwd: `pwd` + el mismo comando desde otra carpeta.
+   El SHA desplegado y el log vacío no explican nada por sí solos.
+
+3. **Regla preventiva:** (1) Antes de correr `wp` en un script remoto, hacer
+   `cd` a la raíz de WordPress (o a un directorio sin `vendor/autoload.php`),
+   nunca quedarse en el directorio de un plugin con `vendor/`. (2) Para
+   `git` sí hay que estar en el plugin; separar las fases: `cd "$PLUGIN"`
+   para git y `cd "$WP"` antes de WP-CLI. (3) Si un comando devuelve 255 sin
+   output, sospechar fatal PHP silencioso y probar `--debug`/otro cwd antes de
+   tocar el código de negocio.
