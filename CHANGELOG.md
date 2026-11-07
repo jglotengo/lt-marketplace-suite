@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-11-07
+
+### Fixed — `HEADER-SYNC-2026-11-07` (header del plugin desincronizado con LTMS_VERSION)
+
+> **Hallazgo (P2 heredado de `DEPLOY-RELOAD-2026-10-29`):** el header del
+> plugin declaraba `Version: 2.9.339` mientras el `define('LTMS_VERSION')`
+> real era `2.9.433`. WordPress lee el `Version:` del header del archivo
+> principal (`get_plugin_data`), no la constante: la UI de plugins, los checks
+> de compatibilidad y cualquier diagnóstico externo leen el header; el
+> cache-busting de assets usa `LTMS_VERSION`. Dos fuentes de verdad
+> divergentes.
+>
+> - `lt-marketplace-suite.php`: header `Version: 2.9.339` → `2.9.433`
+>   (sincronizado con el define, línea 95).
+> - **Test anti-drift:** `tests/unit/PluginHeaderVersionSyncTest.php` (group
+>   `plugin-version`) — fija la invariante header `Version:` ==
+>   `LTMS_VERSION` leyendo el fuente real (parse del header como lo hace
+>   `get_file_data` + exactitud de un solo define). Verificado que el test
+>   fallaría con el estado pre-fix (2.9.339 vs 2.9.433).
+> - **Validación:** `php -l` OK en ambos archivos; suite completa local
+>   (`LTMS_UNIT_ONLY=true`, testsuite unit): **5,372 tests, 11,998
+>   aserciones, 0 fallos, 3 skipped**.
+
 ## [Unreleased] — 2026-10-29
 
 ### Fixed — `DEPLOY-RELOAD-2026-10-29` (workflow de deploy: YAML inválido + reload bloqueante)
