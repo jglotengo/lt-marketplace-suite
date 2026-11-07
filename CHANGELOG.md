@@ -25,7 +25,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   fallaría con el estado pre-fix (2.9.339 vs 2.9.433).
 > - **Validación:** `php -l` OK en ambos archivos; suite completa local
 >   (`LTMS_UNIT_ONLY=true`, testsuite unit): **5,372 tests, 11,998
->   aserciones, 0 fallos, 3 skipped**.
+>   aserciones, 0 fallos, 3 skipped**. CI del commit `4ec61be5` (runs
+>   [42353649380](https://github.com/jglotengo/lt-marketplace-suite/actions/runs/42353649380)
+>   unit+integration y
+>   [42353649327](https://github.com/jglotengo/lt-marketplace-suite/actions/runs/42353649327)
+>   lint): **success**. Deploy a producción
+>   ([42353649428](https://github.com/jglotengo/lt-marketplace-suite/actions/runs/42353649428)):
+>   **success** — SHA verificado en servidor + reload con migraciones y
+>   `home=200`.
 
 ## [Unreleased] — 2026-10-29
 
