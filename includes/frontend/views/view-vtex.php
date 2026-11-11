@@ -407,6 +407,13 @@ if ( empty( $seo_template ) ) {
                                 </select>
                                 <p style="margin:4px 0 0;font-size:0.7rem;color:#9ca3af;"><?php esc_html_e( 'Redondear precio por encima al múltiplo', 'ltms' ); ?></p>
                             </div>
+                            <div>
+                                <label style="display:block;font-weight:600;margin-bottom:4px;font-size:0.85rem;">
+                                    <?php esc_html_e( 'Piso de precio', 'ltms' ); ?>
+                                </label>
+                                <input type="number" name="min_price" value="<?php echo esc_attr( $rules['min_price'] ); ?>" min="0" max="10000000" step="100" style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:4px;">
+                                <p style="margin:4px 0 0;font-size:0.7rem;color:#9ca3af;"><?php esc_html_e( '0 = sin piso. Los productos cuyo precio final quede por debajo NO se sincronizan.', 'ltms' ); ?></p>
+                            </div>
                         </div>
 
                         <!-- Ejemplo de cálculo -->

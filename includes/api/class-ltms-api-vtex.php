@@ -296,6 +296,24 @@ final class LTMS_Api_Vtex {
             return $result;
         }
 
+        // TAIWAN-MIRROR TM-3 (2026-11-10) — CONTRATO DE FORMATO (fail-closed).
+        // Espejo de la regla dura de Juguetería Taiwan: "el cron aborta antes de
+        // tocar catalogo.js si los encabezados cambian". El Search API de VTEX
+        // devuelve SIEMPRE una lista JSON; si llega 2xx con un body no-lista
+        // (objeto, escalar), la estructura cambió → error explícito en vez de
+        // un éxito fantasma con 0 productos por página.
+        $vtex_data = $result['data'];
+        $is_list   = is_array( $vtex_data )
+            && ( [] === $vtex_data || array_keys( $vtex_data ) === range( 0, count( $vtex_data ) - 1 ) );
+        if ( ! $is_list ) {
+            return [
+                'success' => false,
+                'data'    => [],
+                'error'   => 'La respuesta de VTEX cambió de estructura (contrato de formato): HTTP 200 sin lista de productos. Sync abortada.',
+                'status'  => $result['status'],
+            ];
+        }
+
         $products = is_array( $result['data'] ) ? $result['data'] : [];
         return [
             'success' => true,

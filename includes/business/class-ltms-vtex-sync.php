@@ -150,6 +150,9 @@ final class LTMS_Vtex_Sync {
             'skipped'      => $result['skipped'] ?? 0,
             'errors'       => $result['errors'] ?? [],
             'message'      => $result['message'] ?? '',
+            // TAIWAN-MIRROR TM-2: novedades de omisión con motivo.
+            'skipped_products' => $result['skipped_products'] ?? [],
+            'skipped_reasons'  => $result['skipped_reasons'] ?? [],
         ] );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
@@ -174,7 +177,7 @@ final class LTMS_Vtex_Sync {
                         $result['created'] ?? 0,
                         $result['updated'] ?? 0,
                         $result['skipped'] ?? 0
-                    ),
+                    ) . self::novedades_summary( $result ),
                     'is_read'    => 0,
                     'created_at' => LTMS_Utils::now_utc(),
                 ],
@@ -220,6 +223,25 @@ final class LTMS_Vtex_Sync {
 
             $offset += 5;
         }
+    }
+
+    /**
+     * TAIWAN-MIRROR TM-2 (2026-11-10): resumen legible de las novedades de
+     * omisión para la notificación in-dashboard (paridad con PosGold).
+     *
+     * @param array $result Resultado de sync_vendor_products().
+     * @return string
+     */
+    private static function novedades_summary( array $result ): string {
+        $reasons = $result['skipped_reasons'] ?? [];
+        if ( ! is_array( $reasons ) || empty( $reasons ) ) {
+            return '';
+        }
+        $parts = [];
+        foreach ( $reasons as $motivo => $count ) {
+            $parts[] = sprintf( '%d %s', (int) $count, (string) $motivo );
+        }
+        return ' ' . __( 'Omisiones: ', 'ltms' ) . implode( ', ', $parts ) . '.';
     }
 
     /**
@@ -343,6 +365,11 @@ final class LTMS_Vtex_Sync {
         $filtered_out    = 0;
         $processed_product_ids = [];
 
+        // TAIWAN-MIRROR TM-2 (2026-11-10): novedades de omisión con motivo
+        // (mismo espejo que PosGold: qué no se publicó y por qué).
+        $skipped_products = [];
+        $skipped_reasons  = [];
+
         // Procesa UN producto normalizado: filtro de categoría → completitud →
         // precio (reglas) → título SEO → sync WC. Compartido por la Fase A
         // (Search API) y la Fase B (sitemaps / catálogo completo).
@@ -352,7 +379,7 @@ final class LTMS_Vtex_Sync {
             string $category_filter,
             array $price_rules,
             string $seo_template
-        ) use ( &$created, &$updated, &$skipped, &$skipped_incomplete, &$filtered_out, &$errors ): void {
+        ) use ( &$created, &$updated, &$skipped, &$skipped_incomplete, &$filtered_out, &$errors, &$skipped_products, &$skipped_reasons ): void {
             // Filtro por categoría.
             if ( ! empty( $category_filter ) ) {
                 $filtered = LTMS_Vtex_Price_Calculator::filter_by_category( [ $product ], $category_filter );
@@ -367,11 +394,31 @@ final class LTMS_Vtex_Sync {
             if ( ! $validation['complete'] ) {
                 $skipped++;
                 $skipped_incomplete++;
+                $motivo = 'incompleto: ' . implode( ',', $validation['missing'] );
+                $skipped_products[] = [
+                    'codigo' => (string) $product['sku'],
+                    'motivo' => $motivo,
+                ];
+                $skipped_reasons[ $motivo ] = ( $skipped_reasons[ $motivo ] ?? 0 ) + 1;
                 return;
             }
 
             // Precio final con reglas del vendor.
             $price_calc = LTMS_Vtex_Price_Calculator::calculate( (float) $product['regular_price'], $price_rules );
+
+            // TAIWAN-MIRROR TM-4 (2026-11-10) — piso de precio del vendor
+            // (regla 11 de Taiwan: por debajo del piso no se enlista).
+            $min_price = (float) ( $price_rules['min_price'] ?? 0 );
+            if ( $min_price > 0 && (float) $price_calc['price'] < $min_price ) {
+                $skipped++;
+                $skipped_products[] = [
+                    'codigo' => (string) $product['sku'],
+                    'motivo' => 'precio_minimo',
+                ];
+                $skipped_reasons['precio_minimo'] = ( $skipped_reasons['precio_minimo'] ?? 0 ) + 1;
+                return;
+            }
+
             // PRICE-RECALC FIX: persistir el COSTO original (precio VTEX antes de
             // reglas) para poder re-calcular precios masivamente sin re-fetch.
             $product['_ltms_cost'] = $price_calc['cost'];
@@ -525,6 +572,7 @@ final class LTMS_Vtex_Sync {
                     'updated'            => $updated,
                     'skipped'            => $skipped,
                     'skipped_incomplete' => $skipped_incomplete,
+                    'skipped_reasons'    => $skipped_reasons,
                     'errors'             => $errors,
                 ]
             );
@@ -552,6 +600,15 @@ final class LTMS_Vtex_Sync {
             );
         }
 
+        // TAIWAN-MIRROR TM-2: resumen de omisiones por motivo en el mensaje.
+        if ( ! empty( $skipped_reasons ) ) {
+            $reason_parts = [];
+            foreach ( $skipped_reasons as $motivo => $count ) {
+                $reason_parts[] = sprintf( '%d %s', $count, $motivo );
+            }
+            $message_parts[] = __( 'omisiones: ', 'ltms' ) . implode( ', ', $reason_parts );
+        }
+
         return [
             'success'      => true,
             'message'      => __( 'Sincronización completa: ', 'ltms' ) . implode( ', ', $message_parts ) . '.',
@@ -560,6 +617,8 @@ final class LTMS_Vtex_Sync {
             'skipped'      => $skipped,
             'duplicates'   => 0,
             'filtered_out' => $filtered_out,
+            'skipped_products' => array_slice( $skipped_products, 0, 50, false ),
+            'skipped_reasons'  => $skipped_reasons,
             'errors'       => $errors,
         ];
     }

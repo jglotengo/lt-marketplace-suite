@@ -4,6 +4,88 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-11-10
+
+### Changed — `TAIWAN-MIRROR-2026-11-10` (espejo de las reglas duras de Juguetería Taiwan en PosGold/VTEX)
+
+> **Origen:** auditoría de la integración PosGold de LTMS contra las reglas
+> duras maduradas en el proyecto de Juguetería Taiwan
+> (`C:\Users\User\JUGUETERIA_TAIWAN\AGENTS.md`, `sync_posgold.py`: filtros
+> duros "activo + existencias + ...", conciliación dura en 3 puertas,
+> novedades_*.xlsx con motivo, contrato de formato del export, piso de
+> precio, dedup por mayor existencia). Se espejó SOLO lo que aplica al
+> marketplace; el resto queda documentado abajo como no-aplica.
+>
+> **PosGold (aplican TM-1..TM-6):**
+> - **TM-1 — Filtro duro "activo"** (`includes/business/class-ltms-posgold-sync.php`):
+>   la API V6 puede devolver filas con `Activo=false` (verificado en la
+>   respuesta real — el query param `activo=true` no filtra del lado server).
+>   Antes se sincronizaban y publicaban igual; ahora se omiten con motivo
+>   `inactivo` (fail-closed: solo '1'/'true'/'yes'/'si' cuentan como activo).
+> - **TM-2 — Novedades con motivo** (PosGold + VTEX): cada producto omitido
+>   viaja como `{codigo, motivo}` (`inactivo`, `incompleto: <campos>`,
+>   `precio_minimo`) en `skipped_products`/`skipped_reasons` del resultado,
+>   del meta `_ltms_*_sync_last_result` (polling del panel) y de la
+>   notificación in-dashboard (resumen "N motivo"). Lista capada a 50; el
+>   resumen por motivo siempre completo.
+> - **TM-3 — Contrato de formato fail-closed** (`includes/api/class-ltms-api-posgold.php`,
+>   `class-ltms-api-vtex.php`, sync PosGold): (a) 2xx con JSON válido y
+>   Status!==false pero SIN contenedor de productos reconocible (Datos/data/
+>   Items/...) → error explícito en vez de éxito fantasma con 0 productos;
+>   VTEX: 2xx con body no-lista → error. (b) Payload normalizado 100% sin
+>   campo de existencias (nuevo `_stock_present` en normalize_product; cuenta
+>   Stock/Disponible/Existencia/cantidad/saldo) → sync abortada SIN tocar el
+>   catálogo: era un drift de esquema que pondría TODOS los stocks a 0 y el
+>   Sync Visibility Gate ocultaría el catálogo entero del marketplace.
+> - **TM-4 — Piso de precio por vendor** (regla 11 de Taiwan): nueva key
+>   `min_price` en los defaults compartidos PosGold/VTEX (default 0 =
+>   deshabilitado, sin cambio de comportamiento). Precio final < min_price →
+>   skip con motivo `precio_minimo`. UI: campo "Piso de precio" en
+>   view-posgold.php y view-vtex.php, lectura y tope (0..10M) en
+>   `ajax_save_posgold_rules`/`ajax_save_vtex_rules`, envío en
+>   ltms-posgold.js/ltms-vtex.js (submit + collectRules) + `.min`
+>   regenerados. Paridad de defaults PosGold/VTEX preservada.
+> - **TM-5 — Dedup con mayor existencia** (regla 1 de Taiwan
+>   "deduplicar-mayor-existencia"): `deduplicate_by_sku()` ya no conserva la
+>   primera fila a ciegas — ante el mismo código gana la fila con MÁS stock
+>   (empate → la primera; sin stock se lee 0 y nunca rompe).
+> - **TM-6 — Clamps defensivos** en `calculate()` (PosGold, heredado por
+>   VTEX): porcentajes clampeados a [0,100] (margen a [0,500], paridad con el
+>   handler) y montos fijos ≥ 0. Un meta corrupto/negativo jamás produce un
+>   precio por debajo del costo (guardia de rentabilidad de Taiwan).
+>
+> **VTEX (aplican TM-2, TM-3, TM-4/TM-6 por delegación):**
+> - TM-3: contrato de formato en `get_products_search()`.
+> - TM-2/TM-4: novedades y piso en `handle_product` (Fase A y Fase B).
+> - **No aplica TM-1 (filtro activo) en VTEX**: la Fase B (VTEX-CATALOGO-FIX)
+>   descarga DELIBERADAMENTE agotados/inactivos vía sitemaps — el visibility
+>   gate los oculta del público. **No aplica TM-5**: VTEX dedup por productId
+>   entre fases y cada item es un SKU único.
+>
+> **Reglas de Taiwan evaluadas y NO espejadas (no aplican a LTMS):**
+> abortar todo si UN producto falla (LTMS es incremental multi-vendor: skip
+> con motivo es el análogo correcto), stock mínimo 50+ (canal dropshipping de
+> Dropi, no retail), precio honesto del tachado (LTMS no inventa compare-at:
+> nunca setea sale_price), redondeo hacia arriba (YA implementado en
+> `round_up_to_multiple()` + testeado), costos cifrados/fuera del repo (repo
+> de Taiwan es público; LTMS guarda el costo en DB privada para el recálculo),
+> conciliación contra exports (LTMS sincroniza contra API viva), democión de
+> productos ausentes de la API (decisión de negocio pendiente: qué hacer con
+> un producto que desaparece de PosGold — ocultar/draft/borrar).
+>
+> - **Tests:** `tests/unit/TaiwanMirrorPosGoldTest.php` +
+>   `tests/unit/TaiwanMirrorVtexTest.php` (group `taiwan-mirror`, 17 tests /
+>   62 aserciones): contrato de formato (PosGold y VTEX), catálogo vacío
+>   legítimo sigue siendo éxito, `_stock_present`, guard de existencias,
+>   filtro activo con novedades, piso de precio con novedades, incompletos
+>   con motivo, dedup max-stock/empate, clamps, defaults con paridad y
+>   min_price=0 no omite nada.
+> - **Validación:** `php -l` OK en los 9 archivos PHP tocados + 2 tests;
+>   `node scripts/build.js` regeneró `ltms-posgold.min.js` y
+>   `ltms-vtex.min.js` (50/50 JS + 28/28 CSS, 0 errores). Bump
+>   `LTMS_VERSION` 2.9.433 → 2.9.434 (cache-busting de los JS) con header
+>   sincronizado (PluginHeaderVersionSyncTest).
+
 ## [Unreleased] — 2026-11-07
 
 ### Fixed — `HEADER-SYNC-2026-11-07` (header del plugin desincronizado con LTMS_VERSION)

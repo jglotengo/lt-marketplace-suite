@@ -116,6 +116,10 @@ final class LTMS_PosGold_Sync {
             'skipped'      => $result['skipped'] ?? 0,
             'errors'       => $result['errors'] ?? [],
             'message'      => $result['message'] ?? '',
+            // TAIWAN-MIRROR TM-2: novedades de omisión con motivo (qué no se
+            // publicó y por qué) — alimenta el polling del panel.
+            'skipped_products' => $result['skipped_products'] ?? [],
+            'skipped_reasons'  => $result['skipped_reasons'] ?? [],
         ] );
 
         // Enviar notificación al vendor.
@@ -141,7 +145,7 @@ final class LTMS_PosGold_Sync {
                         $result['created'] ?? 0,
                         $result['updated'] ?? 0,
                         $result['skipped'] ?? 0
-                    ),
+                    ) . self::novedades_summary( $result ),
                     'is_read'    => 0,
                     'created_at' => LTMS_Utils::now_utc(),
                 ],
@@ -271,6 +275,71 @@ final class LTMS_PosGold_Sync {
             $normalized[] = LTMS_Api_PosGold::normalize_product( $raw_product, $creds['subdomain'] );
         }
 
+        // TAIWAN-MIRROR TM-2 (2026-11-10): novedades de omisión con motivo.
+        // Espejo del reporte novedades_*.xlsx de Juguetería Taiwan ("lo que no
+        // publica y por qué"): cada producto omitido viaja con su motivo en el
+        // resultado, en el meta _ltms_posgold_sync_last_result y en la
+        // notificación in-dashboard. La lista se capa a 50 entradas (el
+        // resumen por motivo en skipped_reasons siempre queda completo).
+        $skipped          = 0;
+        $skipped_products = [];
+        $skipped_reasons  = [];
+
+        // TAIWAN-MIRROR TM-3 (2026-11-10) — guard de existencias (conciliación
+        // dura). Espejo de "si el catálogo quedara sin existencias, aborta SIN
+        // tocar lo publicado": si el payload normalizado viene 100% sin
+        // ningún campo de existencias, es drift de esquema de la API y hoy
+        // silenciaría TODOS los stocks a 0 → el visibility gate ocultaría el
+        // catálogo entero del marketplace. Aborta la sync sin escribir nada.
+        if ( ! empty( $normalized ) ) {
+            $with_stock = 0;
+            foreach ( $normalized as $normalized_product ) {
+                if ( ! empty( $normalized_product['_stock_present'] ) ) {
+                    $with_stock++;
+                }
+            }
+            if ( 0 === $with_stock ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::error(
+                        'POSGOLD_SYNC_CONTRACT',
+                        sprintf( 'Vendor #%d: la respuesta de PosGold no incluye existencias en %d productos (contrato de formato). Sync abortada sin tocar el catálogo.', $vendor_id, count( $normalized ) ),
+                        [ 'vendor_id' => $vendor_id, 'total' => count( $normalized ) ]
+                    );
+                }
+                return [
+                    'success'          => false,
+                    'message'          => __( 'La respuesta de PosGold no incluye existencias (contrato de formato). Sincronización abortada sin tocar tu catálogo.', 'ltms' ),
+                    'created'          => 0,
+                    'updated'          => 0,
+                    'skipped'          => 0,
+                    'skipped_products' => [],
+                    'skipped_reasons'  => [],
+                    'errors'           => [ 'Respuesta de PosGold sin campo de existencias (Stock/Disponible/Existencia) en todo el payload.' ],
+                ];
+            }
+        }
+
+        // TAIWAN-MIRROR TM-1 (2026-11-10) — filtro duro "activo".
+        // Espejo de los filtros duros de Taiwan ("activo + existencias + foto +
+        // ...") y de su conciliación "todos activos, sí o sí": la API V6 puede
+        // devolver filas con Activo=false (verificado en la respuesta real) y
+        // hoy se sincronizaban/publishaban igual. Un producto desactivado en
+        // PosGold NO entra al marketplace; se reporta en las novedades.
+        $active_normalized = [];
+        foreach ( $normalized as $product ) {
+            if ( ! self::is_posgold_active( $product['activo'] ?? '' ) ) {
+                $skipped++;
+                $skipped_products[] = [
+                    'codigo' => (string) ( $product['codigo'] ?? '' ),
+                    'motivo' => 'inactivo',
+                ];
+                $skipped_reasons['inactivo'] = ( $skipped_reasons['inactivo'] ?? 0 ) + 1;
+                continue;
+            }
+            $active_normalized[] = $product;
+        }
+        $normalized = $active_normalized;
+
         // 5. Filtrar por categoriaid si el vendor configuró categorías.
         $category_filter = (string) get_user_meta( $vendor_id, 'ltms_posgold_category_ids', true );
         if ( ! empty( $category_filter ) && class_exists( 'LTMS_PosGold_Price_Calculator' ) ) {
@@ -301,7 +370,6 @@ final class LTMS_PosGold_Sync {
         // 9. Sincronizar cada producto.
         $created         = 0;
         $updated         = 0;
-        $skipped         = 0;
         $skipped_incomplete = 0;
         $errors          = [];
 
@@ -311,6 +379,11 @@ final class LTMS_PosGold_Sync {
             if ( ! $validation['complete'] ) {
                 $skipped++;
                 $skipped_incomplete++;
+                $skipped_products[] = [
+                    'codigo' => (string) $product['codigo'],
+                    'motivo' => 'incompleto: ' . implode( ',', $validation['missing'] ),
+                ];
+                $skipped_reasons[ 'incompleto: ' . implode( ',', $validation['missing'] ) ] = ( $skipped_reasons[ 'incompleto: ' . implode( ',', $validation['missing'] ) ] ?? 0 ) + 1;
                 continue;
             }
 
@@ -320,6 +393,21 @@ final class LTMS_PosGold_Sync {
             // en el meta _ltms_posgold_cost para que el recálculo masivo pueda
             // re-preciar sin re-sincronizar (mismo patrón PRICE-RECALC de VTEX).
             $price_calc = LTMS_PosGold_Price_Calculator::calculate( (float) $product['regular_price'], $price_rules );
+
+            // TAIWAN-MIRROR TM-4 (2026-11-10) — piso de precio del vendor.
+            // Espejo de la regla 11 de Taiwan: por debajo del piso no se enlista.
+            // El producto NO se sincroniza y queda reportado en las novedades.
+            $min_price = (float) ( $price_rules['min_price'] ?? 0 );
+            if ( $min_price > 0 && (float) $price_calc['price'] < $min_price ) {
+                $skipped++;
+                $skipped_products[] = [
+                    'codigo' => (string) $product['codigo'],
+                    'motivo' => 'precio_minimo',
+                ];
+                $skipped_reasons['precio_minimo'] = ( $skipped_reasons['precio_minimo'] ?? 0 ) + 1;
+                continue;
+            }
+
             $product['_ltms_cost'] = $price_calc['cost'];
             $product['regular_price'] = $price_calc['price'];
 
@@ -366,6 +454,7 @@ final class LTMS_PosGold_Sync {
                     'updated'            => $updated,
                     'skipped'            => $skipped,
                     'skipped_incomplete' => $skipped_incomplete,
+                    'skipped_reasons'    => $skipped_reasons,
                     'errors'             => $errors,
                 ]
             );
@@ -401,6 +490,15 @@ final class LTMS_PosGold_Sync {
             );
         }
 
+        // TAIWAN-MIRROR TM-2: resumen de omisiones por motivo en el mensaje.
+        if ( ! empty( $skipped_reasons ) ) {
+            $reason_parts = [];
+            foreach ( $skipped_reasons as $motivo => $count ) {
+                $reason_parts[] = sprintf( '%d %s', $count, $motivo );
+            }
+            $message_parts[] = __( 'omisiones: ', 'ltms' ) . implode( ', ', $reason_parts );
+        }
+
         return [
             'success' => true,
             'message' => __( 'Sincronización completa: ', 'ltms' ) . implode( ', ', $message_parts ) . '.',
@@ -409,6 +507,8 @@ final class LTMS_PosGold_Sync {
             'skipped' => $skipped,
             'duplicates'   => count( $duplicates ),
             'filtered_out' => $filtered_out,
+            'skipped_products' => array_slice( $skipped_products, 0, 50, false ),
+            'skipped_reasons'  => $skipped_reasons,
             'errors'  => $errors,
         ];
     }
@@ -453,6 +553,46 @@ final class LTMS_PosGold_Sync {
             'usuarioid'  => $usuarioid,
             'bodegaid'   => $bodegaid,
         ];
+    }
+
+    /**
+     * TAIWAN-MIRROR TM-1 (2026-11-10): ¿el producto PosGold está activo?
+     *
+     * normalize_product entrega 'activo' como string (Activo=true → '1',
+     * Activo=false → '', 'true'/'false' crudos → tal cual). Espejo estricto de
+     * la conciliación de Taiwan ("it.get('Activo') is not True → violación"):
+     * solo '1'/'true'/'yes'/'si' cuentan como activo; vacío o 'false' es
+     * inactivo (fail-closed).
+     *
+     * @param mixed $activo Valor crudo del campo activo.
+     * @return bool
+     */
+    private static function is_posgold_active( $activo ): bool {
+        if ( is_bool( $activo ) ) {
+            return $activo;
+        }
+        $value = strtolower( trim( (string) $activo ) );
+        return in_array( $value, [ '1', 'true', 'yes', 'si', 'sí' ], true );
+    }
+
+    /**
+     * TAIWAN-MIRROR TM-2 (2026-11-10): resumen legible de las novedades de
+     * omisión ("5 sin precio, 3 inactivos, 2 piso de precio") para la
+     * notificación in-dashboard. Vacío si no hubo omisiones con motivo.
+     *
+     * @param array $result Resultado de sync_vendor_products().
+     * @return string
+     */
+    private static function novedades_summary( array $result ): string {
+        $reasons = $result['skipped_reasons'] ?? [];
+        if ( ! is_array( $reasons ) || empty( $reasons ) ) {
+            return '';
+        }
+        $parts = [];
+        foreach ( $reasons as $motivo => $count ) {
+            $parts[] = sprintf( '%d %s', (int) $count, (string) $motivo );
+        }
+        return ' ' . __( 'Omisiones: ', 'ltms' ) . implode( ', ', $parts ) . '.';
     }
 
     /**

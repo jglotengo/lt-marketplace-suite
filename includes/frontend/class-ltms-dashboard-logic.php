@@ -2281,6 +2281,9 @@ final class LTMS_Dashboard_Logic {
             'iva_pct'                => (float) ( $_POST['iva_pct'] ?? 19 ),
             'redi_cost_pct'          => (float) ( $_POST['redi_cost_pct'] ?? 0 ),
             'round_multiple'         => (int)   ( $_POST['round_multiple'] ?? 1000 ),
+            // TAIWAN-MIRROR TM-4 (2026-11-10): piso de precio del vendor
+            // (regla 11 de Taiwan). 0 = deshabilitado.
+            'min_price'              => (float) ( $_POST['min_price'] ?? 0 ),
         ];
 
         // Validar rangos (mismos topes que VTEX: montos hasta 10M, no cap 100).
@@ -2291,6 +2294,7 @@ final class LTMS_Dashboard_Logic {
         $rules['lotengo_commission_pct'] = max( 0, min( 50, $rules['lotengo_commission_pct'] ) );
         $rules['redi_cost_pct']          = max( 0, min( 100, $rules['redi_cost_pct'] ) );
         $rules['round_multiple']         = max( 1, $rules['round_multiple'] );
+        $rules['min_price']              = max( 0, min( 10000000, $rules['min_price'] ) );
 
         LTMS_PosGold_Price_Calculator::save_vendor_rules( $user_id, $rules );
 
@@ -2888,6 +2892,9 @@ final class LTMS_Dashboard_Logic {
             'iva_pct'                => (float) ( $_POST['iva_pct'] ?? 19 ),
             'redi_cost_pct'          => (float) ( $_POST['redi_cost_pct'] ?? 0 ),
             'round_multiple'         => (int)   ( $_POST['round_multiple'] ?? 1000 ),
+            // TAIWAN-MIRROR TM-4 (2026-11-10): piso de precio del vendor
+            // (regla 11 de Taiwan). 0 = deshabilitado. Paridad con PosGold.
+            'min_price'              => (float) ( $_POST['min_price'] ?? 0 ),
         ];
 
         $rules['transport_amount']       = max( 0, min( 10000000, $rules['transport_amount'] ) );
@@ -2897,6 +2904,7 @@ final class LTMS_Dashboard_Logic {
         $rules['lotengo_commission_pct'] = max( 0, min( 50, $rules['lotengo_commission_pct'] ) );
         $rules['redi_cost_pct']          = max( 0, min( 100, $rules['redi_cost_pct'] ) );
         $rules['round_multiple']         = max( 1, $rules['round_multiple'] );
+        $rules['min_price']              = max( 0, min( 10000000, $rules['min_price'] ) );
 
         LTMS_Vtex_Price_Calculator::save_vendor_rules( $user_id, $rules );
 

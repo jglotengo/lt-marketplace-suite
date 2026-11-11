@@ -251,7 +251,8 @@
             lotengo_commission_pct: $form.find('input[name="lotengo_commission_pct"]').val(),
             iva_pct: $form.find('select[name="iva_pct"]').val(),
             redi_cost_pct: $form.find('input[name="redi_cost_pct"]').val(),
-            round_multiple: $form.find('select[name="round_multiple"]').val()
+            round_multiple: $form.find('select[name="round_multiple"]').val(),
+            min_price: $form.find('input[name="min_price"]').val()
         }).done(function(resp){
             $btn.prop('disabled', false).html('💾 Guardar reglas de precio');
             if (resp.success) {
@@ -522,7 +523,8 @@
             lotengo_commission_pct: $form.find('input[name="lotengo_commission_pct"]').val(),
             iva_pct: $form.find('select[name="iva_pct"]').val(),
             redi_cost_pct: $form.find('input[name="redi_cost_pct"]').val(),
-            round_multiple: $form.find('select[name="round_multiple"]').val()
+            round_multiple: $form.find('select[name="round_multiple"]').val(),
+            min_price: $form.find('input[name="min_price"]').val()
         };
     }
 

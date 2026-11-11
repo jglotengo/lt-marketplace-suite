@@ -239,6 +239,33 @@ final class LTMS_Api_PosGold {
         // La API puede devolver el array de productos directamente o envuelto en un objeto.
         $products = self::extract_products_array( $data );
 
+        // TAIWAN-MIRROR TM-3 (2026-11-10) — CONTRATO DE FORMATO (fail-closed).
+        // Espejo de la regla dura de Juguetería Taiwan: "el cron aborta antes de
+        // tocar catalogo.js si los encabezados cambian". Si la API responde 2xx
+        // con JSON válido y Status !== false, pero el payload NO trae ningún
+        // contenedor conocido (Datos/data/productos/Items/...) ni un producto
+        // suelto, la estructura cambió → error explícito en vez de un éxito
+        // fantasma con 0 productos (que el vendor leería como "catálogo vacío"
+        // mientras el catálogo real queda sin sincronizar). Un catálogo legítimo
+        // vacío SIEMPRE viaja con el contenedor ("Datos":[]) → sigue siendo éxito.
+        if ( empty( $products ) && is_array( $data ) && ! empty( $data ) ) {
+            $has_container = false;
+            foreach ( [ 'Datos', 'data', 'productos', 'Items', 'items', 'results', 'lista', 'List' ] as $container_key ) {
+                if ( array_key_exists( $container_key, $data ) ) {
+                    $has_container = true;
+                    break;
+                }
+            }
+            if ( ! $has_container && ! isset( $data['codigo'] ) && ! isset( $data['Codigo'] ) ) {
+                return [
+                    'success' => false,
+                    'data'    => [],
+                    'error'   => 'La respuesta de PosGold cambió de estructura (contrato de formato): HTTP 200 sin contenedor de productos reconocible. Sync abortada para no alterar el catálogo publicado.',
+                    'status'  => $status_code,
+                ];
+            }
+        }
+
         return [
             'success' => true,
             'data'    => $products,
@@ -378,6 +405,21 @@ final class LTMS_Api_PosGold {
         $iva         = $pick( [ 'iva', 'Iva', 'IVA', 'tax_rate', 'ProductoImpuestoPorcentaje' ] );
         $unidad      = $pick( [ 'unidad', 'Unidad', 'UNIDAD', 'unit' ] );
 
+        // TAIWAN-MIRROR TM-3 (2026-11-10): presencia del campo de existencias en
+        // el payload crudo (contrato de formato). La sync aborta si el 100% de
+        // los productos viene SIN ninguno de estos campos: sería un drift de
+        // esquema que hoy silenciaría TODOS los stocks a 0 y el visibility gate
+        // ocultaría el catálogo entero del marketplace. Nota: la fuente del
+        // VALOR sigue siendo el pick de $stock (Stock); Disponible solo cuenta
+        // como "el payload trae existencias" para el guard.
+        $stock_present = false;
+        foreach ( [ 'stock', 'Stock', 'STOCK', 'existencia', 'Existencia', 'Disponible', 'disponible', 'cantidad', 'Cantidad', 'saldo' ] as $stock_key ) {
+            if ( array_key_exists( $stock_key, $raw ) ) {
+                $stock_present = true;
+                break;
+            }
+        }
+
         return [
             'codigo'         => (string) $codigo,
             'sku'            => (string) $codigo,
@@ -400,6 +442,7 @@ final class LTMS_Api_PosGold {
             'activo'         => (string) $activo,
             'iva'            => (float) $iva,
             'unidad'         => (string) $unidad,
+            '_stock_present' => $stock_present,
             '_raw'           => $raw,
         ];
     }

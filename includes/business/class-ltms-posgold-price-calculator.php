@@ -66,6 +66,13 @@ final class LTMS_PosGold_Price_Calculator {
             'redi_cost_pct'         => 0.0,
             // Múltiplo para redondeo (1000 = redondea a miles)
             'round_multiple'        => 1000,
+            // TAIWAN-MIRROR TM-4 (2026-11-10): piso de precio del vendor (COP/MXN).
+            // Espejo de la regla 11 de Juguetería Taiwan ("el Precio 5 mínimo para
+            // enlistar es $2.000 — por debajo, empacar y despachar una unidad
+            // cuesta más de lo que deja"). 0 = deshabilitado: productos cuyo
+            // precio FINAL quede por debajo del piso NO se sincronizan (skip con
+            // motivo 'precio_minimo' en las novedades), nunca se publica por debajo.
+            'min_price'             => 0.0,
             // Si el producto es ReDi o no (default: no)
             'is_redi'               => false,
         ];
@@ -150,6 +157,28 @@ final class LTMS_PosGold_Price_Calculator {
     public static function calculate( float $cost, array $rules ): array {
         $breakdown = [];
 
+        // TAIWAN-MIRROR TM-6 (2026-11-10) — clamps defensivos de reglas.
+        // Espejo de la guardia de rentabilidad de Taiwan ("jamás por debajo del
+        // precio rentable"): un meta corrupto/negativo (margin_pct -50, IVA -19,
+        // monto de transporte -5000) no debe producir un precio por debajo del
+        // costo ni gastos negativos. Los porcentajes se clampan a [0,100] (el
+        // margen respeta el tope 500 del handler AJAX) y los montos fijos a ≥0.
+        // IMPORTANTE: las keys de monto fijo SOLO se clampan si ya venían en el
+        // array — inyectarlas activaría el modo fijo y rompería el fallback %
+        // legacy (reglas sin transport_amount/advertising_amount, tests VtexRules).
+        // Para reglas válidas el resultado es idéntico al cálculo anterior.
+        if ( isset( $rules['transport_amount'] ) ) {
+            $rules['transport_amount'] = max( 0.0, (float) $rules['transport_amount'] );
+        }
+        if ( isset( $rules['advertising_amount'] ) ) {
+            $rules['advertising_amount'] = max( 0.0, (float) $rules['advertising_amount'] );
+        }
+        $rules['returns_pct']        = max( 0.0, min( 100.0, (float) ( $rules['returns_pct'] ?? 0 ) ) );
+        $rules['margin_pct']         = max( 0.0, min( 500.0, (float) ( $rules['margin_pct'] ?? 0 ) ) );
+        $rules['lotengo_commission_pct'] = max( 0.0, min( 100.0, (float) ( $rules['lotengo_commission_pct'] ?? 0 ) ) );
+        $rules['iva_pct']            = max( 0.0, min( 100.0, (float) ( $rules['iva_pct'] ?? 0 ) ) );
+        $rules['redi_cost_pct']      = max( 0.0, min( 100.0, (float) ( $rules['redi_cost_pct'] ?? 0 ) ) );
+
         // 1. Costo base
         $breakdown['cost'] = $cost;
 
@@ -164,7 +193,7 @@ final class LTMS_PosGold_Price_Calculator {
         if ( isset( $rules['transport_amount'] ) ) {
             $transport = (float) $rules['transport_amount'];
         } else {
-            $transport = $cost * ( (float) ( $rules['transport_pct'] ?? 0 ) / 100 );
+            $transport = $cost * ( max( 0.0, min( 100.0, (float) ( $rules['transport_pct'] ?? 0 ) ) ) / 100 );
         }
         $breakdown['transport'] = $transport;
 
@@ -174,7 +203,7 @@ final class LTMS_PosGold_Price_Calculator {
         if ( isset( $rules['advertising_amount'] ) ) {
             $advertising = (float) $rules['advertising_amount'];
         } else {
-            $advertising = $cost * ( (float) ( $rules['advertising_pct'] ?? 0 ) / 100 );
+            $advertising = $cost * ( max( 0.0, min( 100.0, (float) ( $rules['advertising_pct'] ?? 0 ) ) ) / 100 );
         }
         $breakdown['advertising'] = $advertising;
 
@@ -368,30 +397,49 @@ final class LTMS_PosGold_Price_Calculator {
     }
 
     /**
-     * Depura productos duplicados por SKU/código, quedándose con el primero.
+     * Depura productos duplicados por SKU/código, quedándose con la fila de
+     * MÁS existencias.
+     *
+     * TAIWAN-MIRROR TM-5 (2026-11-10): espejo de la regla 1 del panel de
+     * Juguetería Taiwan ("deduplicar-mayor-existencia": de los publicados
+     * duplicados solo queda el de MÁS existencias de POSGold; empate → el
+     * primero). Cuando la API devuelve el mismo código dos veces (multi-bodega,
+     * re-sync solapado), conservar la primera a ciegas podía publicar la fila
+     * con menos stock; ahora gana la de mayor existencia. Sin el campo stock
+     * se lee 0 y la regla nunca rompe (mismo criterio de Taiwan).
      *
      * @param array $products Lista de productos normalizados.
      * @return array{unique: array, duplicates: array}
      */
     public static function deduplicate_by_sku( array $products ): array {
-        $seen     = [];
-        $unique   = [];
+        $seen       = [];
+        $unique     = [];
         $duplicates = [];
 
         foreach ( $products as $product ) {
-            $sku = (string) ( $product['codigo'] ?? '' );
+            $sku = strtolower( (string) ( $product['codigo'] ?? '' ) );
             if ( empty( $sku ) ) {
                 // Productos sin SKU se incluyen sin depurar.
                 $unique[] = $product;
                 continue;
             }
 
-            $sku_lower = strtolower( $sku );
-            if ( isset( $seen[ $sku_lower ] ) ) {
-                $duplicates[] = $product;
+            if ( ! isset( $seen[ $sku ] ) ) {
+                $seen[ $sku ] = count( $unique );
+                $unique[]     = $product;
+                continue;
+            }
+
+            // Duplicado: gana la fila con MÁS existencias (empate → primera).
+            $existing_idx   = $seen[ $sku ];
+            $existing_stock = (float) ( $unique[ $existing_idx ]['stock'] ?? 0 );
+            $new_stock      = (float) ( $product['stock'] ?? 0 );
+
+            if ( $new_stock > $existing_stock ) {
+                $duplicates[]            = $unique[ $existing_idx ];
+                $unique[ $existing_idx ] = $product;
             } else {
-                $seen[ $sku_lower ] = true;
-                $unique[] = $product;
+                $duplicates[] = $product;
             }
         }
 

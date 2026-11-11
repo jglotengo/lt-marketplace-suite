@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.433
+ * Version:           2.9.434
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -92,7 +92,12 @@ define( 'LTMS_LOADED', true );
 // cuenta visible en 768-1279px, form.cart con todos sus hijos organizados,
 // addons "+Añadir" llevan al carrito, upsells del minicart con tamaño
 // anterior + pill de agregar.
-define( 'LTMS_VERSION', '2.9.433' );
+// TAIWAN-MIRROR-2026-11-10: bump 2.9.433 → 2.9.434 — espejo de las reglas
+// duras de Juguetería Taiwan en las integraciones PosGold/VTEX (TM-1..TM-6:
+// filtro activo, novedades con motivo, contrato de formato fail-closed, piso
+// de precio, dedup max-stock, clamps) + cache-busting de ltms-posgold.js y
+// ltms-vtex.js (nuevo campo min_price en los forms de reglas).
+define( 'LTMS_VERSION', '2.9.434' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
