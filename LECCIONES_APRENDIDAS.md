@@ -4661,3 +4661,97 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    usar un cliente/IP no bloqueada o aceptar el challenge de SG de forma
    explícita, nunca reintentar 200 a ciegas. (3) Misma clase que #199/#202: el
    color del job no es la verdad; el efecto medido en el entorno real sí.
+
+## 34. v2.9.434-435 — TAIWAN-MIRROR: conciliación de lo publicado (TM-7) + gotchas del harness de tests en Windows (3 lecciones nuevas)
+
+> Contexto: ciclo TAIWAN-MIRROR (commits 559e6079 → 552bc298, v2.9.434 →
+> v2.9.435). TM-7 oculta el producto publicado que desaparece del catálogo
+> PosGold (`ausente`) o llega inactivo (`desactivado`) vía stock 0 + Sync
+> Visibility Gate, con guard anti-catastrofe del 50% de ausencias ("aborta
+> SIN tocar lo publicado"). Durante la implementación y los tests aparecieron
+> 3 patrones con riesgo de reincidencia.
+
+### Lección #205: recorder de llamadas con closures en tests — retornar el array capturado lo desconecta (COW); usar una propiedad de la clase (TAIWAN-MIRROR TM-7, 2026-11-10)
+
+1. **Caso real:** el helper `stub_published_products()` de
+   `TaiwanMirrorPosGoldTest` registraba closures `use ( &$ops )` para capturar
+   `update_post_meta`/`delete_post_meta` y hacía `return $ops;`. Los asserts
+   sobre el SUT pasaban (`hidden_products` poblado: la sync SÍ demotaba) pero
+   las capturas salían vacías: "Failed asserting that actual size 0 matches
+   expected size 1". La sospecha inicial fue la semántica de re-stub de Brain
+   Monkey (¿primer o último `when()` gana?); un test scratch demostró que
+   last-wins funciona, y el debug dentro del plugin mostró la democión
+   corriendo con el producto correcto y `function_exists('update_post_meta')`
+   en true — el stub estaba aplicado, el recorder no grababa.
+
+2. **Diagnóstico:** PHP asigna arrays por valor (copy-on-write). El closure
+   captura la VARIABLE local `$ops` del helper por referencia y sigue mutando
+   esa variable (que vive mientras el closure la referencie), pero
+   `return $ops;` copia el array al scope del test: el test lee una copia
+   congelada vacía mientras el recorder escribe en otra. La firma exacta del
+   bug es "asserts del estado del SUT pasan + capturas de ops siempre vacías".
+
+3. **Regla preventiva:** (1) Para grabar llamadas en tests, usar una propiedad
+   de la clase de test y closures que capturen `$this` (objetos pasan por
+   handle, no se copian); NUNCA retornar el array que los closures mutan.
+   (2) Ante "el stub no se aplicó", aislar primero la semántica del framework
+   con un test scratch (barato, 30 segundos) antes de culpar al mock, y luego
+   instrumentar el SUT con un debug temporal. (3) Misma familia que #119: la
+   infraestructura de test también puede estar desconectada del código que
+   dice verificar — un test verde no prueba el recorder, solo el SUT.
+
+### Lección #206: PowerShell 5.1 corrompe UTF-8 sin BOM en el round-trip Get-Content/Set-Content y añade un BOM que rompe strict_types (TAIWAN-MIRROR TM-7, 2026-11-10)
+
+1. **Caso real:** para renombrar `$ops` → `$this->meta_ops` en
+   `TaiwanMirrorPosGoldTest.php` se usó `Get-Content -Raw` + `-replace` +
+   `Set-Content -Encoding UTF8`. El archivo (UTF-8 sin BOM, escrito por la
+   herramienta de edición) fue leído como ANSI/CP-1252: TODOS los acentos
+   quedaron doble-encoded (mojibake) y `Set-Content` añadió un BOM con el que
+   `php -l` murió con "strict_types declaration must be the very first
+   statement in the script" — dos síntomas simultáneos en un solo round-trip.
+
+2. **Diagnóstico:** PS 5.1 lee archivos sin BOM asumiendo ANSI y escribe
+   "-Encoding UTF8" CON BOM. El mojibake en el output de `Select-String` no
+   siempre es del console: si vino de un round-trip, está grabado en el
+   archivo. El rollback limpio de un archivo commiteado es
+   `git checkout -- <file>` y rehacer los cambios con la herramienta de
+   edición.
+
+3. **Regla preventiva:** (1) Ediciones quirúrgicas de archivos del repo en
+   Windows: usar la herramienta de edición (edit/Write), jamás
+   Get-Content/Set-Content. (2) Si hace falta un script de reemplazo masivo:
+   `[System.IO.File]::ReadAllText/WriteAllText` con
+   `UTF8Encoding($false)` explícito (sin BOM). (3) Tras cualquier round-trip
+   de PowerShell sobre un archivo con tildes, verificar `php -l` Y la primera
+   línea (strict_types) Y una línea con acentos vía la herramienta de lectura.
+   (4) El mismo riesgo aplica a los `.min` de assets: regenerarlos siempre con
+   `node scripts/build.js`, nunca con cmdlets de texto.
+
+### Lección #207: los tests de invariante de call-sites (source-counting) se rompen al añadir call-sites legítimos — actualizarlos en el MISMO commit y anclar los strpos por offset (TAIWAN-MIRROR TM-7, 2026-11-10)
+
+1. **Caso real:** `SyncVisibilityGateTest` fija con `substr_count` que
+   posgold-sync y vtex-sync llamen EXACTAMENTE 2 veces a
+   `LTMS_Business_Sync_Visibility_Gate::apply_gate`, más un assert de orden
+   con `strpos` (primera ocurrencia después de `download_and_attach_image`).
+   TM-7 añadió el call-site de la democión (`demote_published_product`),
+   colocado en los helpers ANTES de create/update en el archivo → 2 failures:
+   el conteo (3 ≠ 2) y — de haberse ajustado solo el conteo — el `strpos`
+   habría apuntado a la democión (antes de la descarga de imagen) y el assert
+   de orden habría fallado igual.
+
+2. **Diagnóstico:** los tests de paridad a nivel fuente codifican la
+   ARQUITECTURA vigente, no un requisito: añadir un call-site legítimo sin
+   actualizarlos en el mismo commit rompe la suite con fallos que parecen
+   regresiones del feature nuevo. Es la misma familia de #119 (tests huérfanos
+   del enfoque abandonado), pero con la variante de que el código nuevo es
+   correcto y el test viejo es quien quedó desactualizado.
+
+3. **Regla preventiva:** (1) Al añadir call-sites/estructura que un test
+   fuente cuenta, actualizar la invariante en el MISMO commit, con comentario
+   que nombre el call-site nuevo (create + update + democión TM-7). (2) En
+   asserts de orden por `strpos` sobre archivos con varios puntos de interés,
+   anclar el offset (`strpos($haystack, $needle, $offset)`) en lugar de asumir
+   la primera ocurrencia global del archivo. (3) Antes de commitear un cambio
+   estructural, buscar la cantidad codificada o el símbolo contado
+   (`substr_count`, "call-sites", el nombre del método) en `tests/` para
+   localizar invariantes fuente relacionadas.

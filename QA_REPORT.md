@@ -1,11 +1,78 @@
 # LT Marketplace Suite — QA Report
 
-**Version:** 2.9.432
-**Report Date:** 2026-10-28
+**Version:** 2.9.435
+**Report Date:** 2026-11-11
 **Environment:** Ubuntu 22.04 · PHP 8.1+ · MySQL 8.0 · WordPress 6.3+ · WooCommerce 8.0+
-**Tester:** Automated CI + Manual Review + 31+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, AUDIT-FUNNEL-2026-10-28, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX)
-**Commits:** 1,500+ (HEAD@v2.9.432)
-**Audits completed:** 31+ (all 100% resolved for P0+P1+P2)
+**Tester:** Automated CI + Manual Review + 32+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, AUDIT-FUNNEL-2026-10-28, TAIWAN-MIRROR-2026-11-10, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX)
+**Commits:** 1,500+ (HEAD@v2.9.435)
+**Audits completed:** 32+ (all 100% resolved for P0+P1+P2)
+
+---
+
+## 0.16. v2.9.434-435 — TAIWAN-MIRROR-2026-11-10 (espejo de las reglas duras de Juguetería Taiwan en PosGold/VTEX: TM-1..TM-7, 21 tests nuevos)
+
+**Scope:** auditoría de la integración PosGold de LTMS contra las reglas duras
+maduradas en el proyecto Juguetería Taiwan (`sync_posgold.py`: filtros duros,
+conciliación en 3 puertas, novedades con motivo, contrato de formato del
+export, piso de precio, dedup por mayor existencia). Se espejó SOLO lo que
+aplica al marketplace; el resto quedó documentado como no-aplica en el
+CHANGELOG. Commit 1 (v2.9.434): TM-1..TM-6. Commit 2 (v2.9.435): TM-7,
+resolución de la decisión de negocio pendiente (qué hacer con los productos
+que desaparecen del catálogo del proveedor → se OCULTAN).
+
+**Fixes por prioridad (TM-7, v2.9.435):**
+- **P1 — Productos publicados huérfanos:** el publicado que la sync ya no
+  encuentra quedaba publicado para siempre con datos muertos (precio/stock
+  congelados). Ahora se demue: stock 0 + `outofstock` → Sync Visibility Gate
+  lo oculta de todo lo público (catálogo, búsqueda, URL directa) y lo
+  restaura solo si la sync lo trae de vuelta activo con existencias.
+  - PosGold: motivo `ausente` (no está en la respuesta) y `desactivado`
+    (presente con `Activo=false` — señal autoritativa). Marca
+    `_ltms_posgold_missing` (timestamp|motivo), limpia al reaparecer.
+  - VTEX: solo `ausente` (no hay `desactivado`: el 'activo' normalizado es
+    disponibilidad `IsAvailable`, no estado de catálogo).
+- **P1 — Guard anti-catastrofe (Taiwan: "aborta SIN tocar lo publicado"):**
+  ausencia de ≥50% de lo publicado (`DEMOTION_ABORT_RATIO=0.5`, cuenta SOLO
+  `ausente`) → sync abortada COMPLETA sin ocultar nada (respuesta truncada,
+  bodegaid/appKey equivocada, auth a otra empresa). En PosGold aborta ANTES
+  del loop; en VTEX tras ambas fases (los creates ya pasaron, nada se oculta).
+- **P1 — Respuesta vacía con catálogo publicado:** aborta (Taiwan: "ningun
+  producto seleccionado; NO se toca el catalogo"); sin publicados sigue
+  siendo éxito (vendor nuevo).
+- **P2 — Alcance de la conciliación:** lo publicado fuera del filtro de
+  categorías del vendor NO se oculta (Taiwan regla 13); seen set construido
+  contra la respuesta cruda pre-filtros (TM-1/categoría/incompletitud no
+  generan falsos ausentes).
+- **P2 — Observabilidad:** `hidden_products`/`hidden_reasons` (cap 50,
+  resumen completo) en el resultado, meta `_ltms_*_sync_last_result`
+  (polling del panel), notificación in-dashboard ("Ocultados: N motivo") y
+  mensaje de sync ("ocultados: ...").
+
+**Fixes del commit 1 (v2.9.434, resumen — detalle en CHANGELOG):**
+TM-1 filtro duro activo (Activo=false no entra al marketplace), TM-2
+novedades `{codigo, motivo}` en resultado/meta/notificación, TM-3 contrato de
+formato fail-closed (2xx sin contenedor reconocible → error; payload 100% sin
+campo de existencias → aborta sin tocar nada), TM-4 piso de precio por vendor
+(`min_price` default 0 + UI en los forms de reglas), TM-5 dedup por mayor
+existencia, TM-6 clamps defensivos de reglas (jamás precio < costo).
+
+**Tests:** +21 en `tests/unit/TaiwanMirrorPosGoldTest.php` +
+`TaiwanMirrorVtexTest.php` (group `taiwan-mirror`: 26 tests / 106 aserciones
+en total): contrato de formato, catálogo vacío legítimo, `_stock_present`,
+guard de existencias, filtro activo, piso de precio, incompletos, dedup
+max-stock, clamps, paridad de defaults; TM-7: democión por ausencia y por
+desactivación con marca, abort al 50% sin ocultar nada, abort con respuesta
+vacía y catálogo publicado, limpieza de marca al reaparecer, lo publicado
+fuera de filtro no se toca. Actualización de invariantes fuente en
+`SyncVisibilityGateTest` (3 call-sites de apply_gate: create + update +
+democión) y stubs TM-7 en `VtexFunctionalE2ETest`.
+
+**Validación:** suite unit completa verde — 5,398 tests / 12,104 aserciones /
+0 fallos / 3 skipped (baseline 5,389/12,060). CI tests success (run 1928),
+Lint success (625), Deploy success (1924). Producción verificada:
+`https://lo-tengo.com.co/` HTTP 200 con assets `ver=2.9.435`. Lecciones
+nuevas: #205 (COW en recorders de test), #206 (PowerShell corrompe UTF-8 sin
+BOM), #207 (invariantes de call-sites se actualizan en el mismo commit).
 
 ---
 
