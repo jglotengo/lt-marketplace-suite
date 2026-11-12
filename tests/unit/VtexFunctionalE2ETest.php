@@ -363,6 +363,13 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		Monkey\Functions\when( 'media_handle_sideload' )->justReturn( 77 );
 		Monkey\Functions\when( 'set_post_thumbnail' )->justReturn( true );
 
+		// TAIWAN-MIRROR TM-7: conciliación de lo publicado deshabilitada
+		// (sin publicados) — los tests de democión viven en TaiwanMirrorVtexTest.
+		Monkey\Functions\when( 'get_posts' )->justReturn( [] );
+		Monkey\Functions\when( 'get_post_meta' )->justReturn( '' );
+		Monkey\Functions\when( 'update_post_meta' )->justReturn( true );
+		Monkey\Functions\when( 'delete_post_meta' )->justReturn( true );
+
 		$result = \LTMS_Vtex_Sync::sync_vendor_products( 141 );
 
 		$this->assertTrue( $result['success'], 'La sync debe tener éxito: ' . ( $result['message'] ?? '' ) );
@@ -538,6 +545,12 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 		Monkey\Functions\when( 'media_handle_sideload' )->justReturn( 77 );
 		Monkey\Functions\when( 'set_post_thumbnail' )->justReturn( true );
 
+		// TAIWAN-MIRROR TM-7: conciliación deshabilitada (sin publicados).
+		Monkey\Functions\when( 'get_posts' )->justReturn( [] );
+		Monkey\Functions\when( 'get_post_meta' )->justReturn( '' );
+		Monkey\Functions\when( 'update_post_meta' )->justReturn( true );
+		Monkey\Functions\when( 'delete_post_meta' )->justReturn( true );
+
 		$result = \LTMS_Vtex_Sync::sync_vendor_products( 141 );
 
 		$this->assertTrue( $result['success'], 'La sync debe tener éxito: ' . ( $result['message'] ?? '' ) );
@@ -566,6 +579,11 @@ final class VtexFunctionalE2ETest extends LTMS_Unit_Test_Case {
 			}
 		);
 		Monkey\Functions\when( 'update_user_meta' )->justReturn( true );
+		// TAIWAN-MIRROR TM-7: conciliación deshabilitada (sin publicados).
+		Monkey\Functions\when( 'get_posts' )->justReturn( [] );
+		Monkey\Functions\when( 'get_post_meta' )->justReturn( '' );
+		Monkey\Functions\when( 'update_post_meta' )->justReturn( true );
+		Monkey\Functions\when( 'delete_post_meta' )->justReturn( true );
 		$this->stub_http( static fn() => [
 			'response' => [ 'code' => 200 ],
 			'body'     => wp_json_encode( [] ),

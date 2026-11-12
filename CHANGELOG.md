@@ -16,7 +16,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > precio, dedup por mayor existencia). Se espejó SOLO lo que aplica al
 > marketplace; el resto queda documentado abajo como no-aplica.
 >
-> **PosGold (aplican TM-1..TM-6):**
+> **PosGold (aplican TM-1..TM-7):**
 > - **TM-1 — Filtro duro "activo"** (`includes/business/class-ltms-posgold-sync.php`):
 >   la API V6 puede devolver filas con `Activo=false` (verificado en la
 >   respuesta real — el query param `activo=true` no filtra del lado server).
@@ -53,8 +53,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   VTEX): porcentajes clampeados a [0,100] (margen a [0,500], paridad con el
 >   handler) y montos fijos ≥ 0. Un meta corrupto/negativo jamás produce un
 >   precio por debajo del costo (guardia de rentabilidad de Taiwan).
+> - **TM-7 — Conciliación de lo publicado** (decisión de negocio resuelta:
+>   los productos que desaparecen del catálogo del proveedor se OCULTAN):
+>   - PosGold: el producto publicado que la respuesta ya NO trae (motivo
+>     `ausente`) o trae con `Activo=false` (motivo `desactivado`) se demue vía
+>     stock 0 + `outofstock` → el Sync Visibility Gate lo oculta de TODO lo
+>     público (catálogo, búsqueda, URL directa) y lo RESTAURA solo cuando la
+>     sync lo traiga de vuelta activo con existencias. Marca de observabilidad
+>     `_ltms_posgold_missing` (timestamp|motivo), limpia al reaparecer.
+>   - Guard anti-catastrofe (Taiwan: "aborta SIN tocar lo publicado"): si
+>     AUSENCIA la mitad (o más) de lo publicado (`DEMOTION_ABORT_RATIO=0.5`,
+>     cuenta SOLO `ausente` — la desactivación explícita es señal autoritativa
+>     y no cuenta), la sync aborta COMPLETA sin ocultar nada (respuesta
+>     truncada, bodegaid equivocada, auth a otra empresa). Respuesta vacía con
+>     catálogo publicado → aborta (Taiwan: "ningun producto seleccionado; NO
+>     se toca el catalogo"); respuesta vacía sin publicados → éxito (vendor
+>     nuevo). Lo publicado fuera del filtro de categorías NO se oculta
+>     (Taiwan regla 13).
+>   - VTEX: TM-7 solo con motivo `ausente` (no hay `desactivado`: el 'activo'
+>     normalizado es disponibilidad `IsAvailable`, no estado de catálogo).
+>     Seen SKUs recolectados en Fase A + Fase B pre-filtros; el guard corre al
+>     final de ambas fases (los creates ya pasaron, pero NADA se oculta).
+>   - Reporte: `hidden_products`/`hidden_reasons` en el resultado, meta
+>     `_ltms_*_sync_last_result`, notificación in-dashboard ("Ocultados: N
+>     motivo") y mensaje de sync ("ocultados: ..."). Capa a 50, resumen
+>     completo.
 >
-> **VTEX (aplican TM-2, TM-3, TM-4/TM-6 por delegación):**
+> **VTEX (aplican TM-2, TM-3, TM-4/TM-6 por delegación, TM-7 solo 'ausente'):**
 > - TM-3: contrato de formato en `get_products_search()`.
 > - TM-2/TM-4: novedades y piso en `handle_product` (Fase A y Fase B).
 > - **No aplica TM-1 (filtro activo) en VTEX**: la Fase B (VTEX-CATALOGO-FIX)
@@ -70,21 +95,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > `round_up_to_multiple()` + testeado), costos cifrados/fuera del repo (repo
 > de Taiwan es público; LTMS guarda el costo en DB privada para el recálculo),
 > conciliación contra exports (LTMS sincroniza contra API viva), democión de
-> productos ausentes de la API (decisión de negocio pendiente: qué hacer con
-> un producto que desaparece de PosGold — ocultar/draft/borrar).
+> productos ausentes de la API (RESUELTA en TM-7: se ocultan vía stock 0 +
+> visibility gate, con guard anti-catastrofe de 50%).
 >
 > - **Tests:** `tests/unit/TaiwanMirrorPosGoldTest.php` +
->   `tests/unit/TaiwanMirrorVtexTest.php` (group `taiwan-mirror`, 17 tests /
->   62 aserciones): contrato de formato (PosGold y VTEX), catálogo vacío
+>   `tests/unit/TaiwanMirrorVtexTest.php` (group `taiwan-mirror`, 26 tests /
+>   106 aserciones): contrato de formato (PosGold y VTEX), catálogo vacío
 >   legítimo sigue siendo éxito, `_stock_present`, guard de existencias,
 >   filtro activo con novedades, piso de precio con novedades, incompletos
 >   con motivo, dedup max-stock/empate, clamps, defaults con paridad y
->   min_price=0 no omite nada.
+>   min_price=0 no omite nada; TM-7: democión por ausencia/desactivación con
+>   marca, abort al 50% sin ocultar nada, abort con respuesta vacía y
+>   catálogo publicado, limpieza de marca al reaparecer, lo publicado fuera
+>   del filtro de categorías no se toca (PosGold y VTEX).
 > - **Validación:** `php -l` OK en los 9 archivos PHP tocados + 2 tests;
 >   `node scripts/build.js` regeneró `ltms-posgold.min.js` y
 >   `ltms-vtex.min.js` (50/50 JS + 28/28 CSS, 0 errores). Bump
 >   `LTMS_VERSION` 2.9.433 → 2.9.434 (cache-busting de los JS) con header
 >   sincronizado (PluginHeaderVersionSyncTest).
+> - **TM-7 (commit 2.9.435):** +9 tests TM-7 (6 PosGold + 3 VTEX); suite
+>   unit completa verde (5,398 tests). Bump 2.9.434 → 2.9.435. Sin cambios
+>   de assets (backend-only).
 
 ## [Unreleased] — 2026-11-07
 

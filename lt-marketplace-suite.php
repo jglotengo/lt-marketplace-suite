@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.434
+ * Version:           2.9.435
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -92,12 +92,13 @@ define( 'LTMS_LOADED', true );
 // cuenta visible en 768-1279px, form.cart con todos sus hijos organizados,
 // addons "+Añadir" llevan al carrito, upsells del minicart con tamaño
 // anterior + pill de agregar.
-// TAIWAN-MIRROR-2026-11-10: bump 2.9.433 → 2.9.434 — espejo de las reglas
-// duras de Juguetería Taiwan en las integraciones PosGold/VTEX (TM-1..TM-6:
-// filtro activo, novedades con motivo, contrato de formato fail-closed, piso
-// de precio, dedup max-stock, clamps) + cache-busting de ltms-posgold.js y
-// ltms-vtex.js (nuevo campo min_price en los forms de reglas).
-define( 'LTMS_VERSION', '2.9.434' );
+// TAIWAN-MIRROR-2026-11-10: bump 2.9.434 → 2.9.435 — TM-7 conciliación de lo
+// publicado: el producto publicado que desaparece de PosGold (ausente) o se
+// desactiva (Activo=false) se oculta vía stock 0 + visibility gate; ≥50% de
+// ausencias aborta la sync sin ocultar nada (Taiwan: "aborta SIN tocar lo
+// publicado"); respuesta vacía con catálogo publicado aborta. VTEX: solo
+// 'ausente' (sin 'desactivado' — IsAvailable es disponibilidad).
+define( 'LTMS_VERSION', '2.9.435' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────

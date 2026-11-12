@@ -34,6 +34,24 @@ final class LTMS_Vtex_Sync {
     /** Meta key que guarda el COSTO original (precio VTEX antes de reglas). */
     const COST_META_KEY = '_ltms_vtex_cost';
 
+    /**
+     * TAIWAN-MIRROR TM-7 (2026-11-10): meta de democión de lo publicado.
+     * Se marca el producto que VTEX ya no trae (ausente), con
+     * timestamp|motivo, para observabilidad.
+     */
+    const MISSING_META_KEY = '_ltms_vtex_missing';
+
+    /**
+     * TAIWAN-MIRROR TM-7 (2026-11-10): ratio máximo de productos YA PUBLICADOS
+     * que pueden desaparecer de la respuesta de VTEX antes de abortar la
+     * democión. Espejo de la conciliación dura de Taiwan ("aborta SIN tocar lo
+     * publicado"): una ausencia de la mitad (o más) del catálogo publicado es
+     * casi siempre una anomalía (paginación trunca, cuenta/appKey equivocada).
+     * En VTEX el guard corre al final de ambas fases: los creates/updates de la
+     * corrida ya pasaron, pero NADA se oculta y la sync reporta error.
+     */
+    const DEMOTION_ABORT_RATIO = 0.5;
+
     /** Cron hook para sync en background. */
     const CRON_HOOK = 'ltms_vtex_sync_cron';
 
@@ -153,6 +171,9 @@ final class LTMS_Vtex_Sync {
             // TAIWAN-MIRROR TM-2: novedades de omisión con motivo.
             'skipped_products' => $result['skipped_products'] ?? [],
             'skipped_reasons'  => $result['skipped_reasons'] ?? [],
+            // TAIWAN-MIRROR TM-7: ocultados por ausencia en el catálogo.
+            'hidden_products'  => $result['hidden_products'] ?? [],
+            'hidden_reasons'   => $result['hidden_reasons'] ?? [],
         ] );
 
         if ( class_exists( 'LTMS_Core_Logger' ) ) {
@@ -233,15 +254,102 @@ final class LTMS_Vtex_Sync {
      * @return string
      */
     private static function novedades_summary( array $result ): string {
+        $out = '';
         $reasons = $result['skipped_reasons'] ?? [];
-        if ( ! is_array( $reasons ) || empty( $reasons ) ) {
-            return '';
+        if ( is_array( $reasons ) && ! empty( $reasons ) ) {
+            $parts = [];
+            foreach ( $reasons as $motivo => $count ) {
+                $parts[] = sprintf( '%d %s', (int) $count, (string) $motivo );
+            }
+            $out .= ' ' . __( 'Omisiones: ', 'ltms' ) . implode( ', ', $parts ) . '.';
         }
-        $parts = [];
-        foreach ( $reasons as $motivo => $count ) {
-            $parts[] = sprintf( '%d %s', (int) $count, (string) $motivo );
+
+        // TAIWAN-MIRROR TM-7: ocultados por ausencia en el catálogo VTEX.
+        $hidden = $result['hidden_reasons'] ?? [];
+        if ( is_array( $hidden ) && ! empty( $hidden ) ) {
+            $parts = [];
+            foreach ( $hidden as $motivo => $count ) {
+                $parts[] = sprintf( '%d %s', (int) $count, (string) $motivo );
+            }
+            $out .= ' ' . __( 'Ocultados: ', 'ltms' ) . implode( ', ', $parts ) . '.';
         }
-        return ' ' . __( 'Omisiones: ', 'ltms' ) . implode( ', ', $parts ) . '.';
+        return $out;
+    }
+
+    /**
+     * TAIWAN-MIRROR TM-7 (2026-11-10): SKUs de los productos que este vendor
+     * ya tiene publicados desde VTEX (id WC => SKU VTEX).
+     *
+     * Base de la conciliación de lo publicado: solo productos con las metas de
+     * sync (creados/actualizados por esta integración) del propio vendor —
+     * jamás toca productos de otros vendors ni cargas manuales del panel.
+     *
+     * @param int $vendor_id ID del vendedor.
+     * @return array<int, string>
+     */
+    private static function get_vendor_synced_product_codes( int $vendor_id ): array {
+        $ids = get_posts( [
+            'post_type'      => 'product',
+            'post_status'    => 'publish',
+            'author'         => $vendor_id,
+            'posts_per_page' => 10000,
+            'fields'         => 'ids',
+            // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+            'meta_query'     => [
+                'relation' => 'AND',
+                [
+                    'key'     => self::SYNC_META_KEY,
+                    'compare' => 'EXISTS',
+                ],
+                [
+                    'key'     => self::CODE_META_KEY,
+                    'compare' => 'EXISTS',
+                ],
+            ],
+        ] );
+
+        $codes = [];
+        foreach ( (array) $ids as $product_id ) {
+            $code = (string) get_post_meta( (int) $product_id, self::CODE_META_KEY, true );
+            if ( '' !== $code ) {
+                $codes[ (int) $product_id ] = $code;
+            }
+        }
+        return $codes;
+    }
+
+    /**
+     * TAIWAN-MIRROR TM-7 (2026-11-10): oculta un producto publicado que VTEX
+     * ya no trae (motivo 'ausente').
+     *
+     * Mecanismo: stock a 0 → el Sync Visibility Gate lo oculta de TODO lo
+     * público (catálogo, búsqueda, URL directa — guard_single_product) y lo
+     * RESTAURA cuando la sync lo traiga de vuelta (update_product_fields
+     * refresca el stock y apply_gate republisha). La marca MISSING_META_KEY
+     * queda para observabilidad y se limpia cuando el SKU reaparece.
+     *
+     * @param int    $product_id ID del producto WC.
+     * @param string $motivo     'ausente'.
+     * @return void
+     */
+    private static function demote_published_product( int $product_id, string $motivo ): void {
+        $wc_product = wc_get_product( $product_id );
+        if ( ! $wc_product ) {
+            return;
+        }
+
+        $wc_product->set_manage_stock( true );
+        $wc_product->set_stock_quantity( 0 );
+        $wc_product->set_stock_status( 'outofstock' );
+        $wc_product->save();
+
+        update_post_meta( $product_id, self::MISSING_META_KEY, current_time( 'mysql', true ) . '|' . $motivo );
+
+        // SYNC-VIS-GATE: ocultar de inmediato (el save ya dispara el hook, la
+        // llamada explícita replica el patrón del sync tras adjuntar imagen).
+        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) ) {
+            LTMS_Business_Sync_Visibility_Gate::apply_gate( $product_id );
+        }
     }
 
     /**
@@ -364,6 +472,9 @@ final class LTMS_Vtex_Sync {
         $total_products  = 0;
         $filtered_out    = 0;
         $processed_product_ids = [];
+        // TAIWAN-MIRROR TM-7: SKUs vistos en la respuesta cruda de esta corrida
+        // (Fase A + Fase B), base de la conciliación de lo publicado.
+        $seen_skus = [];
 
         // TAIWAN-MIRROR TM-2 (2026-11-10): novedades de omisión con motivo
         // (mismo espejo que PosGold: qué no se publicó y por qué).
@@ -495,6 +606,13 @@ final class LTMS_Vtex_Sync {
                 $items = is_array( $raw_product['items'] ?? null ) ? $raw_product['items'] : [];
                 foreach ( $items as $item ) {
                     $product = LTMS_Api_Vtex::normalize_search_item( $raw_product, $item );
+                    // TAIWAN-MIRROR TM-7: todo SKU visto en la respuesta cruda
+                    // cuenta como presente (aunque el filtro de categorías o la
+                    // incompletitud lo omitan del sync) — la conciliación de lo
+                    // publicado se juzga contra el catálogo completo.
+                    if ( '' !== (string) $product['sku'] ) {
+                        $seen_skus[ (string) $product['sku'] ] = true;
+                    }
                     $handle_product( $vendor_id, $product, $category_filter, $price_rules, $seo_template );
                 }
             }
@@ -549,8 +667,72 @@ final class LTMS_Vtex_Sync {
             $items = is_array( $raw['items'] ?? null ) ? $raw['items'] : [];
             foreach ( $items as $item ) {
                 $product = LTMS_Api_Vtex::normalize_search_item( $raw, $item );
+                // TAIWAN-MIRROR TM-7: mismo registro de SKUs vistos que Fase A.
+                if ( '' !== (string) $product['sku'] ) {
+                    $seen_skus[ (string) $product['sku'] ] = true;
+                }
                 $handle_product( $vendor_id, $product, $category_filter, $price_rules, $seo_template );
             }
+        }
+
+        // ── TAIWAN-MIRROR TM-7: conciliación de lo publicado (VTEX) ──────────
+        // Oculta lo publicado que VTEX ya NO trae (motivo 'ausente'). A diferencia
+        // de PosGold, aquí NO hay motivo 'desactivado': el 'activo' normalizado de
+        // VTEX es disponibilidad (IsAvailable) y los agotados se sincronizan a
+        // propósito (VTEX-CATALOGO-FIX) — el gate los oculta por stock.
+        // Guard anti-catastrofe: si la mitad (o más) de lo publicado AUSENCIA,
+        // aborta sin ocultar nada ("aborta SIN tocar lo publicado" de Taiwan).
+        // Nota: en VTEX el guard corre DESPUÉS de ambas fases (el set de vistos
+        // solo se conoce al final) — los altos/updates de la corrida ya pasaron,
+        // pero nada se oculta y la sync reporta error.
+        $published = self::get_vendor_synced_product_codes( $vendor_id );
+        $hidden_products = [];
+        $hidden_reasons  = [];
+        $absent_candidates = [];
+        foreach ( $published as $published_id => $published_sku ) {
+            if ( isset( $seen_skus[ $published_sku ] ) ) {
+                // Reapareció: limpiar la marca de democión si la tenía.
+                if ( get_post_meta( (int) $published_id, self::MISSING_META_KEY, true ) ) {
+                    delete_post_meta( (int) $published_id, self::MISSING_META_KEY );
+                }
+                continue;
+            }
+            $absent_candidates[] = [ (int) $published_id, $published_sku ];
+        }
+        $published_count = count( $published );
+        if ( $published_count > 0 && ( count( $absent_candidates ) / $published_count ) >= self::DEMOTION_ABORT_RATIO ) {
+            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                LTMS_Core_Logger::error(
+                    'VTEX_SYNC_CONTRACT',
+                    sprintf( 'Vendor #%d: VTEX dejó de reportar %d de %d SKUs publicados (>=50%%). Democión abortada sin ocultar nada.', $vendor_id, count( $absent_candidates ), $published_count ),
+                    [ 'vendor_id' => $vendor_id, 'absent' => count( $absent_candidates ), 'published' => $published_count ]
+                );
+            }
+            return [
+                'success'          => false,
+                'message'          => sprintf(
+                    /* translators: 1: ausentes, 2: publicados */
+                    __( 'VTEX dejó de reportar %1$d de tus %2$d SKUs publicados (posible respuesta truncada). Sincronización abortada sin ocultar nada de tu catálogo.', 'ltms' ),
+                    count( $absent_candidates ),
+                    $published_count
+                ),
+                'created'          => $created,
+                'updated'          => $updated,
+                'skipped'          => $skipped,
+                'skipped_products' => array_slice( $skipped_products, 0, 50, false ),
+                'skipped_reasons'  => $skipped_reasons,
+                'hidden_products'  => [],
+                'hidden_reasons'   => [],
+                'errors'           => $errors,
+            ];
+        }
+        foreach ( $absent_candidates as [ $hidden_id, $hidden_sku ] ) {
+            self::demote_published_product( $hidden_id, 'ausente' );
+            $hidden_products[] = [
+                'codigo' => $hidden_sku,
+                'motivo' => 'ausente',
+            ];
+            $hidden_reasons['ausente'] = ( $hidden_reasons['ausente'] ?? 0 ) + 1;
         }
 
         update_user_meta( $vendor_id, 'ltms_vtex_last_sync', time() );
@@ -573,6 +755,7 @@ final class LTMS_Vtex_Sync {
                     'skipped'            => $skipped,
                     'skipped_incomplete' => $skipped_incomplete,
                     'skipped_reasons'    => $skipped_reasons,
+                    'hidden_reasons'     => $hidden_reasons,
                     'errors'             => $errors,
                 ]
             );
@@ -609,6 +792,15 @@ final class LTMS_Vtex_Sync {
             $message_parts[] = __( 'omisiones: ', 'ltms' ) . implode( ', ', $reason_parts );
         }
 
+        // TAIWAN-MIRROR TM-7: resumen de ocultados por motivo en el mensaje.
+        if ( ! empty( $hidden_reasons ) ) {
+            $hidden_parts = [];
+            foreach ( $hidden_reasons as $motivo => $count ) {
+                $hidden_parts[] = sprintf( '%d %s', $count, $motivo );
+            }
+            $message_parts[] = __( 'ocultados: ', 'ltms' ) . implode( ', ', $hidden_parts );
+        }
+
         return [
             'success'      => true,
             'message'      => __( 'Sincronización completa: ', 'ltms' ) . implode( ', ', $message_parts ) . '.',
@@ -619,6 +811,8 @@ final class LTMS_Vtex_Sync {
             'filtered_out' => $filtered_out,
             'skipped_products' => array_slice( $skipped_products, 0, 50, false ),
             'skipped_reasons'  => $skipped_reasons,
+            'hidden_products'  => array_slice( $hidden_products, 0, 50, false ),
+            'hidden_reasons'   => $hidden_reasons,
             'errors'       => $errors,
         ];
     }

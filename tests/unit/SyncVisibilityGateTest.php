@@ -386,16 +386,19 @@ final class SyncVisibilityGateTest extends LTMS_Unit_Test_Case {
 	public function test_posgold_sync_calls_apply_gate_in_create_and_update(): void {
 		$source = $this->read_source( 'includes/business/class-ltms-posgold-sync.php' );
 
-		// 2 call-sites: create_product (tras download_and_attach_image) y
-		// update_product_fields (al final).
+		// 3 call-sites: create_product (tras download_and_attach_image),
+		// update_product_fields (al final) y demote_published_product
+		// (TAIWAN-MIRROR TM-7: ocultar lo publicado ausente/desactivado).
 		$this->assertSame(
-			2,
+			3,
 			substr_count( $source, 'LTMS_Business_Sync_Visibility_Gate::apply_gate' ),
-			'posgold-sync debe llamar apply_gate en create_product Y update_product_fields.'
+			'posgold-sync debe llamar apply_gate en create_product, update_product_fields y la democión TM-7.'
 		);
-		// El call-site de create va DESPUÉS de la descarga de imagen.
+		// El call-site del create va DESPUÉS de la descarga de imagen (se busca
+		// la primera ocurrencia POSTERIOR a la descarga: el call-site de la
+		// democión vive antes en el archivo, en los helpers TM-7).
 		$download_pos = strpos( $source, 'download_and_attach_image( $product[\'imagen_url\'], $wc_product->get_id() );' );
-		$gate_pos     = strpos( $source, 'LTMS_Business_Sync_Visibility_Gate::apply_gate' );
+		$gate_pos     = strpos( $source, 'LTMS_Business_Sync_Visibility_Gate::apply_gate', (int) $download_pos );
 		$this->assertNotFalse( $download_pos );
 		$this->assertNotFalse( $gate_pos );
 		$this->assertGreaterThan( $download_pos, $gate_pos, 'apply_gate debe evaluarse DESPUÉS de descargar la imagen (la imagen se adjunta POST-save).' );
@@ -404,10 +407,12 @@ final class SyncVisibilityGateTest extends LTMS_Unit_Test_Case {
 	public function test_vtex_sync_calls_apply_gate_in_create_and_update(): void {
 		$source = $this->read_source( 'includes/business/class-ltms-vtex-sync.php' );
 
+		// 3 call-sites: create_product, update_product_fields y
+		// demote_published_product (TAIWAN-MIRROR TM-7).
 		$this->assertSame(
-			2,
+			3,
 			substr_count( $source, 'LTMS_Business_Sync_Visibility_Gate::apply_gate' ),
-			'vtex-sync debe llamar apply_gate en create_product Y update_product_fields.'
+			'vtex-sync debe llamar apply_gate en create_product, update_product_fields y la democión TM-7.'
 		);
 	}
 

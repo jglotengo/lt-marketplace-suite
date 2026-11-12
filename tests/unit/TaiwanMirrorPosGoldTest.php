@@ -23,6 +23,12 @@
  *   TM-6  Clamps defensivos: reglas negativas/corruptas jamás producen un
  *         precio por debajo del costo (Taiwan: "jamás por debajo del precio
  *         rentable").
+ *   TM-7  Conciliación de lo publicado: el publicado que PosGold ya no trae
+ *         (ausente) o trae inactivo (desactivado) se OCULTA (stock 0 → gate);
+ *         ausencia de ≥50% de lo publicado → sync abortada sin ocultar nada
+ *         (Taiwan: "aborta SIN tocar lo publicado"); respuesta vacía con
+ *         catálogo publicado → aborta; lo publicado fuera del filtro de
+ *         categorías NO se toca (Taiwan regla 13).
  *
  * @package LTMS\Tests\Unit
  *
@@ -134,6 +140,63 @@ final class TaiwanMirrorPosGoldTest extends LTMS_Unit_Test_Case {
 		Monkey\Functions\when( 'wp_insert_term' )->justReturn( [ 'term_id' => 5 ] );
 		Monkey\Functions\when( 'sanitize_title' )->alias(
 			static fn( $s ) => strtolower( str_replace( ' ', '-', (string) $s ) )
+		);
+
+		// TAIWAN-MIRROR TM-7: sin productos publicados por defecto (la
+		// conciliación no corre); los tests de democión re-stubbean con
+		// stub_published_products().
+		Monkey\Functions\when( 'get_posts' )->justReturn( [] );
+		Monkey\Functions\when( 'get_post_meta' )->justReturn( '' );
+		Monkey\Functions\when( 'update_post_meta' )->justReturn( true );
+		Monkey\Functions\when( 'delete_post_meta' )->justReturn( true );
+	}
+
+	/**
+	 * TAIWAN-MIRROR TM-7: operaciones de metas capturadas por
+	 * stub_published_products() — los tests leen $this->meta_ops['update'|'delete']
+	 * DIRECTAMENTE (retornar el array por valor lo desconecta del recorder: los
+	 * closures capturan $this y mutan la propiedad, no una copia).
+	 */
+	private array $meta_ops = [ 'update' => [], 'delete' => [] ];
+
+	/**
+	 * TAIWAN-MIRROR TM-7: publica N productos "ya sincronizados" (id WC =>
+	 * código PosGold) y captura las operaciones de metas para asertar la
+	 * democión.
+	 */
+	private function stub_published_products( array $id_to_code, array $missing_map = [] ): void {
+		$this->meta_ops = [ 'update' => [], 'delete' => [] ];
+
+		Monkey\Functions\when( 'get_posts' )->alias(
+			static fn() => array_keys( $id_to_code )
+		);
+		Monkey\Functions\when( 'get_post_meta' )->alias(
+			static function ( $object_id, $key = '', $single = false ) use ( $id_to_code, $missing_map ) {
+				if ( \LTMS_PosGold_Sync::CODE_META_KEY === $key ) {
+					return $id_to_code[ (int) $object_id ] ?? '';
+				}
+				if ( \LTMS_PosGold_Sync::MISSING_META_KEY === $key ) {
+					return $missing_map[ (int) $object_id ] ?? '';
+				}
+				return '';
+			}
+		);
+		Monkey\Functions\when( 'update_post_meta' )->alias(
+			function ( $object_id, $key, $value ) {
+				$this->meta_ops['update'][] = [ (int) $object_id, $key, $value ];
+				return true;
+			}
+		);
+		Monkey\Functions\when( 'delete_post_meta' )->alias(
+			function ( $object_id, $key ) {
+				$this->meta_ops['delete'][] = [ (int) $object_id, $key ];
+				return true;
+			}
+		);
+		// La democión necesita un WC_Product (set_stock_*/save); el gate sobre
+		// este stub termina en 'unchanged' (method_exists no ve __call).
+		Monkey\Functions\when( 'wc_get_product' )->alias(
+			static fn( $id ) => new \WC_Product_Simple()
 		);
 	}
 
@@ -376,5 +439,170 @@ final class TaiwanMirrorPosGoldTest extends LTMS_Unit_Test_Case {
 		$this->assertTrue( $result['success'] );
 		$this->assertSame( 1, $result['created'], 'Con min_price=0 (default) nada se omite por piso.' );
 		$this->assertSame( [], $result['skipped_products'] );
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// TM-7 — conciliación de lo publicado (ocultar ausentes/desactivados).
+	// ─────────────────────────────────────────────────────────────────────────
+
+	public function test_sync_demotes_published_product_absent_from_response(): void {
+		$this->require_classes();
+		\WC_Product_Simple::$last_sku = '';
+		$this->stub_sync_env();
+		$this->stub_published_products( [
+			101 => 'A001',
+			102 => 'A002',
+			103 => 'A003',
+		] );
+		// La respuesta trae A001 y A002 (activos); A003 desapareció → 1/3 < 50%.
+		$this->stub_posgold_http( [
+			$this->raw_product( 'A001', 'PRODUCTO UNO', 22000.0, 5.0, true ),
+			$this->raw_product( 'A002', 'PRODUCTO DOS', 18000.0, 7.0, true ),
+		] );
+
+		$result = \LTMS_PosGold_Sync::sync_vendor_products( 141 );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 2, $result['created'] );
+		$this->assertSame(
+			[ [ 'codigo' => 'A003', 'motivo' => 'ausente' ] ],
+			$result['hidden_products'],
+			'TM-7: el publicado que desapareció de la respuesta se oculta con su motivo.'
+		);
+		$this->assertSame( [ 'ausente' => 1 ], $result['hidden_reasons'] );
+		// La democión: stock a 0 + marca de observabilidad (timestamp|motivo).
+		$demotions = array_values( array_filter(
+			$this->meta_ops['update'],
+			static fn( $op ) => \LTMS_PosGold_Sync::MISSING_META_KEY === $op[1]
+		) );
+		$this->assertCount( 1, $demotions, 'Exactamente un producto demotado.' );
+		$this->assertSame( 103, $demotions[0][0], 'La democión toca el producto ausente, no los demás.' );
+		$this->assertStringContainsString( '|ausente', (string) $demotions[0][2] );
+		$this->assertStringContainsString( 'ocultados', (string) $result['message'], 'El resumen de ocultados viaja en el mensaje.' );
+	}
+
+	public function test_sync_aborts_when_half_of_published_absent(): void {
+		$this->require_classes();
+		\WC_Product_Simple::$last_sku = '';
+		$this->stub_sync_env();
+		$this->stub_published_products( [
+			101 => 'A001',
+			102 => 'A002',
+		] );
+		// Solo trae A001 → 1/2 = 50% >= 50% → anomalía (respuesta truncada,
+		// bodega equivocada...) → aborta SIN ocultar nada ("aborta SIN tocar lo
+		// publicado" de Taiwan).
+		$this->stub_posgold_http( [
+			$this->raw_product( 'A001', 'PRODUCTO UNO', 22000.0, 5.0, true ),
+		] );
+
+		$result = \LTMS_PosGold_Sync::sync_vendor_products( 141 );
+
+		$this->assertFalse( $result['success'], 'TM-7: ausencia de la mitad de lo publicado aborta la sync.' );
+		$this->assertStringContainsString( 'abortada', (string) $result['message'] );
+		$this->assertSame( 0, $result['created'], 'Aborta sin crear nada.' );
+		$this->assertSame( [], $result['hidden_products'], 'Aborta sin ocultar nada.' );
+		$demotions = array_values( array_filter(
+			$this->meta_ops['update'],
+			static fn( $op ) => \LTMS_PosGold_Sync::MISSING_META_KEY === $op[1]
+		) );
+		$this->assertSame( [], $demotions, 'Ningún update_post_meta de democión (guard anti-catastrofe).' );
+	}
+
+	public function test_sync_demotes_published_product_deactivated_in_posgold(): void {
+		$this->require_classes();
+		\WC_Product_Simple::$last_sku = '';
+		$this->stub_sync_env();
+		$this->stub_published_products( [
+			101 => 'A001',
+			102 => 'A002',
+		] );
+		// A002 sigue en la respuesta pero con Activo=false → 'desactivado'
+		// (señal autoritativa: se oculta SIEMPRE, no cuenta para el guard).
+		$this->stub_posgold_http( [
+			$this->raw_product( 'A001', 'PRODUCTO UNO', 22000.0, 5.0, true ),
+			$this->raw_product( 'A002', 'PRODUCTO DESACTIVADO', 18000.0, 7.0, false ),
+		] );
+
+		$result = \LTMS_PosGold_Sync::sync_vendor_products( 141 );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame(
+			[ [ 'codigo' => 'A002', 'motivo' => 'desactivado' ] ],
+			$result['hidden_products'],
+			'TM-7: el desactivado explícito se demue con motivo desactivado.'
+		);
+		$this->assertSame( [ 'desactivado' => 1 ], $result['hidden_reasons'] );
+		$demotions = array_values( array_filter(
+			$this->meta_ops['update'],
+			static fn( $op ) => \LTMS_PosGold_Sync::MISSING_META_KEY === $op[1]
+		) );
+		$this->assertCount( 1, $demotions );
+		$this->assertSame( 102, $demotions[0][0] );
+		$this->assertStringContainsString( '|desactivado', (string) $demotions[0][2] );
+		// Y además TM-1 lo reporta como omitido de la corrida.
+		$this->assertSame( [ 'inactivo' => 1 ], $result['skipped_reasons'] );
+	}
+
+	public function test_sync_clears_missing_mark_when_published_product_reappears(): void {
+		$this->require_classes();
+		\WC_Product_Simple::$last_sku = '';
+		$this->stub_sync_env();
+		$this->stub_published_products(
+			[ 101 => 'A001' ],
+			[ 101 => '2026-11-10 12:00:00|ausente' ] // Marca de democión previa.
+		);
+		// A001 reaparece activo en la respuesta → se restaura y la marca se limpia.
+		$this->stub_posgold_http( [
+			$this->raw_product( 'A001', 'PRODUCTO DE VUELTA', 22000.0, 5.0, true ),
+		] );
+
+		$result = \LTMS_PosGold_Sync::sync_vendor_products( 141 );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( [], $result['hidden_products'], 'El producto reapareció: nada se oculta.' );
+		$this->assertSame(
+			[ [ 101, \LTMS_PosGold_Sync::MISSING_META_KEY ] ],
+			$this->meta_ops['delete'],
+			'TM-7: reapareció activo → la marca de democión se limpia.'
+		);
+	}
+
+	public function test_sync_aborts_on_empty_response_with_published_products(): void {
+		$this->require_classes();
+		\WC_Product_Simple::$last_sku = '';
+		$this->stub_sync_env();
+		$this->stub_published_products( [ 101 => 'A001' ] );
+		// "Datos":[] con catálogo publicado → aborta (Taiwan: "ningun producto
+		// seleccionado; NO se toca el catalogo").
+		$this->stub_posgold_http( [] );
+
+		$result = \LTMS_PosGold_Sync::sync_vendor_products( 141 );
+
+		$this->assertFalse( $result['success'], 'TM-7: respuesta vacía con catálogo publicado aborta la sync.' );
+		$this->assertStringContainsString( 'vacío', (string) $result['message'] );
+	}
+
+	public function test_sync_does_not_demote_products_outside_category_filter(): void {
+		$this->require_classes();
+		\WC_Product_Simple::$last_sku = '';
+		$this->stub_sync_env( [ 'ltms_posgold_category_ids' => '52' ] );
+		$this->stub_published_products( [
+			101 => 'A001',
+			102 => 'A002',
+		] );
+		// A002 está en la respuesta (categoría 99, fuera del filtro 52): NO se
+		// oculta — Taiwan regla 13: lo ya publicado fuera de alcance no se toca.
+		$this->stub_posgold_http( [
+			$this->raw_product( 'A001', 'EN FILTRO', 22000.0, 5.0, true ),
+			array_merge( $this->raw_product( 'A002', 'FUERA DE FILTRO', 18000.0, 7.0, true ), [ 'Categoriaid' => 99 ] ),
+		] );
+
+		$result = \LTMS_PosGold_Sync::sync_vendor_products( 141 );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 1, $result['filtered_out'], 'El producto fuera de filtro se omite de la corrida.' );
+		$this->assertSame( [], $result['hidden_products'], 'TM-7: publicado fuera del filtro de categorías NO se oculta.' );
+		$this->assertSame( [], $this->meta_ops['update'], 'Ninguna democión para productos fuera de filtro.' );
 	}
 }
