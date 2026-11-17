@@ -333,14 +333,26 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
             // cargo SIN device_session_id de forma totalmente silenciosa y Openpay
             // lo rechazaba con un error opaco para el comprador. Ahora queda
             // registrado en el log estructurado para diagnóstico/soporte.
-            if ( '' === $device && class_exists( 'LTMS_Core_Logger' ) ) {
-                LTMS_Core_Logger::warning(
-                    'OPENPAY_DEVICE_SESSION_MISSING',
-                    sprintf(
-                        'Cargo de tarjeta sin device_session_id (order=%s). El SDK JS no generó la sesión de dispositivo.',
-                        $order->get_order_number()
-                    )
+            // E2EFIX-03 (AUDIT-E2E-PAY-2026-11-17, P2): Openpay RECHAZA el cargo sin
+            // device_session_id con 400 error 1001 "Attribute device_session_id is
+            // required" (verificado en sandbox el 2026-11-17 — ya no es opcional).
+            // Enviarlo = error opaco con el token posiblemente consumido. Bloquear
+            // ANTES del charge con mensaje accionable para el comprador.
+            if ( '' === $device ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'OPENPAY_DEVICE_SESSION_MISSING',
+                        sprintf(
+                            'Cargo de tarjeta sin device_session_id (order=%s). El SDK JS no generó la sesión de dispositivo — cargo bloqueado (E2EFIX-03).',
+                            $order->get_order_number()
+                        )
+                    );
+                }
+                wc_add_notice(
+                    __( 'No pudimos iniciar la verificación antifraude de tu banco (puede estar bloqueada por tu navegador). Recarga la página e intenta de nuevo.', 'ltms' ),
+                    'error'
                 );
+                return [ 'result' => 'failure', 'redirect' => '' ];
             }
 
             $result = $client->charge( [
