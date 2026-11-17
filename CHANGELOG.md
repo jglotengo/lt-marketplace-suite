@@ -6,6 +6,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-17
 
+### Fixed — `E2EFIX-2026-11-17` (ciclo de fixes de la auditoría E2E de compra sandbox, AUDIT-E2E-PAY-2026-11-17)
+
+> Derivado de la compra E2E sandbox como auditor sobre producción (QA_REPORT §0.17).
+> 4 fixes (2×P1, 2×P2), 14 tests nuevos; suite 5,412 tests / 12,150 assertions / 3 skipped, cero regresiones.
+>
+> - **E2EFIX-01 (P1):** los POST que mueven dinero en `LTMS_Api_Openpay`
+>   (`create_charge`, `create_pse_charge`, `create_spei_reference`,
+>   `create_oxxo_charge`) y `create_refund` ya no reintentan automáticamente
+>   tras 5xx/timeout (`perform_request(..., $retry=false)`). El token de tarjeta
+>   es de un solo uso: el reintento convertía un 5xx recuperable en un fallo
+>   garantizado (422 "source_id was already used") con el cargo ya vivo en
+>   Openpay. El refund por doble-reembolso (Openpay permite reembolsos
+>   parciales repetidos hasta agotar el saldo). Recuperación: webhook
+>   `charge.succeeded` / reintento manual del admin.
+> - **E2EFIX-02 (P1):** `LTMS_Business_Order_Split::process()` ya no hace
+>   skip-only cuando la fila `lt_commissions` preexiste (creada por el writer
+>   fiscal con `commission_rate=0.0` en `woocommerce_checkout_order_processed`):
+>   el nuevo `heal_commission_row()` sana las columnas de dinero con los
+>   valores reales del split (mismos criterios que `record_commission`),
+>   idempotente (si ya coincide, no escribe). Cierra la doble fuente de
+>   verdad que alimentaba panel auditor, export fiscal y Alegra con fee=0.
+> - **E2EFIX-03 (P2):** el gateway bloquea el cargo de tarjeta cuando falta
+>   `device_session_id` (Openpay responde 400 error 1001 — ya obligatorio):
+>   `wc_add_notice` accionable + `result=failure` ANTES de `$client->charge()`,
+>   preservando el log PAY-15.
+> - **E2EFIX-04 (P2):** eliminado el script muerto `assets/js/ltms-checkout.js`
+>   (+min, enqueue, localize CO, manifest de integration tests). El endpoint
+>   AJAX `ltms_process_checkout` queda documentado como huérfano para el
+>   ciclo de limpieza posterior (`ltms_get_cart` sigue vivo vía cart drawer).
+>   Deferidos documentados: unificación del motor de impuestos del writer
+>   fiscal vs split (decisión de negocio), retest E2E con cargo real
+>   (bloqueado por incidente Openpay sandbox), higiene de config Stripe.
+
 ### Changed — `DOCS-SYNC-2026-11-17` (cierre de pendientes de documentación + checkpoint stale)
 
 > Resolución de los 4 pendientes detectados en la lectura completa del proyecto
