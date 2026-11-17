@@ -569,6 +569,195 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     }
 
     // -----------------------------------------------------------------------
+    // 8. E2EFIX-02 — heal de fila lt_commissions preexistente
+    // -----------------------------------------------------------------------
+
+    /**
+     * Holder de capturas para el stub wpdb (objetos compartidos por handle —
+     * el constructor de una clase anónima no acepta paso por referencia).
+     */
+    private function make_capture(): object {
+        return new class {
+            public array  $updates           = [];
+            public array  $inserts           = [];
+            public string $commissions_table = 'wp_lt_commissions';
+        };
+    }
+
+    /**
+     * Stub wpdb con captura para el flujo de heal:
+     *  - get_var en lt_commissions → id existente (la fila ya existe).
+     *  - get_row en lt_commissions → fila "writer fiscal" (rate=0, sin fee).
+     *  - get_row en lt_vendor_wallets → wallet base.
+     *  - insert()/update() → capturados en $capture.
+     */
+    private function make_heal_wpdb( array $existing_row, object $capture, bool $values_already_match ): object {
+        $wallet_row = [
+            'id' => 1, 'vendor_id' => 0, 'balance' => '0.00', 'balance_pending' => '0.00',
+            'balance_reserved' => '0.00', 'currency' => 'COP', 'is_frozen' => 0,
+            'total_earned' => '0.00', 'total_withdrawn' => '0.00',
+            'created_at' => '2026-01-01 00:00:00', 'updated_at' => '2026-01-01 00:00:00',
+            'last_transaction' => null,
+        ];
+        $row = $values_already_match
+            ? array_merge( $existing_row, [
+                'gross_amount' => '100000.00', 'commission_amount' => '10000.00',
+                'vendor_amount' => '90000.00', 'tax_withholding' => '0.00', 'iva_amount' => '0.00',
+            ] )
+            : $existing_row;
+
+        return new class( $row, $wallet_row, $capture ) {
+            public string $prefix     = 'wp_';
+            public string $last_error = '';
+            public int    $insert_id  = 1;
+            public mixed  $last_result = null;
+
+            public function __construct(
+                private array $commission_row,
+                private array $wallet_row,
+                private object $capture
+            ) {}
+
+            public function get_var( mixed $q = null ): mixed {
+                if ( is_string( $q ) && str_contains( $q, 'lt_commissions' ) ) {
+                    return '5'; // La fila de comisión YA existe (writer fiscal).
+                }
+                return null;
+            }
+
+            public function get_row( mixed $q = null, string $output = 'OBJECT', int $y = 0 ): mixed {
+                if ( is_string( $q ) && str_contains( $q, 'lt_commissions' ) ) {
+                    return $output === ARRAY_A ? $this->commission_row : (object) $this->commission_row;
+                }
+                if ( is_string( $q ) && str_contains( $q, 'lt_vendor_wallets' ) ) {
+                    return $output === ARRAY_A ? $this->wallet_row : (object) $this->wallet_row;
+                }
+                return null;
+            }
+
+            public function get_results( mixed $q = null, string $output = 'OBJECT' ): array { return []; }
+            public function prepare( string $q, mixed ...$args ): string { return $q; }
+            public function query( string $q ): int|bool { return true; }
+            public function insert( string $t, array $d, mixed $f = null ): int|bool {
+                $this->capture->inserts[ $t ][] = $d;
+                return 1;
+            }
+            public function update( string $t, array $d, array $w, mixed $f = null, mixed $wf = null ): int|bool {
+                $this->capture->updates[ $t ][] = [ 'data' => $d, 'where' => $w ];
+                // Aplicar el update a la fila interna (stub stateful) para simular
+                // el double-fire idempotente en la segunda pasada de process().
+                if ( $t === $this->capture->commissions_table && (int) ( $w['id'] ?? 0 ) === (int) ( $this->commission_row['id'] ?? 0 ) ) {
+                    $this->commission_row = array_merge( $this->commission_row, $d );
+                }
+                return 1;
+            }
+            public function delete( string $t, array $w, mixed $f = null ): int|bool { return 1; }
+            public function esc_like( string $text ): string { return addcslashes( $text, '_%\\' ); }
+            public function get_charset_collate(): string { return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'; }
+        };
+    }
+
+    /**
+     * Setup común para tests de heal: stubs de WP + order válido (vendor 10, item 20, 100000).
+     */
+    private function prepare_heal_scenario( array $existing_row, object $capture, bool $values_already_match = false ): \WC_Order {
+        // El vendor se resuelve desde get_post_meta del PRODUCTO (no del order) —
+        // product 20 → vendor 10. Sin esto group_items_by_vendor salta el item y
+        // process() retorna temprano (ORDER_SPLIT_NO_VENDOR).
+        Functions\when( 'get_post_meta' )->alias(
+            fn( $pid, $key, $single = true ) => $key === '_ltms_vendor_id' ? '10' : ''
+        ); // no es ReDi
+        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 10, 'roles' => [] ] );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
+        Functions\when( '__' )->returnArg();
+        Functions\when( 'wp_json_encode' )->alias( fn( $d, $f = 0 ) => json_encode( $d, $f ) );
+
+        $GLOBALS['wpdb'] = $this->make_heal_wpdb( $existing_row, $capture, $values_already_match );
+
+        return $this->make_order( 10, 10, [ $this->make_item( product_id: 20, total: 100000.0 ) ] );
+    }
+
+    /**
+     * E2EFIX-02: la fila preexistente (creada por el writer fiscal con rate=0)
+     * debe sanarse con los valores reales del split al pagar el pedido.
+     */
+    public function test_existing_commission_row_is_healed_with_real_split_values(): void {
+        // Fila "writer fiscal": gross correcto pero fee=0 y vendor=gross (sin comisión).
+        $capture = $this->make_capture();
+        $order = $this->prepare_heal_scenario(
+            [
+                'id' => 5, 'order_id' => 10, 'vendor_id' => 10, 'product_id' => null,
+                'gross_amount' => '100000.00', 'commission_amount' => '0.00',
+                'vendor_amount' => '100000.00', 'tax_withholding' => '4.25',
+                'iva_amount' => '28.31', 'currency' => 'COP', 'status' => 'pending',
+            ],
+            $capture
+        );
+
+        LTMS_Business_Order_Split::process( $order );
+
+        // La fila existente NO se duplica con un insert.
+        $commission_inserts = array_filter(
+            array_keys( $capture->inserts ),
+            fn( $t ) => str_contains( (string) $t, 'lt_commissions' )
+        );
+        $this->assertSame( [], $commission_inserts, 'La fila existente no debe insertarse de nuevo' );
+
+        // Sí debe sanarse con update.
+        $this->assertArrayHasKey( 'wp_lt_commissions', $capture->updates, 'Debe sanarse la fila lt_commissions' );
+        $this->assertCount( 1, $capture->updates['wp_lt_commissions'] );
+        $upds = $capture->updates['wp_lt_commissions'][0];
+        $data = $upds['data'];
+
+        $this->assertEqualsWithDelta( 10000.0, (float) $data['commission_amount'], 0.001, 'La fee debe sanarse al 10% real (no al 0% del writer fiscal)' );
+        $this->assertSame( 'paid', $data['status'] );
+        $this->assertSame( 20, (int) $data['product_id'] );
+        $this->assertSame( 'COP', $data['currency'] );
+        $this->assertSame( [ 'id' => 5 ], $upds['where'] );
+
+        // Invariante del split: vendor_amount = gross − fee − withholding.
+        $gross = (float) $data['gross_amount'];
+        $fee   = (float) $data['commission_amount'];
+        $wh    = (float) $data['tax_withholding'];
+        $net   = (float) $data['vendor_amount'];
+        $this->assertEqualsWithDelta( $gross - $fee - $wh, $net, 0.01, 'vendor_amount debe respetar gross−fee−withholding' );
+        $this->assertEqualsWithDelta( 100000.0, $gross, 0.001 );
+        $this->assertGreaterThan( 0.0, $fee );
+    }
+
+    /**
+     * E2EFIX-02: double-fire idempotente — si process() corre dos veces para la
+     * misma orden (webhook + listener), la segunda pasada NO escribe un update
+     * adicional (la fila ya quedó sanada por la primera).
+     */
+    public function test_heal_is_idempotent_on_second_process_call(): void {
+        $capture = $this->make_capture();
+        $order = $this->prepare_heal_scenario(
+            [
+                'id' => 5, 'order_id' => 10, 'vendor_id' => 10, 'product_id' => null,
+                'gross_amount' => '100000.00', 'commission_amount' => '0.00',
+                'vendor_amount' => '100000.00', 'tax_withholding' => '4.25',
+                'iva_amount' => '28.31', 'currency' => 'COP', 'status' => 'pending',
+            ],
+            $capture
+        );
+
+        LTMS_Business_Order_Split::process( $order );
+        $updates_after_first = count( $capture->updates['wp_lt_commissions'] ?? [] );
+        $this->assertSame( 1, $updates_after_first, 'Primera pasada: 1 update de heal' );
+
+        // Segunda pasada (double-fire): la fila ya está sanada (el stub aplicó
+        // el update a su estado interno) → NO debe haber un segundo update.
+        LTMS_Business_Order_Split::process( $order );
+        $this->assertCount(
+            1,
+            $capture->updates['wp_lt_commissions'] ?? [],
+            'Segunda pasada: sin update adicional (idempotencia real del heal)'
+        );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

@@ -331,10 +331,20 @@ final class LTMS_Business_Order_Split {
                 );
 
                 if ( $existing_commission_id > 0 ) {
+                    // E2EFIX-02 (AUDIT-E2E-PAY-2026-11-17, P1): la fila puede haber
+                    // nacido por el writer fiscal (LTMS_Commission_Writer, hook
+                    // woocommerce_checkout_order_processed) con commission_rate=0.0
+                    // hardcodeado y vendor_amount=gross-reteiva con un motor de
+                    // impuestos propio — dos fuentes de verdad para la misma orden
+                    // (wallet acredita el split real, la tabla dice otra cosa;
+                    // panel de auditor y Alegra facturan con esos datos). Sanar
+                    // SIEMPRE las columnas de dinero con los valores reales del
+                    // split. Idempotente: si ya coinciden, no escribe nada.
+                    self::heal_commission_row( $existing_commission_id, $order, $vendor_id, $r );
                     LTMS_Core_Logger::info(
                         'ORDER_SPLIT_COMMISSION_ALREADY_RECORDED',
                         sprintf(
-                            'Pedido #%d vendor #%d: comisión #%d ya registrada — skip insert (idempotency).',
+                            'Pedido #%d vendor #%d: comisión #%d ya registrada — heal de columnas de dinero aplicado (idempotency).',
                             $order->get_id(),
                             $vendor_id,
                             $existing_commission_id
@@ -696,6 +706,114 @@ final class LTMS_Business_Order_Split {
                 )
             );
         }
+    }
+
+    /**
+     * E2EFIX-02: sanar una fila lt_commissions preexistente con los valores
+     * reales del split (mismas columnas de dinero que record_commission).
+     *
+     * Contexto: el writer fiscal crea la fila al woocommerce_checkout_order_processed
+     * con una lógica de impuestos propia y commission_rate=0.0; cuando el pedido se
+     * paga, el split calcula la comisión real (estrategia + tier) pero el check de
+     * idempotencia solo hacía skip → la fila quedaba con la versión fiscal
+     * desalineada para siempre (panel, export fiscal y Alegra la consumen).
+     *
+     * Compara con tolerancia 0.001 (floats desde DB string) — si ya coincide,
+     * no escribe nada (idempotente, seguro bajo reintentos/webhooks).
+     *
+     * @param int      $commission_id ID de la fila existente.
+     * @param WC_Order $order         Pedido.
+     * @param int      $vendor_id     ID del vendedor.
+     * @param array    $r             Resultado del split (gross/platform_fee/vendor_net/tax_breakdown).
+     * @return void
+     */
+    private static function heal_commission_row( int $commission_id, \WC_Order $order, int $vendor_id, array $r ): void {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'lt_commissions';
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                "SELECT gross_amount, commission_amount, vendor_amount, tax_withholding, iva_amount FROM `{$table}` WHERE id = %d",
+                $commission_id
+            )
+        );
+
+        if ( ! $row || ! is_object( $row ) ) {
+            return; // Fila inaccesible — nada que sanar (no bloquea el split).
+        }
+
+        $gross       = (float) $r['gross_amount'];
+        $fee         = (float) $r['platform_fee'];
+        $vendor_net  = (float) $r['vendor_net'];
+        $withholding = (float) ( $r['tax_breakdown']['withholding_total'] ?? $r['tax_breakdown']['total_withholding'] ?? 0.0 );
+        $iva         = (float) ( $r['tax_breakdown']['iva'] ?? $r['tax_breakdown']['iva_amount'] ?? 0.0 );
+
+        // Idempotencia real: si los valores ya coinciden con el split, skip.
+        $already_healed = abs( (float) $row->gross_amount - $gross ) < 0.001
+            && abs( (float) $row->commission_amount - $fee ) < 0.001
+            && abs( (float) $row->vendor_amount - $vendor_net ) < 0.001
+            && abs( (float) $row->tax_withholding - $withholding ) < 0.001
+            && abs( (float) $row->iva_amount - $iva ) < 0.001;
+
+        if ( $already_healed ) {
+            return;
+        }
+
+        // Obtener el primer product_id del pedido (mismo criterio que record_commission).
+        $first_product_id = 0;
+        foreach ( $order->get_items() as $item ) {
+            $first_product_id = (int) $item->get_product_id();
+            break;
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        $result = $wpdb->update(
+            $table,
+            [
+                'gross_amount'      => $gross,
+                'commission_amount' => $fee,
+                'vendor_amount'     => $vendor_net,
+                'tax_withholding'   => $withholding,
+                'iva_amount'        => $iva,
+                'product_id'        => $first_product_id,
+                'currency'          => $order->get_currency(),
+                'status'            => 'paid',
+            ],
+            [ 'id' => $commission_id ],
+            [ '%f', '%f', '%f', '%f', '%f', '%d', '%s', '%s' ],
+            [ '%d' ]
+        );
+
+        if ( $result === false ) {
+            throw new \RuntimeException(
+                sprintf(
+                    'LTMS Order Split: failed to heal commission #%d for order #%d vendor #%d: %s',
+                    $commission_id,
+                    $order->get_id(),
+                    $vendor_id,
+                    $wpdb->last_error ?: '(unknown DB error)'
+                )
+            );
+        }
+
+        LTMS_Core_Logger::info(
+            'ORDER_SPLIT_COMMISSION_HEALED',
+            sprintf(
+                'Pedido #%d vendor #%d: comisión #%d sanada — gross %s, fee %s, vendor_net %s, withholding %s, iva %s.',
+                $order->get_id(),
+                $vendor_id,
+                $commission_id,
+                LTMS_Utils::format_money( $gross ),
+                LTMS_Utils::format_money( $fee ),
+                LTMS_Utils::format_money( $vendor_net ),
+                LTMS_Utils::format_money( $withholding ),
+                LTMS_Utils::format_money( $iva )
+            ),
+            [ 'order_id' => $order->get_id(), 'vendor_id' => $vendor_id, 'commission_id' => $commission_id ]
+        );
     }
 
     /**
