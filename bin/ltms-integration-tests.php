@@ -659,7 +659,7 @@ ltms_group( '16 — Assets JS/CSS en disco' );
 
 $assets = [
     'assets/js/ltms-dashboard.js',
-    'assets/js/ltms-checkout.js',
+    // E2EFIX-04: 'assets/js/ltms-checkout.js' eliminado (script muerto, checkout CO usa gateway WC).
     'assets/js/ltms-kds.js',
     'assets/js/ltms-checkout-mexico.js',
     'assets/js/ltms-login-register.js',

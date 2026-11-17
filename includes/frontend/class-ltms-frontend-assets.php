@@ -716,14 +716,10 @@ final class LTMS_Frontend_Assets {
             wp_enqueue_script( 'ltms-checkout-mexico', $url . 'js/ltms-checkout-mexico' . $suffix . '.js', [ 'jquery', 'openpay-js' ], $ver, true );
         }
 
-        wp_enqueue_script(
-            'ltms-checkout',
-            $url . 'js/ltms-checkout' . $suffix . '.js',
-            [ 'jquery', 'openpay-js', 'openpay-data' ],
-            $ver,
-            true
-        );
-
+        // E2EFIX-04 (AUDIT-E2E-PAY-2026-11-17, P2): el script 'ltms-checkout'
+        // (js/ltms-checkout.js) quedó muerto cuando el checkout CO migró a los
+        // templates nativos de WooCommerce (el formulario #ltms-checkout-form ya
+        // no existe). Eliminado el enqueue; el checkout CO usa el gateway WC.
         $this->localize_checkout_script( $country );
     }
 
@@ -1012,25 +1008,8 @@ final class LTMS_Frontend_Assets {
             ]);
         }
 
-        wp_localize_script( 'ltms-checkout', 'ltmsCheckout', [
-            'ajax_url'     => admin_url( 'admin-ajax.php' ),
-            'nonce'        => wp_create_nonce( 'ltms_checkout_nonce' ),
-            'merchant_id'  => esc_attr( $merchant_id ),
-            'public_key'   => esc_attr( $public_key ),
-            'is_sandbox'   => $is_sandbox,
-            'country'      => $country,
-            'currency'     => LTMS_Core_Config::get_currency(),
-            'order_total'  => $cart_total,
-            'order_id'     => $order_id,
-            'pse_enabled'  => $country === 'CO' && LTMS_Core_Config::get( 'ltms_pse_enabled', 'yes' ) === 'yes',
-            'addi_enabled' => LTMS_Core_Config::get( 'ltms_addi_enabled', 'no' ) === 'yes',
-            'i18n'         => [
-                'card_error'      => __( 'Error al tokenizar la tarjeta. Verifica los datos.', 'ltms' ),
-                'processing'      => __( 'Procesando pago...', 'ltms' ),
-                'payment_success' => __( '¡Pago exitoso!', 'ltms' ),
-                'payment_error'   => __( 'Error al procesar el pago. Intenta de nuevo.', 'ltms' ),
-            ],
-        ]);
+        // E2EFIX-04: el localize para el script 'ltms-checkout' (CO) se eliminó
+        // junto con el script muerto (ver comentario en enqueue_checkout_assets).
     }
 
     /**

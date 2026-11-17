@@ -417,6 +417,13 @@ final class LTMS_Frontend_Checkout_Handler {
     /**
      * Procesa el pago del checkout.
      *
+     * E2EFIX-04 (AUDIT-E2E-PAY-2026-11-17, P2): el único consumer frontend de
+     * este handler era assets/js/ltms-checkout.js, eliminado en este ciclo (el
+     * checkout CO usa el gateway nativo de WooCommerce). El handler queda
+     * registrado de forma temporal con el endpoint sin consumidor — eliminar
+     * el registro y el método en un ciclo de limpieza posterior tras confirmar
+     * por analytics que nadie lo llama.
+     *
      * Parámetros POST esperados (enviados por ltms-checkout.js):
      *  - nonce          : ltms_checkout_nonce
      *  - payment_method : card | pse | oxxo | addi | nequi | daviplata
