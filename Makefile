@@ -47,16 +47,14 @@ phpstan: ## Análisis estático con PHPStan (nivel 6)
 
 # ── Tests ─────────────────────────────────────────────────────────
 
-test: ## Ejecuta las pruebas PHPUnit
+test: ## Ejecuta las pruebas PHPUnit (suites declaradas en phpunit.xml)
 	vendor/bin/phpunit \
-		--bootstrap tests/test-bootstrap.php \
-		tests/Unit/ \
+		--configuration phpunit.xml \
 		--colors=always
 
 test-coverage: ## PHPUnit con reporte de cobertura HTML
 	vendor/bin/phpunit \
-		--bootstrap tests/test-bootstrap.php \
-		tests/Unit/ \
+		--configuration phpunit.xml \
 		--coverage-html reports/coverage \
 		--coverage-clover reports/clover.xml
 
@@ -71,8 +69,7 @@ test-e2e-open: ## Abre Cypress UI para pruebas E2E interactivas
 
 test-unit-watch: ## PHPUnit con file-watcher (requiere phpunit-watcher)
 	vendor/bin/phpunit-watcher watch \
-		--bootstrap tests/test-bootstrap.php \
-		tests/Unit/
+		--configuration phpunit.xml
 
 # ── Internationalization ───────────────────────────────────────────
 

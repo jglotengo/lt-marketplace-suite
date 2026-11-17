@@ -26,13 +26,13 @@ Eres un Desarrollador WordPress Senior Full-Stack especializado en el plugin `lt
 
 **Stack:** PHP 8.1+, WordPress 6.3+ (mínimo declarado 6.0), WooCommerce 8.0+ (mínimo declarado 7.0, tested up to 8.9), MySQL 8.0, jQuery/AJAX, SiteGround (hosting compartido)
 
-**Versión actual del plugin:** `2.9.346` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`). 30+ auditorías completas del ciclo de vida del marketplace están completadas, con 280+ bugs fixeados (129 P0 + 100 P1 + 16 P2 + 33 CSP, acumulados v2.9.142 → v2.9.346). 100% CSP compliant (0 inline `<script>`, 0 inline onclick, 0 alert, 0 confirm en todas las views). 9/9 webhook handlers fail-closed. 0 AJAX handlers sin nonce. 0 SQL injection. OWASP Top 10 scan: all clean. 215 idempotency keys en operaciones financieras. 17 API integrations hardenadas con Idempotency-Key + sslverify + timeout + parent::__construct.
+**Versión actual del plugin:** `2.9.435` (ver cabecera de `lt-marketplace-suite.php` y `CHANGELOG.md`). 30+ auditorías completas del ciclo de vida del marketplace están completadas, con 280+ bugs fixeados (129 P0 + 100 P1 + 16 P2 + 33 CSP, acumulados v2.9.142 → v2.9.435). 100% CSP compliant (0 inline `<script>`, 0 inline onclick, 0 alert, 0 confirm en todas las views). 9/9 webhook handlers fail-closed. 0 AJAX handlers sin nonce. 0 SQL injection. OWASP Top 10 scan: all clean. 215 idempotency keys en operaciones financieras. 17 API integrations hardenadas con Idempotency-Key + sslverify + timeout + parent::__construct.
 
 **Design system "Plaza Viva" (v2.9.178+):** Foundation de CSS/JS para los 9 templates nativos WC. Activado en producción vía `LTMS_Native_Templates` (template_include override). Assets: `assets/css/ltms-plaza-viva.css` (724 líneas) + `assets/js/ltms-plaza-viva.js` (647 líneas). Templates nativos: single-product, home, archive, cart, checkout, order-tracking, vendor-store, help-center, content-product. Plan completo en `PLAN_IMPLEMENTACION_PLAZA_VIVA.md`.
 
-**Test suite:** 4,891 tests (CI 100% verde), 10 tests nuevos en el ciclo v2.9.340–346 (shop/cart cards UX: `ShopCardsHomeParityTest`). Cobertura: tax engine 100%, wallet ledger 98%, WAF 96%, API clients 94%.
+**Test suite:** 5,398 tests (CI 100% verde; último ciclo `TAIWAN-MIRROR-2026-11-10` con +35 tests del grupo `taiwan-mirror`). Cobertura: tax engine 100%, wallet ledger 98%, WAF 96%, API clients 94%.
 
-**Producción:** SiteGround WAF confirmado por Contra Cultura (ya activo). Deploy vía webhook self-updating en `deploy/ltms-deploy-webhook.php` (v5).
+**Producción:** SiteGround WAF confirmado por Contra Cultura (ya activo). Deploy vía SSH desde GitHub Actions (`deploy.yml`: ff-merge con verificación de SHA obligatoria, reset OPcache y reload síncrono con migraciones/rewrite/cache/purge). El webhook HTTP `deploy/ltms-deploy-webhook.php` quedó deprecado el 2026-10-28 (DEPLOY-WH-CAPTCHA: SG respondía 202+sgcaptcha al runner → deploy "verde" sin desplegar).
 
 ---
 

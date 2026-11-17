@@ -4,7 +4,28 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-11-10
+## [Unreleased] — 2026-11-17
+
+### Changed — `DOCS-SYNC-2026-11-17` (cierre de pendientes de documentación + checkpoint stale)
+
+> Resolución de los 4 pendientes detectados en la lectura completa del proyecto
+> (sin cambios de código del plugin; no aplica bump de `LTMS_VERSION`):
+> - **Checkpoint `lee-archivo.txt` (vigente 2026-11-07, HEADER-SYNC — sin
+>   pendientes):** la relectura confirmó que el checkpoint vigente NO es el
+>   snapshot stale de 2026-09-22 y no tiene tareas abiertas. El pendiente
+>   histórico del ciclo responsive mobile quedó verificado como resuelto:
+>   `assets/css/ltms-dashboard.min.css` (regenerado 2026-11-10) contiene
+>   `.ltms-booking-tabs`, `.ltms-booking-tab` y `.ltms-envios-stats`; el commit
+>   `337d5faf` es ancestro de `main` y los deploys posteriores (último validado
+>   en HEADER-SYNC 2026-11-07, home=200) lo llevaron a producción.
+> - **CLAUDE.md:** versión 2.9.346 → 2.9.435; suite 4,891 → 5,398 tests; deploy
+>   por webhook (deprecado) → SSH de `deploy.yml` con verificación de SHA.
+> - **README.md:** versión y badge 2.9.334 → 2.9.435.
+> - **Makefile:** targets `test`, `test-coverage` y `test-unit-watch` apuntaban
+>   al bootstrap legacy (`tests/test-bootstrap.php` + `tests/Unit/`); ahora usan
+>   `--configuration phpunit.xml` (suites `unit`/`integration`/`all` del
+>   bootstrap dual). Validado ejecutando el comando subyacente con
+>   `LTMS_UNIT_ONLY=true` (`PluginHeaderVersionSyncTest`: OK, 4 assertions).
 
 ### Changed — `TAIWAN-MIRROR-2026-11-10` (espejo de las reglas duras de Juguetería Taiwan en PosGold/VTEX)
 
