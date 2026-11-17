@@ -228,11 +228,19 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
 
         // INTEGRATIONS-AUDIT P0 FIX: Idempotency-Key on charge to prevent
         // duplicate charges on 5xx retry. Openpay supports this header.
+        // E2EFIX-01 (AUDIT-E2E-PAY-2026-11-17, P1): el source_id (token de tarjeta)
+        // es de UN solo uso. Si el 1er intento llega a Openpay y la respuesta se
+        // pierde (5xx/timeout), el cargo ya existe y el token ya fue consumido —
+        // el reintento automático del cliente responde 422 "This source_id was
+        // already used" y enmascara el estado real (cargo vivo + orden pending +
+        // cliente que reintenta). POST /charges NO es reintentable: un 5xx se
+        // propaga tal cual y la recuperación es manual/por webhook.
         $response = $this->perform_request(
             'POST',
             "/" . rawurlencode( $this->merchant_id ) . "/charges",
             $payload,
-            [ 'Idempotency-Key' => 'ltms_charge_' . $order_id_safe ]
+            [ 'Idempotency-Key' => 'ltms_charge_' . $order_id_safe ],
+            false
         );
 
         return [
@@ -288,10 +296,16 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             ],
         ];
 
+        // E2EFIX-01 (AUDIT-E2E-PAY-2026-11-17, P1): cargo PSE no reintentable —
+        // si el 1er intento creó la referencia y la respuesta se perdió (5xx),
+        // el reintento con el mismo order_id choca con el dedup de Openpay
+        // (error "order_id ya existe") y enmascara la referencia real ya emitida.
         return $this->perform_request(
             'POST',
             "/{$this->merchant_id}/charges",
-            $payload
+            $payload,
+            [],
+            false
         );
     }
 
@@ -327,7 +341,9 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             ],
         ];
 
-        return $this->perform_request( 'POST', "/{$this->merchant_id}/charges", $payload );
+        // E2EFIX-01: cargo SPEI no reintentable — mismo motivo que PSE (E2EFIX-01):
+        // un reintento tras 5xx con la referencia ya creada enmascara el estado real.
+        return $this->perform_request( 'POST', "/{$this->merchant_id}/charges", $payload, [], false );
     }
 
     /**
@@ -361,10 +377,14 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             ],
         ];
 
+        // E2EFIX-01: cargo OXXO no reintentable — un reintento tras 5xx puede
+        // emitir una segunda referencia para la misma orden (dinero real).
         return $this->perform_request(
             'POST',
             "/{$this->merchant_id}/charges",
-            $payload
+            $payload,
+            [],
+            false
         );
     }
 
@@ -398,11 +418,17 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
 
         // INTEGRATIONS-AUDIT P0 FIX: Idempotency-Key on refund — duplicate
         // refunds are a direct financial loss.
+        // E2EFIX-01 (AUDIT-E2E-PAY-2026-11-17, P1): reembolso NO reintentable —
+        // si el 1er intento reembolsó y la respuesta se perdió (5xx), un
+        // reintento automático puede emitir un SEGUNDO reembolso (Openpay
+        // permite reembolsos parciales repetidos hasta agotar el saldo del
+        // cargo = pérdida directa). Recuperación: reintento manual del admin.
         return $this->perform_request(
             'POST',
             "/" . rawurlencode( $this->merchant_id ) . "/charges/" . $charge_id . "/refund",
             $payload,
-            [ 'Idempotency-Key' => 'ltms_refund_' . $charge_id . '_' . ( $amount > 0 ? (string) $amount : 'full' ) ]
+            [ 'Idempotency-Key' => 'ltms_refund_' . $charge_id . '_' . ( $amount > 0 ? (string) $amount : 'full' ) ],
+            false
         );
     }
 

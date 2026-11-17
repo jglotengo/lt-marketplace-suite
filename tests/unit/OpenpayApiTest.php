@@ -360,6 +360,218 @@ class OpenpayApiTest extends TestCase
         $this->assertStringContainsString('sk_test_abc', $decoded);
     }
 
+    // ── Section 5b: E2EFIX-01 — cargos/refunds NO reintentables (5xx) ─────────
+
+    /**
+     * Stub de la capa HTTP devolviendo siempre HTTP 500 con body JSON de error
+     * de Openpay (como el incidente sandbox del 2026-11-17: 500 error_code 1000
+     * con el cargo creado igualmente en el backend).
+     *
+     * @param int $calls Contador de llamadas a wp_remote_request (por referencia).
+     */
+    private function stub_http_500( int &$calls ): void
+    {
+        $calls = 0;
+        Functions\when('wp_remote_request')->alias(
+            static function ( string $url, array $args ) use ( &$calls ): mixed {
+                $calls++;
+                return [
+                    'response' => [ 'code' => 500, 'message' => 'Internal Server Error' ],
+                    'body'     => '{"error_code":1000,"description":"Internal error"}',
+                ];
+            }
+        );
+        Functions\when('wp_remote_retrieve_response_code')->justReturn(500);
+        Functions\when('wp_remote_retrieve_body')->justReturn('{"error_code":1000,"description":"Internal error"}');
+        Functions\when('is_wp_error')->justReturn(false);
+    }
+
+    /**
+     * @test
+     * E2EFIX-01: POST /charges (tarjeta) NO debe reintentar tras un 5xx —
+     * el token de tarjeta es de un solo uso y el reintento responde 422
+     * "This source_id was already used", enmascarando el cargo ya creado.
+     */
+    public function test_create_charge_does_not_retry_on_5xx(): void
+    {
+        \LTMS_Core_Config::set( 'ltms_api_retry_delay_seconds', 0 );
+        $client = $this->make_client();
+
+        $calls = 0;
+        $this->stub_http_500( $calls );
+
+        try {
+            $client->create_charge(
+                'tok_test_abc123',
+                149000.0,
+                'Pedido #22192',
+                [ 'name' => 'QA', 'email' => 'qa@example.com', 'city' => 'Bogotá' ],
+                'order_001'
+            );
+            $this->fail('Se esperaba RuntimeException tras HTTP 500');
+        } catch ( \RuntimeException $e ) {
+            $this->assertStringContainsString('Error HTTP 500', $e->getMessage());
+        }
+
+        $this->assertSame(1, $calls, 'POST /charges debe hacer exactamente 1 intento con 5xx (no reintentable)');
+    }
+
+    /**
+     * @test
+     * E2EFIX-01: PSE no reintentable tras 5xx.
+     */
+    public function test_create_pse_charge_does_not_retry_on_5xx(): void
+    {
+        \LTMS_Core_Config::set( 'ltms_api_retry_delay_seconds', 0 );
+        $client = $this->make_client();
+
+        $calls = 0;
+        $this->stub_http_500( $calls );
+
+        try {
+            $client->create_pse_charge(
+                100000.0,
+                'Test PSE',
+                [ 'name' => 'Test', 'email' => 'a@b.co', 'city' => 'Bogotá' ],
+                '1022',
+                'https://example.com/return',
+                'order_002'
+            );
+            $this->fail('Se esperaba RuntimeException tras HTTP 500');
+        } catch ( \RuntimeException $e ) {
+            $this->assertStringContainsString('Error HTTP 500', $e->getMessage());
+        }
+
+        $this->assertSame(1, $calls, 'POST /charges PSE debe hacer exactamente 1 intento con 5xx');
+    }
+
+    /**
+     * @test
+     * E2EFIX-01: SPEI (MX) no reintentable tras 5xx.
+     */
+    public function test_create_spei_reference_does_not_retry_on_5xx(): void
+    {
+        \LTMS_Core_Config::set( 'ltms_api_retry_delay_seconds', 0 );
+        $client = $this->make_client();
+
+        // Override country to MX
+        $ref  = new ReflectionClass($client);
+        $prop = $ref->getProperty('country');
+        $prop->setAccessible(true);
+        $prop->setValue($client, 'MX');
+
+        $calls = 0;
+        $this->stub_http_500( $calls );
+
+        try {
+            $client->create_spei_reference(
+                500.0,
+                'Test SPEI',
+                [ 'name' => 'Test', 'email' => 'a@b.mx' ],
+                'order_003'
+            );
+            $this->fail('Se esperaba RuntimeException tras HTTP 500');
+        } catch ( \RuntimeException $e ) {
+            $this->assertStringContainsString('Error HTTP 500', $e->getMessage());
+        }
+
+        $this->assertSame(1, $calls, 'POST /charges SPEI debe hacer exactamente 1 intento con 5xx');
+    }
+
+    /**
+     * @test
+     * E2EFIX-01: OXXO (MX) no reintentable tras 5xx — un reintento puede
+     * emitir una segunda referencia para la misma orden.
+     */
+    public function test_create_oxxo_charge_does_not_retry_on_5xx(): void
+    {
+        \LTMS_Core_Config::set( 'ltms_api_retry_delay_seconds', 0 );
+        $client = $this->make_client();
+
+        // Override country to MX
+        $ref  = new ReflectionClass($client);
+        $prop = $ref->getProperty('country');
+        $prop->setAccessible(true);
+        $prop->setValue($client, 'MX');
+
+        $calls = 0;
+        $this->stub_http_500( $calls );
+
+        try {
+            $client->create_oxxo_charge(
+                350.0,
+                'Test OXXO MX',
+                [ 'name' => 'Juan', 'email' => 'j@e.mx' ],
+                'order_004'
+            );
+            $this->fail('Se esperaba RuntimeException tras HTTP 500');
+        } catch ( \RuntimeException $e ) {
+            $this->assertStringContainsString('Error HTTP 500', $e->getMessage());
+        }
+
+        $this->assertSame(1, $calls, 'POST /charges OXXO debe hacer exactamente 1 intento con 5xx');
+    }
+
+    /**
+     * @test
+     * E2EFIX-01: reembolso no reintentable tras 5xx — Openpay permite
+     * reembolsos parciales repetidos hasta agotar el saldo = doble reembolso.
+     */
+    public function test_create_refund_does_not_retry_on_5xx(): void
+    {
+        \LTMS_Core_Config::set( 'ltms_api_retry_delay_seconds', 0 );
+        $client = $this->make_client();
+
+        $calls = 0;
+        $this->stub_http_500( $calls );
+
+        try {
+            $client->create_refund( 'tr_abc123', 500.0, 'QA' );
+            $this->fail('Se esperaba RuntimeException tras HTTP 500');
+        } catch ( \RuntimeException $e ) {
+            $this->assertStringContainsString('Error HTTP 500', $e->getMessage());
+        }
+
+        $this->assertSame(1, $calls, 'POST /refund debe hacer exactamente 1 intento con 5xx');
+    }
+
+    /**
+     * @test
+     * Guard de regresión: la maquinaria de retry SIGUE viva para peticiones
+     * seguras (GET). Un 5xx sostenido con retry activo debe agotar max_retries
+     * intentos antes de lanzar "Error HTTP 500".
+     *
+     * Nota: el número de intentos se lee por reflexión de la instancia porque
+     * el bootstrap UNIT puede sombra el cliente real (stub con max_retries=3)
+     * mientras producción usa el real (max_retries=4) — el contrato bajo test
+     * es "cuenta == max_retries", no un número fijo.
+     */
+    public function test_get_charge_still_retries_on_5xx(): void
+    {
+        \LTMS_Core_Config::set( 'ltms_api_retry_delay_seconds', 0 );
+        $client = $this->make_client();
+
+        $calls = 0;
+        $this->stub_http_500( $calls );
+
+        try {
+            $client->get_charge( 'tr_abc123' );
+            $this->fail('Se esperaba RuntimeException tras agotar reintentos');
+        } catch ( \RuntimeException $e ) {
+            // Con 5xx sostenido, el último intento sale por el branch no-reintentable
+            // (attempts < max_retries es falso) → el mensaje es "Error HTTP 500", pero
+            // lo relevante es que HUBO max_retries intentos (retry vivo).
+            $this->assertStringContainsString('Error HTTP 500', $e->getMessage());
+        }
+
+        $ref  = new ReflectionClass($client);
+        $prop = $ref->getProperty('max_retries');
+        $prop->setAccessible(true);
+        $expected_attempts = (int) $prop->getValue($client);
+
+        $this->assertSame($expected_attempts, $calls, 'GET /charges debe reintentar hasta max_retries');
+    }
+
     // ── Section 6: Reflection ─────────────────────────────────────────────────
 
     /**
