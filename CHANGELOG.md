@@ -6,6 +6,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-17
 
+### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
+
+> Owner confirmó: Stripe no se usa y nadie consume el endpoint legacy
+> `ltms_process_checkout`. Limpieza ejecutada y verificada en producción.
+> Suite 5,409 tests / 12,156 assertions / 3 skipped (neto -6 tests retirados
+> con la maquinaria eliminada; sin tests huérfanos).
+>
+> - **Endpoint legacy eliminado (commit `f1862e1e`):** único consumer era
+>   `ltms-checkout.js` (borrado en E2EFIX-04). Eliminados registros
+>   `wp_ajax[_nopriv]_ltms_process_checkout`, `ajax_process_checkout()`,
+>   procesadores privados card/PSE/OXXO/Addi/Nequi/Daviplata,
+>   `get_or_create_order_from_session()`, `build_addi_items()`, lock de
+>   idempotencia (`checkout_lock_key` + acquire/release/lock_option_name) y
+>   `recover_orphaned_checkout()` (~950 líneas). Verificado en prod:
+>   `has_action()` legacy = false; `ltms_get_pse_banks` y `ltms_get_cart`
+>   siguen vivos; checkout HTTP 200. Tests retirados en el mismo commit
+>   (FIX #13 ×2, PAY-09 ×2, PAY-13 handler ×2); PAY-08 re-anclado al path vivo
+>   (`Idempotency-Key` estable de `LTMS_Api_Openpay::create_charge`); marker
+>   EXCMSG-FIX preservado en el header del handler para la matriz de regresión.
+> - **Stripe retirado (producción):** `woocommerce_ltms_stripe_settings` →
+>   `enabled=no`, credenciales (`secret_key`, `publishable_key`, `_live`,
+>   `webhook_secret`) y `connect_account_id` vaciados; eliminadas options
+>   sueltas `ltms_stripe_public_key`/`ltms_stripe_secret_key`/
+>   `ltms_stripe_webhook_secret` (en claro en DB). Verificado:
+>   `get_available_payment_gateways() = ["ltms_openpay"]`, gateway object
+>   `enabled='no'`, cero fatales nuevos. `LTMS_Payment_Orchestrator` queda
+>   dormido sin caller de producción (no se borra; superficie multi-pasarela).
+
 ### Fixed — `COMMISSION-RATE-FIX-2026-11-18` (P3 del fixture webhook E2E, AUDIT-E2E-PAY-2026-11-17)
 
 > Hallazgo P3 detectado en el fixture webhook (§0.19): `lt_commissions.commission_rate`
