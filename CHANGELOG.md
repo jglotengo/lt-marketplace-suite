@@ -34,6 +34,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > consentimiento redundante; incidente Openpay sandbox para cargos sigue activo
 > (bloquea el E2E con cargo real y la cancelación de 4 cargos huérfanos).
 
+### Changed — `AUDIT-E2E-PAY-2026-11-17-QA-CHECKOUT` — resolución de hallazgos abiertos (2026-11-18)
+
+> Cierre de los hallazgos abiertos del QA E2E (§0.19, QA_REPORT), autorizados por el
+> owner. 1 fix de código + 2 configuraciones de producción verificadas end-to-end.
+>
+> - **Consent único (P2, commit `513c2cb9`):** eliminados el render y el validador
+>   duplicados de `LTMS_Legal_Compliance` (`render_checkout_consent_field` /
+>   `validate_checkout_consent` + sus hooks); el checkbox único es
+>   `ltms_privacy_consent` (render/validación en `LTMS_Frontend_Checkout_Handler`).
+>   `save_checkout_consent()` sigue guardando el rastro legal (`_ltms_checkout_consent`,
+>   IP, versiones, `lt_consent_log`) aceptando el campo consolidado o el legado.
+>   Verificado en vivo: 1 checkbox, 1 solo error si falta, guard E2EFIX-03 al pasar.
+>   Test reemplazado: `test_legal_compliance_consent_consolidated_into_single_field`.
+>   Suite 5,414 tests / 12,165 assertions / 3 skipped, cero regresiones.
+> - **Stock global activado (P1, producción):** `woocommerce_manage_stock` → `yes`
+>   (1,802 productos con `_manage_stock=yes`); `managing_stock()=true` verificado y
+>   retrofit de las órdenes QA pagadas 22192/22195 (22163: 20→18, `_reduced_stock=1`
+>   por ítem). Las ventas futuras descuentan stock real.
+> - **Emails WC activados (P2, producción):** habilitados los emails de orden
+>   (new_order, processing, completed, on-hold, refunded, invoice, cancelled, failed)
+>   y `stock_email_enabled`; `wp_mail` verificado en prod (`MAIL_SENT=true`).
+>
+> Sigue bloqueado: E2E con cargo real Openpay por el incidente sandbox externo
+> (retest 2026-11-18: `/charges` y `/cancel` responden 500 error 1000).
+
 ### Fixed — `E2EFIX-2026-11-17` (ciclo de fixes de la auditoría E2E de compra sandbox, AUDIT-E2E-PAY-2026-11-17)
 
 > Derivado de la compra E2E sandbox como auditor sobre producción (QA_REPORT §0.17).
