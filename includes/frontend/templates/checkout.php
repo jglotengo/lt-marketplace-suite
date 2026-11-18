@@ -601,8 +601,23 @@ get_header( 'shop' );
                              * checkout/review-order.php (tabla de items + totales). El hook
                              * woocommerce_checkout_order_review (mismo nombre) sigue
                              * disparándose en form-checkout.php nativo de WC 11.x.
+                             *
+                             * GUEST-CONSENT-FIX (AUDIT-E2E-PAY-2026-11-17): se restauran
+                             * los hooks estándar woocommerce_checkout_before_order_review /
+                             * woocommerce_checkout_after_order_review que rodean el order
+                             * review en form-checkout.php nativo. Este template los había
+                             * dejado de disparar, así que todo módulo enganchado a ellos
+                             * quedaba mudo — en particular LTMS_Legal_Compliance::
+                             * render_checkout_consent_field() (checkbox ltms_checkout_consent,
+                             * validado en woocommerce_checkout_process), cuyo campo NUNCA se
+                             * renderizaba y bloqueaba el checkout de TODOS los guests con
+                             * "Debes aceptar la Política de Privacidad..." pese a marcar el
+                             * checkbox del template. También restaura el placeholder
+                             * ltms-customs-estimate (render_customs_estimate).
                              */
+                            do_action( 'woocommerce_checkout_before_order_review' );
                             woocommerce_order_review();
+                            do_action( 'woocommerce_checkout_after_order_review' );
                             ?>
 
                             <!-- Cupón (en checkout también disponible) -->

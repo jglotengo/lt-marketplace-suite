@@ -34,6 +34,8 @@ class AuditE2ePay20261117FixesTest extends LTMS_Unit_Test_Case {
 	private const FRONTEND_ASSETS_PATH = __DIR__ . '/../../includes/frontend/class-ltms-frontend-assets.php';
 	private const CHECKOUT_HANDLER_PATH = __DIR__ . '/../../includes/frontend/class-ltms-frontend-checkout-handler.php';
 	private const BIN_TESTS_PATH      = __DIR__ . '/../../bin/ltms-integration-tests.php';
+	private const CHECKOUT_TEMPLATE_PATH = __DIR__ . '/../../includes/frontend/templates/checkout.php';
+	private const LEGAL_COMPLIANCE_PATH  = __DIR__ . '/../../includes/business/class-ltms-legal-compliance.php';
 
 	// ════════════════════════════════════════════════════════════════════
 	// E2EFIX-03: device_session_id ausente → bloquear ANTES del cargo
@@ -130,5 +132,60 @@ class AuditE2ePay20261117FixesTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'E2EFIX-04', $source, 'El handler huérfano debe documentar la eliminación pendiente' );
 		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_process_checkout'", $source, 'El registro del endpoint debe seguir vivo hasta el ciclo de limpieza' );
 		$this->assertStringContainsString( "add_action( 'wp_ajax_nopriv_ltms_process_checkout'", $source, 'El registro nopriv debe seguir vivo hasta el ciclo de limpieza' );
+	}
+
+	// ════════════════════════════════════════════════════════════════════
+	// GUEST-CONSENT-FIX (P0): el template checkout debe disparar los hooks
+	// form-checkout wrappers o los guests quedan bloqueados por el
+	// validador ltms_checkout_consent cuyo campo nunca se renderiza.
+	// ════════════════════════════════════════════════════════════════════
+
+	public function test_checkout_template_fires_before_and_after_order_review_hooks(): void {
+		$source = file_get_contents( self::CHECKOUT_TEMPLATE_PATH );
+
+		$this->assertStringContainsString( 'GUEST-CONSENT-FIX', $source, 'El fix debe estar marcado con su ID de tarea' );
+		$this->assertStringContainsString(
+			"do_action( 'woocommerce_checkout_before_order_review' )",
+			$source,
+			'El template debe disparar woocommerce_checkout_before_order_review (render_customs_estimate)'
+		);
+		$this->assertStringContainsString(
+			"do_action( 'woocommerce_checkout_after_order_review' )",
+			$source,
+			'El template debe disparar woocommerce_checkout_after_order_review (render_checkout_consent_field)'
+		);
+
+		// El hook after_order_review debe envolver la llamada del order review
+		// (así el consent checkbox aparece junto al resumen, como en form-checkout.php).
+		// strrpos: la PRIMERA mención de woocommerce_order_review() está en el
+		// docblock histórico (CHECKOUT-CTA-VISIBLE FIX); la llamada real va después.
+		$before_pos = strpos( $source, "do_action( 'woocommerce_checkout_before_order_review' )" );
+		$review_pos = strrpos( $source, 'woocommerce_order_review()' );
+		$after_pos  = strpos( $source, "do_action( 'woocommerce_checkout_after_order_review' )" );
+		$this->assertNotFalse( $before_pos );
+		$this->assertNotFalse( $review_pos );
+		$this->assertNotFalse( $after_pos );
+		$this->assertLessThan( $review_pos, $before_pos, 'before_order_review debe ir antes del order review' );
+		$this->assertLessThan( $after_pos, $review_pos, 'after_order_review debe ir después del order review' );
+	}
+
+	public function test_legal_compliance_consent_field_still_hooked_and_validated(): void {
+		$source = file_get_contents( self::LEGAL_COMPLIANCE_PATH );
+
+		// El render sigue enganchado al hook que el template ahora dispara.
+		$this->assertStringContainsString(
+			"add_action( 'woocommerce_checkout_after_order_review', [ __CLASS__, 'render_checkout_consent_field' ] )",
+			$source,
+			'El checkbox ltms_checkout_consent debe seguir enganchado a after_order_review'
+		);
+		// El validador que bloquea guests debe seguir vivo en checkout_process.
+		$this->assertStringContainsString(
+			"add_action( 'woocommerce_checkout_process',          [ __CLASS__, 'validate_checkout_consent' ] )",
+			$source,
+			'El validador de consentimiento debe seguir enganchado a checkout_process'
+		);
+		// El campo que renderiza es el mismo que el validador lee.
+		$this->assertStringContainsString( "woocommerce_form_field( 'ltms_checkout_consent'", $source );
+		$this->assertStringContainsString( "\$_POST['ltms_checkout_consent']", $source );
 	}
 }
