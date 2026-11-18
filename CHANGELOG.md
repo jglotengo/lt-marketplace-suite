@@ -58,6 +58,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >
 > Sigue bloqueado: E2E con cargo real Openpay por el incidente sandbox externo
 > (retest 2026-11-18: `/charges` y `/cancel` responden 500 error 1000).
+>
+> - **Webhook Openpay validado con fixture firmado (2026-11-18):** payloads
+>   HMAC-SHA256 enviados al endpoint público (`/wp-json/ltms/v1/webhooks/openpay`):
+>   `charge.succeeded` → orden pending→processing + comisión + wallet + stock + emails;
+>   replay → `Already processed`; `charge.failed` → failed; firma inválida → 401;
+>   order inexistente → 404; evento huérfano → `OPENPAY_WEBHOOK_ORPHAN_EVENT`.
+>   Artefactos del fixture eliminados y stock restaurado. Nuevo hallazgo P3
+>   documentado: `commission_rate` queda en 0.0000 (display/export, sin impacto
+>   en montos) — fix propuesto para ciclo posterior.
 
 ### Fixed — `E2EFIX-2026-11-17` (ciclo de fixes de la auditoría E2E de compra sandbox, AUDIT-E2E-PAY-2026-11-17)
 
