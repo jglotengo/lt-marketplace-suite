@@ -139,6 +139,7 @@ final class LTMS_Business_Order_Split {
 
             $vendor_results[ $vendor_id ] = [
                 'gross_amount'      => $gross_amount,
+                'platform_rate'     => $platform_rate,
                 'platform_fee'      => $platform_fee,
                 'vendor_net'        => $vendor_net,
                 'withholding_total' => $withholding_total,
@@ -353,7 +354,7 @@ final class LTMS_Business_Order_Split {
                     );
                 } else {
                     // OS-BUG-C: record_commission lanza excepción si $wpdb->insert falla.
-                    self::record_commission( $order, $vendor_id, $r['gross_amount'], $r['platform_fee'], $r['vendor_net'], $r['tax_breakdown'] );
+                    self::record_commission( $order, $vendor_id, $r['gross_amount'], $r['platform_fee'], $r['vendor_net'], $r['tax_breakdown'], (float) ( $r['platform_rate'] ?? 0.0 ) );
                 }
 
                 LTMS_Core_Logger::info(
@@ -636,6 +637,7 @@ final class LTMS_Business_Order_Split {
      * @param float     $platform_fee  Comisión plataforma.
      * @param float     $vendor_net    Monto neto vendedor.
      * @param array     $tax_breakdown Desglose fiscal.
+     * @param float     $commission_rate Tasa de comisión aplicada (0.12 = 12%) — COMMISSION-RATE-FIX.
      * @return void
      * @throws \RuntimeException Si el insert falla (caller debe ROLLBACK la tx externa).
      */
@@ -645,7 +647,8 @@ final class LTMS_Business_Order_Split {
         float $gross_amount,
         float $platform_fee,
         float $vendor_net,
-        array $tax_breakdown
+        array $tax_breakdown,
+        float $commission_rate = 0.0
     ): void {
         global $wpdb;
 
@@ -667,6 +670,10 @@ final class LTMS_Business_Order_Split {
                 'product_id'        => $first_product_id,          // NOT NULL — primer producto del pedido
                 'gross_amount'      => $gross_amount,
                 'commission_amount' => $platform_fee,               // comisión de la plataforma
+                // COMMISSION-RATE-FIX: la tasa aplicada debe quedar persistida
+                // (antes quedaba en el default 0.0000 y el export de privacidad
+                // mostraba "Tasa 0" aunque el monto de comisión fuera correcto).
+                'commission_rate'   => max( 0.0, min( 1.0, $commission_rate ) ),
                 'vendor_amount'     => $vendor_net,                 // monto neto para el vendedor
                 'tax_withholding'   => $tax_breakdown['withholding_total'] ?? $tax_breakdown['total_withholding'] ?? 0.0, // M-QA-02: normalised
                 'iva_amount'        => $tax_breakdown['iva'] ?? $tax_breakdown['iva_amount'] ?? 0.0, // NOT NULL DEFAULT 0
@@ -676,7 +683,7 @@ final class LTMS_Business_Order_Split {
                 'metadata'          => wp_json_encode( $tax_breakdown ),
                 'created_at'        => LTMS_Utils::now_utc(),
             ],
-            [ '%d', '%d', '%d', '%f', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s' ]
+            [ '%d', '%d', '%d', '%f', '%f', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s' ]
         );
 
         // OS-BUG-C FIX: el insert puede fallar por deadlock, constraint violation,
@@ -736,7 +743,7 @@ final class LTMS_Business_Order_Split {
         $row = $wpdb->get_row(
             $wpdb->prepare(
                 // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                "SELECT gross_amount, commission_amount, vendor_amount, tax_withholding, iva_amount FROM `{$table}` WHERE id = %d",
+                "SELECT gross_amount, commission_amount, commission_rate, vendor_amount, tax_withholding, iva_amount FROM `{$table}` WHERE id = %d",
                 $commission_id
             )
         );
@@ -746,14 +753,18 @@ final class LTMS_Business_Order_Split {
         }
 
         $gross       = (float) $r['gross_amount'];
+        $rate        = max( 0.0, min( 1.0, (float) ( $r['platform_rate'] ?? 0.0 ) ) );
         $fee         = (float) $r['platform_fee'];
         $vendor_net  = (float) $r['vendor_net'];
         $withholding = (float) ( $r['tax_breakdown']['withholding_total'] ?? $r['tax_breakdown']['total_withholding'] ?? 0.0 );
         $iva         = (float) ( $r['tax_breakdown']['iva'] ?? $r['tax_breakdown']['iva_amount'] ?? 0.0 );
 
         // Idempotencia real: si los valores ya coinciden con el split, skip.
+        // COMMISSION-RATE-FIX: la tasa entra en la comparación para que una fila
+        // saneada antes del fix (rate=0.0000 con montos correctos) se corrija.
         $already_healed = abs( (float) $row->gross_amount - $gross ) < 0.001
             && abs( (float) $row->commission_amount - $fee ) < 0.001
+            && abs( (float) ( $row->commission_rate ?? 0.0 ) - $rate ) < 0.0001
             && abs( (float) $row->vendor_amount - $vendor_net ) < 0.001
             && abs( (float) $row->tax_withholding - $withholding ) < 0.001
             && abs( (float) $row->iva_amount - $iva ) < 0.001;
@@ -775,6 +786,8 @@ final class LTMS_Business_Order_Split {
             [
                 'gross_amount'      => $gross,
                 'commission_amount' => $fee,
+                // COMMISSION-RATE-FIX: persistir la tasa aplicada (ver record_commission).
+                'commission_rate'   => $rate,
                 'vendor_amount'     => $vendor_net,
                 'tax_withholding'   => $withholding,
                 'iva_amount'        => $iva,
@@ -783,7 +796,7 @@ final class LTMS_Business_Order_Split {
                 'status'            => 'paid',
             ],
             [ 'id' => $commission_id ],
-            [ '%f', '%f', '%f', '%f', '%f', '%d', '%s', '%s' ],
+            [ '%f', '%f', '%f', '%f', '%f', '%f', '%d', '%s', '%s' ],
             [ '%d' ]
         );
 

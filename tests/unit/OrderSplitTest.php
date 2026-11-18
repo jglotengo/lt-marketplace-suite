@@ -591,7 +591,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
      *  - get_row en lt_vendor_wallets → wallet base.
      *  - insert()/update() → capturados en $capture.
      */
-    private function make_heal_wpdb( array $existing_row, object $capture, bool $values_already_match ): object {
+    private function make_heal_wpdb( array $existing_row, object $capture, bool $values_already_match, ?string $commission_id = '5' ): object {
         $wallet_row = [
             'id' => 1, 'vendor_id' => 0, 'balance' => '0.00', 'balance_pending' => '0.00',
             'balance_reserved' => '0.00', 'currency' => 'COP', 'is_frozen' => 0,
@@ -602,11 +602,12 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         $row = $values_already_match
             ? array_merge( $existing_row, [
                 'gross_amount' => '100000.00', 'commission_amount' => '10000.00',
+                'commission_rate' => '0.1000',
                 'vendor_amount' => '90000.00', 'tax_withholding' => '0.00', 'iva_amount' => '0.00',
             ] )
             : $existing_row;
 
-        return new class( $row, $wallet_row, $capture ) {
+        return new class( $row, $wallet_row, $capture, $commission_id ) {
             public string $prefix     = 'wp_';
             public string $last_error = '';
             public int    $insert_id  = 1;
@@ -615,12 +616,13 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             public function __construct(
                 private array $commission_row,
                 private array $wallet_row,
-                private object $capture
+                private object $capture,
+                private ?string $commission_id
             ) {}
 
             public function get_var( mixed $q = null ): mixed {
                 if ( is_string( $q ) && str_contains( $q, 'lt_commissions' ) ) {
-                    return '5'; // La fila de comisión YA existe (writer fiscal).
+                    return $this->commission_id; // '5' = fila existente; null = insert path.
                 }
                 return null;
             }
@@ -660,7 +662,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     /**
      * Setup común para tests de heal: stubs de WP + order válido (vendor 10, item 20, 100000).
      */
-    private function prepare_heal_scenario( array $existing_row, object $capture, bool $values_already_match = false ): \WC_Order {
+    private function prepare_heal_scenario( array $existing_row, object $capture, bool $values_already_match = false, ?string $commission_id = '5' ): \WC_Order {
         // El vendor se resuelve desde get_post_meta del PRODUCTO (no del order) —
         // product 20 → vendor 10. Sin esto group_items_by_vendor salta el item y
         // process() retorna temprano (ORDER_SPLIT_NO_VENDOR).
@@ -673,7 +675,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         Functions\when( '__' )->returnArg();
         Functions\when( 'wp_json_encode' )->alias( fn( $d, $f = 0 ) => json_encode( $d, $f ) );
 
-        $GLOBALS['wpdb'] = $this->make_heal_wpdb( $existing_row, $capture, $values_already_match );
+        $GLOBALS['wpdb'] = $this->make_heal_wpdb( $existing_row, $capture, $values_already_match, $commission_id );
 
         return $this->make_order( 10, 10, [ $this->make_item( product_id: 20, total: 100000.0 ) ] );
     }
@@ -683,12 +685,13 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
      * debe sanarse con los valores reales del split al pagar el pedido.
      */
     public function test_existing_commission_row_is_healed_with_real_split_values(): void {
-        // Fila "writer fiscal": gross correcto pero fee=0 y vendor=gross (sin comisión).
+        // Fila "writer fiscal": gross correcto pero fee=0, rate=0 y vendor=gross.
         $capture = $this->make_capture();
         $order = $this->prepare_heal_scenario(
             [
                 'id' => 5, 'order_id' => 10, 'vendor_id' => 10, 'product_id' => null,
                 'gross_amount' => '100000.00', 'commission_amount' => '0.00',
+                'commission_rate' => '0.0000',
                 'vendor_amount' => '100000.00', 'tax_withholding' => '4.25',
                 'iva_amount' => '28.31', 'currency' => 'COP', 'status' => 'pending',
             ],
@@ -711,6 +714,8 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         $data = $upds['data'];
 
         $this->assertEqualsWithDelta( 10000.0, (float) $data['commission_amount'], 0.001, 'La fee debe sanarse al 10% real (no al 0% del writer fiscal)' );
+        // COMMISSION-RATE-FIX: la tasa aplicada también debe persistirse.
+        $this->assertEqualsWithDelta( 0.10, (float) $data['commission_rate'], 0.0001, 'commission_rate debe quedar en la tasa aplicada (10%), no en 0' );
         $this->assertSame( 'paid', $data['status'] );
         $this->assertSame( 20, (int) $data['product_id'] );
         $this->assertSame( 'COP', $data['currency'] );
@@ -724,6 +729,30 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         $this->assertEqualsWithDelta( $gross - $fee - $wh, $net, 0.01, 'vendor_amount debe respetar gross−fee−withholding' );
         $this->assertEqualsWithDelta( 100000.0, $gross, 0.001 );
         $this->assertGreaterThan( 0.0, $fee );
+    }
+
+    /**
+     * COMMISSION-RATE-FIX: el insert propio del split (sin fila fiscal previa)
+     * debe persistir la tasa aplicada, no solo el monto.
+     */
+    public function test_record_commission_inserts_applied_commission_rate(): void {
+        $capture = $this->make_capture();
+        $order = $this->prepare_heal_scenario(
+            [ 'id' => 5 ],
+            $capture,
+            false,
+            null // sin fila existente → insert path de record_commission()
+        );
+
+        LTMS_Business_Order_Split::process( $order );
+
+        $this->assertArrayHasKey( 'wp_lt_commissions', $capture->inserts, 'Debe insertarse la comisión (no hay fila previa)' );
+        $this->assertCount( 1, $capture->inserts['wp_lt_commissions'] );
+        $data = $capture->inserts['wp_lt_commissions'][0];
+
+        $this->assertEqualsWithDelta( 10000.0, (float) $data['commission_amount'], 0.001, 'La fee insertada debe ser el 10% real' );
+        $this->assertEqualsWithDelta( 0.10, (float) $data['commission_rate'], 0.0001, 'commission_rate insertado debe ser la tasa aplicada (10%)' );
+        $this->assertSame( 'paid', $data['status'] );
     }
 
     /**
