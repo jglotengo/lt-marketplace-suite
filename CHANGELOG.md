@@ -6,6 +6,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-17
 
+### Fixed — `GUEST-CONSENT-FIX-2026-11-17` (P0 del QA del proceso de compra E2E, AUDIT-E2E-PAY-2026-11-17-QA-CHECKOUT)
+
+> QA del checkout + final del proceso de compra sobre producción (QA_REPORT §0.19).
+> 1 fix P0 + 2 tests nuevos; suite 5,414 tests / 12,162 assertions / 3 skipped, cero regresiones.
+>
+> - **GUEST-CONSENT-FIX (P0):** el template Plaza Viva `templates/checkout.php`
+>   reemplaza a `form-checkout.php` de WooCommerce pero no disparaba los hooks
+>   `woocommerce_checkout_before_order_review` / `woocommerce_checkout_after_order_review`.
+>   Consecuencia: `LTMS_Legal_Compliance::render_checkout_consent_field()` nunca
+>   renderizaba el checkbox `ltms_checkout_consent`, mientras su validador
+>   (`woocommerce_checkout_process`) sí corre — **todos los guests quedaban
+>   bloqueados** con "Debes aceptar la Política de Privacidad..." aunque marcaran
+>   el checkbox del template (`ltms_privacy_consent`). Reproducido en vivo por
+>   POST `wc-ajax=checkout` y verificado el inverso (con el campo, el flujo avanza
+>   hasta el guard de dispositivo de E2EFIX-03, cero llamadas API). Fix a nivel
+>   raíz: `do_action` de ambos hooks alrededor de `woocommerce_order_review()` en
+>   el template (sin tocar lógica de módulos). Restaura también el placeholder
+>   `ltms-customs-estimate`. Tests: 2 source-based en `AuditE2ePay20261117FixesTest`
+>   (template dispara ambos hooks en orden correcto; legal-compliance mantiene
+>   render+validate y el campo renderizado coincide con el leído).
+>
+> Abiertos documentados en §0.19 (decisiones del owner): gestión global de stock
+> desactivada (`woocommerce_manage_stock='no'`) con 1,803 productos en gestión por
+> producto (stock no decrementa; overselling silencioso); emails de orden WC
+> deshabilitados (el comprador no recibe confirmación); doble checkbox de
+> consentimiento redundante; incidente Openpay sandbox para cargos sigue activo
+> (bloquea el E2E con cargo real y la cancelación de 4 cargos huérfanos).
+
 ### Fixed — `E2EFIX-2026-11-17` (ciclo de fixes de la auditoría E2E de compra sandbox, AUDIT-E2E-PAY-2026-11-17)
 
 > Derivado de la compra E2E sandbox como auditor sobre producción (QA_REPORT §0.17).
