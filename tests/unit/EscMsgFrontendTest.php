@@ -13,7 +13,9 @@
  *
  * Alcance sub-ciclo FRONTEND (2 archivos, 2 instancias):
  *   - class-ltms-dashboard-logic.php          : 1 instancia P1 (L553)
- *   - class-ltms-frontend-checkout-handler.php : 1 instancia P2 (L647)
+ *   - class-ltms-frontend-checkout-handler.php : 1 instancia P2 (L647) —
+ *     eliminada con el endpoint legacy en CHECKOUT-LEGACY-REMOVAL-2026-11-18;
+ *     el archivo sigue en la matriz de regresión (marker en el header).
  *
  * Otros archivos frontend (frontend-checkout-mexico-handler.php,
  * frontend-payout-handler.php) ya tenían el sanitize correcto: getMessage

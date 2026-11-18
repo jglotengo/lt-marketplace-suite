@@ -31,10 +31,11 @@
  *     (firma real: 1 arg opcional) → 'País no soportado: mXXXX' en todo pago
  *     MX. Fix: factory + firmas reales (create_charge posicional, oxxo,
  *     spei_reference).
- *   PAY-08 (P1): idempotency key de Openpay regenerada por intento → doble
- *     cobro en retry. Fix: order_ref estable por orden.
- *   PAY-09 (P1): lock de checkout TOCTOU (get_transient + set_transient
- *     separados). Fix: primitiva atómica add_option con stale-takeover.
+ *   PAY-08/PAY-09 (P1): fixes del checkout legacy (order_ref estable + lock
+ *     atómico). El endpoint legacy fue eliminado en
+ *     CHECKOUT-LEGACY-REMOVAL-2026-11-18; el invariante de idempotencia por
+ *     orden del path vivo se cubre en LTMS_Api_Openpay::create_charge
+ *     (Idempotency-Key derivada del order ID).
  *   PAY-10 (P1): return_url 3DS de Stripe apuntaba al checkout. Fix:
  *     order-received URL.
  *   PAY-11 (P1): webhook Stripe respondía 200 tras error interno → evento
@@ -78,7 +79,6 @@ class AuditFunnelBuyerPaymentsFixesTest extends LTMS_Unit_Test_Case {
 	private const ADDI_WH_PATH     = __DIR__ . '/../../includes/api/webhooks/class-ltms-addi-webhook-handler.php';
 	private const STRIPE_WH_PATH   = __DIR__ . '/../../includes/api/webhooks/class-ltms-stripe-webhook-handler.php';
 	private const STRIPE_GW_PATH   = __DIR__ . '/../../includes/gateway/class-ltms-gateway-stripe.php';
-	private const CHECKOUT_H_PATH  = __DIR__ . '/../../includes/frontend/class-ltms-frontend-checkout-handler.php';
 	private const DASHBOARD_PATH   = __DIR__ . '/../../includes/frontend/class-ltms-dashboard-logic.php';
 	private const LISTENER_PATH    = __DIR__ . '/../../includes/business/listeners/class-ltms-order-paid-listener.php';
 
@@ -394,66 +394,16 @@ class AuditFunnelBuyerPaymentsFixesTest extends LTMS_Unit_Test_Case {
 	}
 
 	// ════════════════════════════════════════════════════════════════════
-	// F. Checkout handler (PAY-08, PAY-09) — conductual + source
+	// F. Idempotencia del path vivo (PAY-08) — el handler legacy se eliminó
 	// ════════════════════════════════════════════════════════════════════
 
-	public function test_checkout_lock_acquire_is_atomic_and_releases(): void {
-		// get_current_user_id está definido en el bootstrap ANTES de Patchwork —
-		// usar el global $GLOBALS['__ltms_current_uid'] en vez de re-stubear.
-		$GLOBALS['__ltms_current_uid'] = 7;
-
-		$handler = new \LTMS_Frontend_Checkout_Handler();
-
-		$ref  = new \ReflectionMethod( $handler, 'acquire_checkout_lock' );
-		$ref->setAccessible( true );
-
-		$prop = new \ReflectionProperty( $handler, 'checkout_lock_key' );
-		$prop->setAccessible( true );
-		$prop->setValue( $handler, 'ltms_checkout_lock_7' );
-
-		// Primera adquisición: INSERT atómico exitoso.
-		Functions\when( 'add_option' )->justReturn( true );
-		$this->assertTrue( $ref->invoke( $handler ) );
-
-		// Lock fresco existente (crash no): add_option false, get_option reciente → 409.
-		Functions\when( 'add_option' )->justReturn( false );
-		Functions\when( 'get_option' )->justReturn( (string) time() );
-		$this->assertFalse( $ref->invoke( $handler ) );
-
-		// Lock vencido (crash hace >60s): takeover exitoso.
-		Functions\when( 'get_option' )->justReturn( (string) ( time() - 61 ) );
-		Functions\when( 'delete_option' )->justReturn( true );
-		Functions\when( 'add_option' )->justReturn( true );
-		$this->assertTrue( $ref->invoke( $handler ) );
-
-		// Release: limpia la option del lock (+transient legado).
-		Functions\when( 'delete_option' )->justReturn( true );
-		Functions\when( 'delete_transient' )->justReturn( true );
-		$handler->release_checkout_lock();
-		$this->assertTrue( true );
-
-		unset( $GLOBALS['__ltms_current_uid'] );
-	}
-
-	public function test_checkout_lock_uses_atomic_primitive(): void {
-		$this->assertFileExists( self::CHECKOUT_H_PATH );
-		$source = file_get_contents( self::CHECKOUT_H_PATH );
-
-		$this->assertStringContainsString( 'AUDIT-FUNNEL-PAY-09', $source );
-		$this->assertStringContainsString( 'function acquire_checkout_lock', $source );
-		// El TOCTOU viejo ya no debe existir:
-		$this->assertStringNotContainsString(
-			'if ( get_transient( $this->checkout_lock_key ) )',
-			$source
-		);
-	}
-
-	public function test_checkout_order_ref_is_stable_per_order(): void {
-		$this->assertFileExists( self::CHECKOUT_H_PATH );
-		$source = file_get_contents( self::CHECKOUT_H_PATH );
-
-		$this->assertStringContainsString( 'AUDIT-FUNNEL-PAY-08', $source );
-		$this->assertStringContainsString( "\$order_ref   = 'LTMS-' . \$order->get_id();", $source );
+	public function test_live_charge_idempotency_key_is_stable_per_order(): void {
+		// CHECKOUT-LEGACY-REMOVAL-2026-11-18: el order_ref del handler se fue
+		// con el endpoint. El path vivo (gateway WC → LTMS_Api_Openpay) usa
+		// una Idempotency-Key derivada del ID de orden, estable entre retries.
+		$source = file_get_contents( self::OPENPAY_API_PATH );
+		$this->assertStringContainsString( 'INTEGRATIONS-AUDIT P0 FIX', $source );
+		$this->assertStringContainsString( "'Idempotency-Key' => 'ltms_charge_' . \$order_id_safe", $source );
 	}
 
 	// ════════════════════════════════════════════════════════════════════
@@ -658,20 +608,6 @@ class AuditFunnelBuyerPaymentsFixesTest extends LTMS_Unit_Test_Case {
 			$source,
 			'PAY-13: el cache de bancos PSE debe variar por entorno (antes servía 6h la lista del entorno anterior).'
 		);
-	}
-
-	public function test_oxxo_charge_uses_mx_country(): void {
-		// PAY-13 (hallazgo de re-auditoría): process_oxxo_payment instanciaba el
-		// cliente sin país → usaba el país global del sitio (CO) para un método
-		// que solo existe en MX.
-		$source = file_get_contents( self::CHECKOUT_H_PATH );
-		$this->assertStringContainsString( "new LTMS_Api_Openpay( 'MX' )", $source );
-	}
-
-	public function test_pse_charge_uses_pse_gateway_environment(): void {
-		$source = file_get_contents( self::CHECKOUT_H_PATH );
-		$this->assertStringContainsString( 'woocommerce_ltms_pse_settings', $source );
-		$this->assertStringContainsString( 'AUDIT-FUNNEL-PAY-13', $source );
 	}
 
 	public function test_addi_client_environment_single_truth(): void {

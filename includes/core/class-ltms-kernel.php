@@ -1087,8 +1087,10 @@ final class LTMS_Core_Kernel {
             new LTMS_Products_Ajax();
         }
 
-        // M-14 FIX: handler de checkout AJAX (ltms_process_checkout + ltms_get_pse_banks)
-        // El JS ltms-checkout.js llamaba estas acciones pero no existía ningún handler PHP.
+        // M-14 FIX: handler de checkout AJAX (ltms_get_pse_banks y demás endpoints
+        // del checkout). CHECKOUT-LEGACY-REMOVAL-2026-11-18: el endpoint legacy
+        // ltms_process_checkout (y su JS) fue eliminado; el pago vivo usa el
+        // gateway WC ltms_openpay.
         if ( class_exists( 'LTMS_Frontend_Checkout_Handler' ) ) {
             LTMS_Frontend_Checkout_Handler::init();
         }

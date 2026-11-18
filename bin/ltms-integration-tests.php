@@ -526,7 +526,7 @@ foreach ( $rest_routes as $route ) {
 ltms_group( '11 — AJAX hooks: todos los handlers registrados' );
 
 $ajax_actions = [
-    'ltms_process_checkout', 'ltms_get_pse_banks',
+    'ltms_get_pse_banks',
     'ltms_get_dashboard_data', 'ltms_get_orders_data', 'ltms_get_analytics_data',
     'ltms_get_products_data', 'ltms_create_product', 'ltms_update_product',
     'ltms_get_wallet_data', 'ltms_request_payout',

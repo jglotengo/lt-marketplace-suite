@@ -21,10 +21,6 @@
  * FIX #3  — LTMS_XCover_Checkout_Handler::add_insurance_fee() respeta la
  *           deselección activa del cliente sin recurrir a la sesión.
  *
- * FIX #13 — LTMS_Frontend_Checkout_Handler::recover_orphaned_checkout() no
- *           destruye un carrito nuevo del cliente mientras restaura el
- *           snapshot de un pedido fallido previo.
- *
  * FIX #2  — LTMS_Openpay_Webhook_Handler::find_order_by_txn() busca las
  *           meta keys reales escritas por el checkout handler (PSE, Nequi,
  *           Daviplata, OXXO, SPEI) en vez de solo `_openpay_transaction_id`.
@@ -81,12 +77,6 @@ class CheckoutAuditFixTest extends LTMS_Unit_Test_Case {
     private function load_xcover_class(): void {
         if ( ! class_exists( 'LTMS_XCover_Checkout_Handler', false ) ) {
             require_once $this->plugin_includes_path( 'business/class-ltms-xcover-checkout-handler.php' );
-        }
-    }
-
-    private function load_checkout_handler_class(): void {
-        if ( ! class_exists( 'LTMS_Frontend_Checkout_Handler', false ) ) {
-            require_once $this->plugin_includes_path( 'frontend/class-ltms-frontend-checkout-handler.php' );
         }
     }
 
@@ -214,41 +204,6 @@ class CheckoutAuditFixTest extends LTMS_Unit_Test_Case {
         // simplemente confirmamos que LTMS_Core_Config::get_country() retorna 'CO'.
         $this->assertSame( 'CO', \LTMS_Core_Config::get_country(),
             'Fixture: el país de test debe ser CO para validar el guard.' );
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // FIX #13 — recover_orphaned_checkout no debe destruir carrito nuevo
-    // ─────────────────────────────────────────────────────────────────────────
-
-    public function test_fix13_recover_orphaned_checkout_method_signature_unchanged(): void {
-        $this->load_checkout_handler_class();
-        if ( ! class_exists( 'LTMS_Frontend_Checkout_Handler' ) ) {
-            $this->markTestSkipped( 'Clase checkout handler no disponible.' );
-        }
-
-        // Validamos que el método estático existe y mantiene el contrato:
-        // (int $order_id) : bool. La lógica interna de no-borrar-carrito-nuevo
-        // requiere WC()->cart y session — se cubre en tests de integración.
-        $reflection = new ReflectionClass( 'LTMS_Frontend_Checkout_Handler' );
-        $this->assertTrue( $reflection->hasMethod( 'recover_orphaned_checkout' ) );
-        $method = $reflection->getMethod( 'recover_orphaned_checkout' );
-        $params = $method->getParameters();
-        $this->assertCount( 1, $params );
-        $this->assertSame( 'order_id', $params[0]->getName() );
-        $this->assertSame( 'int', (string) $params[0]->getType() );
-        $this->assertSame( 'bool', (string) $method->getReturnType() );
-    }
-
-    public function test_fix13_recover_returns_false_for_invalid_order_id(): void {
-        $this->load_checkout_handler_class();
-        if ( ! class_exists( 'LTMS_Frontend_Checkout_Handler' ) ) {
-            $this->markTestSkipped( 'Clase checkout handler no disponible.' );
-        }
-
-        // SKU del fix: order_id=0 debe retornar false inmediatamente sin
-        // tocar WC()->cart, evitando efectos secundarios.
-        $result = \LTMS_Frontend_Checkout_Handler::recover_orphaned_checkout( 0 );
-        $this->assertFalse( $result, 'recover_orphaned_checkout(0) debe retornar false sin tocar el carrito.' );
     }
 
     // ─────────────────────────────────────────────────────────────────────────

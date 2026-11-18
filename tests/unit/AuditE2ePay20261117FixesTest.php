@@ -125,13 +125,19 @@ class AuditE2ePay20261117FixesTest extends LTMS_Unit_Test_Case {
 		);
 	}
 
-	public function test_orphaned_handler_is_documented_for_future_cleanup(): void {
-		// El handler PHP queda vivo (endpoint sin consumidor) pero documentado —
-		// la eliminación del registro/método es ciclo posterior tras analytics.
+	public function test_orphaned_endpoint_removed_in_cleanup_cycle(): void {
+		// CHECKOUT-LEGACY-REMOVAL-2026-11-18: owner confirmó que nadie consume
+		// el endpoint legacy; único consumer era ltms-checkout.js (eliminado en
+		// E2EFIX-04). Se eliminan registro admin-ajax, método y maquinaria.
 		$source = file_get_contents( self::CHECKOUT_HANDLER_PATH );
-		$this->assertStringContainsString( 'E2EFIX-04', $source, 'El handler huérfano debe documentar la eliminación pendiente' );
-		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_process_checkout'", $source, 'El registro del endpoint debe seguir vivo hasta el ciclo de limpieza' );
-		$this->assertStringContainsString( "add_action( 'wp_ajax_nopriv_ltms_process_checkout'", $source, 'El registro nopriv debe seguir vivo hasta el ciclo de limpieza' );
+		$this->assertStringContainsString( 'CHECKOUT-LEGACY-REMOVAL-2026-11-18', $source, 'El handler debe documentar la eliminación del endpoint legacy' );
+		$this->assertStringNotContainsString( "add_action( 'wp_ajax_ltms_process_checkout'", $source, 'El registro admin-ajax del endpoint legacy no debe existir' );
+		$this->assertStringNotContainsString( "add_action( 'wp_ajax_nopriv_ltms_process_checkout'", $source, 'El registro nopriv del endpoint legacy no debe existir' );
+		$this->assertStringNotContainsString( 'function ajax_process_checkout', $source, 'El método ajax_process_checkout no debe existir' );
+
+		// Endpoints vivos intactos.
+		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_get_pse_banks'", $source, 'ltms_get_pse_banks debe seguir registrado' );
+		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_get_cart'", $source, 'ltms_get_cart (cart drawer) debe seguir registrado' );
 	}
 
 	// ════════════════════════════════════════════════════════════════════
