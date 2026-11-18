@@ -6,6 +6,37 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-17
 
+### Fixed — `COMMISSION-RATE-FIX-2026-11-18` (P3 del fixture webhook E2E, AUDIT-E2E-PAY-2026-11-17)
+
+> Hallazgo P3 detectado en el fixture webhook (§0.19): `lt_commissions.commission_rate`
+> quedaba en `0.0000` aunque `commission_amount` fuera correcta. Fix + backfill histórico
+> + cambio de destinatarios de email admin; verificado en vivo con dos órdenes fixture.
+> Suite 5,415 tests / 12,171 assertions / 3 skipped, cero regresiones.
+>
+> - **Causa doble:** el writer fiscal inserta `commission_rate => 0.0` al checkout y
+>   `record_commission()` del split tampoco escribía la tasa (default `0.0000`); el heal
+>   de E2EFIX-02 solo saneaba columnas de dinero. Consumidor: export de privacidad
+>   (`LTMS_Privacy_Toolkit`, mostraba "Tasa 0") — sin impacto en montos/payouts.
+> - **Fix (commit `0b3a88d6`, módulo crítico con revisión de segunda pasada):**
+>   `class-ltms-order-split.php`: `$vendor_results[$vendor_id]` lleva `platform_rate`
+>   (tasa aplicada de la cascada `LTMS_Commission_Strategy`, post-validación/fallback);
+>   `record_commission()` nuevo param `float $commission_rate` (clamp 0..1) y la inserta;
+>   `heal_commission_row()` la incluye en SELECT, comparación de idempotencia (tol.
+>   0.0001) y UPDATE — las filas saneadas antes del fix (montos OK, rate 0) se corrigen
+>   en la siguiente pasada. Tests: +1 `test_record_commission_inserts_applied_commission_rate`
+>   (insert path persiste 10%) y assertion de `commission_rate=0.10` en el heal test.
+> - **Verificado en prod:** fixture 22200 (insert path) → comisión #23 rate `0.1200`;
+>   fixture 22201 (heal path sobre fila writer rate=0) → #24 `0.0000→0.1200`; backfill
+>   SQL histórico (`ROUND(fee/gross,4)` solo donde rate=0, fee>0, fee<=gross): #20
+>   `→0.1200` (1 fila). Higiene: eliminadas comisiones huérfanas #18/#19/#21 (órdenes
+>   de guard ya borradas) y saneada #17 con los valores reales — quedan solo #17/#20,
+>   ambas `paid` y consistentes. Fixture eliminado (órdenes, comisiones, wallet
+>   tx/journal/holds; stock 18 restaurado). Sin dinero real.
+> - **Emails admin → `jgmontes@lo-tengo.com.co`:** `woocommerce_email_recipient_new_order`,
+>   `_cancelled_order`, `_failed_order` y `woocommerce_stock_email_recipient` (antes
+>   `contactenos@lo-tengo.shop`). Verificado: `wp_mail` a jgmontes = `true` y los 4
+>   emails del fixture llegaron a ese buzón. `admin_email` WP no se tocó.
+
 ### Fixed — `GUEST-CONSENT-FIX-2026-11-17` (P0 del QA del proceso de compra E2E, AUDIT-E2E-PAY-2026-11-17-QA-CHECKOUT)
 
 > QA del checkout + final del proceso de compra sobre producción (QA_REPORT §0.19).
