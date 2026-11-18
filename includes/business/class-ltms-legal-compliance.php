@@ -48,9 +48,10 @@ class LTMS_Legal_Compliance {
         }
         self::$initialized = true;
 
-        // L-3: Consentimiento en checkout WooCommerce
-        add_action( 'woocommerce_checkout_process',          [ __CLASS__, 'validate_checkout_consent' ] );
-        add_action( 'woocommerce_checkout_after_order_review', [ __CLASS__, 'render_checkout_consent_field' ] );
+        // L-3: Consentimiento en checkout WooCommerce (consolidado 2026-11-18).
+        // GUEST-CONSENT-FIX-2026-11-18: el checkbox único y su validación viven en
+        // LTMS_Frontend_Checkout_Handler (campo ltms_privacy_consent). Aquí solo
+        // queda el registro del rastro legal del pedido.
         add_action( 'woocommerce_checkout_order_created',    [ __CLASS__, 'save_checkout_consent' ], 10, 1 );
 
         // L-4: Cookies SameSite seguras
@@ -269,78 +270,15 @@ class LTMS_Legal_Compliance {
     }
 
     // ── L-3: Checkout Consent ────────────────────────────────────────────────────
-
-    /**
-     * Renderiza el campo de aceptación de política en el checkout de WooCommerce.
-     * Se añade al final del formulario de checkout.
-     *
-     * LC-1 FIX (AUDIT-BATCH2): El campo era `'required' => false` "para no generar
-     * fricción", pero esto permitía a cualquier usuario (incluido guest checkout)
-     * completar la compra sin aceptar T&C/Privacy — violando Ley 1581/2012 art. 9
-     * (consentimiento libre, previo, expreso e informado) y RGPD art. 6.
-     *
-     * Ahora el campo se marca `required` solo cuando el usuario NO tiene un
-     * consentimiento vigente registrado (guest o usuario con versión desactualizada).
-     * Usuarios logueados con ltms_terms_version == TERMS_VERSION no lo ven como
-     * obligatorio (ya consintieron al registrarse).
-     */
-    public static function render_checkout_consent_field(): void {
-        if ( ! function_exists( 'woocommerce_form_field' ) ) {
-            return;
-        }
-
-        $current_user_id = get_current_user_id();
-        $needs_consent   = true;
-        if ( $current_user_id > 0 && ! self::user_needs_reconsent( $current_user_id, 'terms' )
-             && ! self::user_needs_reconsent( $current_user_id, 'privacy' ) ) {
-            // Usuario logueado con consentimiento vigente — no exigir re-aceptar.
-            $needs_consent = false;
-        }
-
-        echo '<div class="ltms-checkout-consent" style="margin:12px 0;">';
-        woocommerce_form_field( 'ltms_checkout_consent', [
-            'type'     => 'checkbox',
-            'class'    => [ 'ltms-consent-field form-row-wide' ],
-            'label'    => sprintf(
-                /* translators: 1: URL política privacidad, 2: URL términos */
-                __( 'He leído y acepto la <a href="%1$s" target="_blank">Política de Privacidad</a> y los <a href="%2$s" target="_blank">Términos y Condiciones</a> de Lo Tengo Colombia (Ley 1581/2012).', 'ltms' ),
-                esc_url( home_url( '/privacidad' ) ),
-                esc_url( home_url( '/terminos' ) )
-            ),
-            'required' => $needs_consent, // LC-1: obligatorio para guests / usuarios sin consentimiento vigente.
-        ], 0 );
-        echo '</div>';
-    }
-
-    /**
-     * Valida el consentimiento en el proceso de checkout.
-     *
-     * LC-1 FIX (AUDIT-BATCH2): Antes era un stub vacío. Ahora: si el usuario
-     * actual no tiene consentimiento vigente (guest o versión desactualizada)
-     * Y NO marcó el checkbox, se agrega un error de validación que BLOQUEA el
-     * checkout — exigencia de Ley 1581/2012 art. 9 y RGPD art. 6.
-     */
-    public static function validate_checkout_consent(): void {
-        $current_user_id = get_current_user_id();
-        $needs_consent   = true;
-        if ( $current_user_id > 0 && ! self::user_needs_reconsent( $current_user_id, 'terms' )
-             && ! self::user_needs_reconsent( $current_user_id, 'privacy' ) ) {
-            $needs_consent = false;
-        }
-
-        if ( ! $needs_consent ) {
-            return; // Usuario con consentimiento vigente — no bloquear.
-        }
-
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing
-        $accepted = ! empty( $_POST['ltms_checkout_consent'] );
-        if ( ! $accepted ) {
-            wc_add_notice(
-                __( 'Debes aceptar la Política de Privacidad y los Términos y Condiciones para completar tu compra (Ley 1581/2012).', 'ltms' ),
-                'error'
-            );
-        }
-    }
+    //
+    // GUEST-CONSENT-FIX-2026-11-18 (consolidación): el checkbox único de
+    // consentimiento es `ltms_privacy_consent`, renderizado y validado por
+    // LTMS_Frontend_Checkout_Handler::add_privacy_consent_field() /
+    // validate_privacy_consent() (visible en cualquier template de checkout).
+    // El render duplicado (`ltms_checkout_consent`) y su validador se eliminaron:
+    // el template Plaza Viva no los mostraba y el validador bloqueaba a TODOS los
+    // guests. Aquí queda solo el registro del rastro legal, que acepta el campo
+    // único consolidado desde save_checkout_consent().
 
     /**
      * Guarda el consentimiento de checkout en la base de datos.
@@ -355,7 +293,10 @@ class LTMS_Legal_Compliance {
      * @param \WC_Order $order
      */
     public static function save_checkout_consent( \WC_Order $order ): void {
-        $accepted  = ! empty( $_POST['ltms_checkout_consent'] ); // phpcs:ignore
+        // GUEST-CONSENT-FIX-2026-11-18: campo único consolidado — el rastro legal
+        // se registra desde el checkbox del template (ltms_privacy_consent) o,
+        // por compatibilidad, desde el campo legado ltms_checkout_consent.
+        $accepted  = ! empty( $_POST['ltms_checkout_consent'] ) || ! empty( $_POST['ltms_privacy_consent'] ); // phpcs:ignore
         $user_id   = $order->get_customer_id();
         $order_id  = $order->get_id();
         $ip        = self::get_client_ip();

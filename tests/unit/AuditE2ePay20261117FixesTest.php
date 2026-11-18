@@ -136,8 +136,9 @@ class AuditE2ePay20261117FixesTest extends LTMS_Unit_Test_Case {
 
 	// ════════════════════════════════════════════════════════════════════
 	// GUEST-CONSENT-FIX (P0): el template checkout debe disparar los hooks
-	// form-checkout wrappers o los guests quedan bloqueados por el
-	// validador ltms_checkout_consent cuyo campo nunca se renderiza.
+	// form-checkout wrappers (paridad con form-checkout.php de WooCommerce).
+	// Tras la consolidación 2026-11-18, el checkbox único es
+	// ltms_privacy_consent (handler), visible en cualquier template.
 	// ════════════════════════════════════════════════════════════════════
 
 	public function test_checkout_template_fires_before_and_after_order_review_hooks(): void {
@@ -152,7 +153,7 @@ class AuditE2ePay20261117FixesTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString(
 			"do_action( 'woocommerce_checkout_after_order_review' )",
 			$source,
-			'El template debe disparar woocommerce_checkout_after_order_review (render_checkout_consent_field)'
+			'El template debe disparar woocommerce_checkout_after_order_review (paridad con form-checkout.php)'
 		);
 
 		// El hook after_order_review debe envolver la llamada del order review
@@ -169,23 +170,27 @@ class AuditE2ePay20261117FixesTest extends LTMS_Unit_Test_Case {
 		$this->assertLessThan( $after_pos, $review_pos, 'after_order_review debe ir después del order review' );
 	}
 
-	public function test_legal_compliance_consent_field_still_hooked_and_validated(): void {
+	public function test_legal_compliance_consent_consolidated_into_single_field(): void {
 		$source = file_get_contents( self::LEGAL_COMPLIANCE_PATH );
 
-		// El render sigue enganchado al hook que el template ahora dispara.
+		// GUEST-CONSENT-FIX-2026-11-18: checkbox único — legal ya no renderiza
+		// ni valida un segundo campo (el duplicado ltms_checkout_consent fue
+		// eliminado junto con su hook); el rastro legal se guarda desde el mismo
+		// checkbox del template (ltms_privacy_consent).
+		$this->assertStringNotContainsString( 'render_checkout_consent_field', $source );
+		$this->assertStringNotContainsString( 'validate_checkout_consent', $source );
 		$this->assertStringContainsString(
-			"add_action( 'woocommerce_checkout_after_order_review', [ __CLASS__, 'render_checkout_consent_field' ] )",
+			"add_action( 'woocommerce_checkout_order_created',    [ __CLASS__, 'save_checkout_consent' ], 10, 1 )",
 			$source,
-			'El checkbox ltms_checkout_consent debe seguir enganchado a after_order_review'
+			'El registro del rastro legal debe seguir enganchado a checkout_order_created'
 		);
-		// El validador que bloquea guests debe seguir vivo en checkout_process.
-		$this->assertStringContainsString(
-			"add_action( 'woocommerce_checkout_process',          [ __CLASS__, 'validate_checkout_consent' ] )",
-			$source,
-			'El validador de consentimiento debe seguir enganchado a checkout_process'
-		);
-		// El campo que renderiza es el mismo que el validador lee.
-		$this->assertStringContainsString( "woocommerce_form_field( 'ltms_checkout_consent'", $source );
+		// El save acepta el campo único (privacy) y el legado.
 		$this->assertStringContainsString( "\$_POST['ltms_checkout_consent']", $source );
+		$this->assertStringContainsString( "\$_POST['ltms_privacy_consent']", $source );
+
+		// El único checkbox lo renderiza y valida el handler.
+		$handler = file_get_contents( self::CHECKOUT_HANDLER_PATH );
+		$this->assertStringContainsString( 'name="ltms_privacy_consent"', $handler );
+		$this->assertStringContainsString( "\$_POST['ltms_privacy_consent']", $handler );
 	}
 }

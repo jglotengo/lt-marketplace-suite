@@ -607,13 +607,13 @@ get_header( 'shop' );
                              * woocommerce_checkout_after_order_review que rodean el order
                              * review en form-checkout.php nativo. Este template los había
                              * dejado de disparar, así que todo módulo enganchado a ellos
-                             * quedaba mudo — en particular LTMS_Legal_Compliance::
-                             * render_checkout_consent_field() (checkbox ltms_checkout_consent,
-                             * validado en woocommerce_checkout_process), cuyo campo NUNCA se
-                             * renderizaba y bloqueaba el checkout de TODOS los guests con
-                             * "Debes aceptar la Política de Privacidad..." pese a marcar el
-                             * checkbox del template. También restaura el placeholder
-                             * ltms-customs-estimate (render_customs_estimate).
+                             * quedaba mudo — en particular el placeholder
+                             * ltms-customs-estimate (render_customs_estimate) y los campos
+                             * de operador turístico. Tras la consolidación 2026-11-18, el
+                             * consentimiento de checkout es el checkbox único
+                             * ltms_privacy_consent renderizado en este template y validado
+                             * por LTMS_Frontend_Checkout_Handler (ya no existe el segundo
+                             * checkbox ltms_checkout_consent).
                              */
                             do_action( 'woocommerce_checkout_before_order_review' );
                             woocommerce_order_review();
