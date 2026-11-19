@@ -105,6 +105,15 @@ class LTMS_Openpay_Webhook_Handler {
             return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
         }
 
+        // OPENPAY-WEBHOOK-EMPTY-PING FIX (2026-11-19): la validación de URL
+        // al dar de alta un webhook por API envía un JSON vacío ({}) y exige
+        // HTTP 200 antes de crear el registro. Sin este ACK el alta falla con
+        // 412/6002 "Expected 200 response ... but was 401". No hay evento ni
+        // transacción que procesar, así que solo se confirma la recepción.
+        if ( empty( $body ) ) {
+            return new WP_REST_Response( [ 'ok' => true ], 200 );
+        }
+
         // AUDIT-FUNNEL-PAY-23 FIX (P0, re-auditoría del ciclo): antes se usaba
         // sanitize_key() sobre el tipo de evento — pero sanitize_key ELIMINA los
         // PUNTOS ('charge.succeeded' → 'chargesucceeded', 'payout.failed' →

@@ -99,6 +99,30 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 
 	// ── 2. Fail-closed sigue intacto para transacciones ──────────────────────
 
+	public function test_empty_validation_ping_is_acknowledged_without_side_effects(): void {
+		$captured = null;
+		Functions\when( 'update_option' )->alias(
+			static function ( $key, $value, $autoload = null ) use ( &$captured ): bool {
+				$captured = [ $key, $value ];
+				return true;
+			}
+		);
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( '{}' ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [ 'ok' => true ], $response->get_data() );
+		$this->assertNull( $captured, 'El ping de validación no debe persistir nada.' );
+	}
+
+	public function test_non_empty_unknown_event_without_signature_is_rejected(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( '{"foo":"bar"}' ) );
+
+		$this->assertSame( 401, $response->get_status() );
+	}
+
 	public function test_unsigned_transaction_event_is_still_rejected(): void {
 		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
 
