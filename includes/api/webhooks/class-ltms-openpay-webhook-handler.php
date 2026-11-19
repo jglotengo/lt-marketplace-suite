@@ -1,8 +1,19 @@
 <?php
 class LTMS_Openpay_Webhook_Handler {
 
+    /**
+     * Opción donde se persiste el último verification_code enviado por Openpay.
+     */
+    private const VERIFICATION_OPTION = 'ltms_openpay_webhook_verification';
+
+    /**
+     * Vigencia del código de verificación mostrado al admin (24 h).
+     */
+    private const VERIFICATION_TTL = 86400;
+
     public static function init(): void {
         add_action( 'rest_api_init', [ __CLASS__, 'register_route' ] );
+        add_action( 'admin_notices', [ __CLASS__, 'maybe_render_verification_notice' ] );
     }
 
     /**
@@ -25,6 +36,52 @@ class LTMS_Openpay_Webhook_Handler {
     }
 
     /**
+     * Muestra el último verification_code recibido de Openpay a los admins
+     * de WooCommerce. La doc oficial (protocolo de 2 pasos) envía
+     * {"type":"verification","verification_code":"..."} al guardar la URL del
+     * webhook; ese código debe ingresarse en el dashboard de Openpay para
+     * confirmar el endpoint. Sin UI quedaría enterrado en el audit log.
+     *
+     * @return void
+     */
+    public static function maybe_render_verification_notice(): void {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            return;
+        }
+
+        $pending = self::get_pending_verification_code();
+        if ( empty( $pending['code'] ) ) {
+            return;
+        }
+
+        printf(
+            '<div class="notice notice-info"><p><strong>%s</strong> <code>%s</code> %s</p></div>',
+            esc_html__( 'Openpay — código de verificación del webhook:', 'ltms' ),
+            esc_html( (string) $pending['code'] ),
+            esc_html__( 'Ingrésalo en el dashboard de Openpay para confirmar el endpoint (válido 24 h).', 'ltms' )
+        );
+    }
+
+    /**
+     * Devuelve el código de verificación vigente (≤ 24 h), si existe.
+     *
+     * @return array{code?:string,received_at?:int,ip?:string}
+     */
+    public static function get_pending_verification_code(): array {
+        $pending = get_option( self::VERIFICATION_OPTION, [] );
+        if ( ! is_array( $pending ) || empty( $pending['code'] ) ) {
+            return [];
+        }
+
+        $received_at = (int) ( $pending['received_at'] ?? 0 );
+        if ( $received_at <= 0 || ( time() - $received_at ) > self::VERIFICATION_TTL ) {
+            return [];
+        }
+
+        return $pending;
+    }
+
+    /**
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
@@ -38,8 +95,44 @@ class LTMS_Openpay_Webhook_Handler {
         }
         set_transient( $rate_key, $count + 1, MINUTE_IN_SECONDS );
 
-        // M-104: Verificar firma HMAC-SHA256 del payload con la clave privada de Openpay
-        // Openpay envía el header X-Openpay-Signature: sha256=<hmac>
+        $body = $request->get_json_params();
+        if ( ! is_array( $body ) ) {
+            return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
+        }
+
+        // AUDIT-FUNNEL-PAY-23 FIX (P0, re-auditoría del ciclo): antes se usaba
+        // sanitize_key() sobre el tipo de evento — pero sanitize_key ELIMINA los
+        // PUNTOS ('charge.succeeded' → 'chargesucceeded', 'payout.failed' →
+        // 'payoutfailed') → el switch de eventos y el str_starts_with('payout.')
+        // NUNCA matcheaban → TODO el dispatch del webhook Openpay estaba muerto:
+        // ni charge.succeeded (confirmación PSE/Nequi/Daviplata/OXXO/SPEI),
+        // ni refund.succeeded, ni payout.* se procesaban. Los eventos de Openpay
+        // usan PUNTOS (a diferencia de Alegra con guiones o ZapSign con
+        // underscores, donde sanitize_key sí funciona). lowercase+sanitize_text
+        // preserva el formato real del evento.
+        $event_type = strtolower( sanitize_text_field( (string) ( $body['type'] ?? '' ) ) );
+
+        // OPENPAY-WEBHOOK-VERIFICATION FIX (alineación con docs oficiales):
+        // el protocolo de verificación de Openpay envía
+        // {"type":"verification","verification_code":"..."} SIN transaction y
+        // SIN firma. Antes el guard "empty($transaction) → 400" y el HMAC
+        // obligatorio lo rechazaban, así que el endpoint no podía registrarse
+        // ni re-verificarse desde el dashboard. Este branch solo persiste el
+        // código (visible para manage_woocommerce ≤ 24 h) — no toca órdenes ni
+        // dinero, por eso puede ir antes de la validación de firma.
+        if ( 'verification' === $event_type ) {
+            return self::handle_verification( $body );
+        }
+
+        // M-104: Verificar firma HMAC-SHA256 del payload con la clave privada.
+        //
+        // OPENPAY-DOCS-ALIGN (2026-11-19): la doc oficial de webhooks NO
+        // documenta el header X-Openpay-Signature ni ningún HMAC — solo el
+        // verification_code y HTTP Basic opcional. Se mantiene fail-closed
+        // (401 sin firma) hasta que soporte de Openpay confirme si firma las
+        // notificaciones; pregunta abierta en el ticket 2026-11-19. Si se
+        // confirma que no firma, la alternativa es re-consultar el cargo vía
+        // GET /charges con la private key y validar contra la orden.
         //
         // WH1 FIX (v2.8.9) CRÍTICO: si private_key está vacío, RECHAZAR el webhook
         // (fail-closed). Antes, si no había key configurada, se omitía la validación
@@ -86,19 +179,6 @@ class LTMS_Openpay_Webhook_Handler {
             return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
         }
 
-        $body = $request->get_json_params();
-
-        // AUDIT-FUNNEL-PAY-23 FIX (P0, re-auditoría del ciclo): antes se usaba
-        // sanitize_key() sobre el tipo de evento — pero sanitize_key ELIMINA los
-        // PUNTOS ('charge.succeeded' → 'chargesucceeded', 'payout.failed' →
-        // 'payoutfailed') → el switch de eventos y el str_starts_with('payout.')
-        // NUNCA matcheaban → TODO el dispatch del webhook Openpay estaba muerto:
-        // ni charge.succeeded (confirmación PSE/Nequi/Daviplata/OXXO/SPEI),
-        // ni refund.succeeded, ni payout.* se procesaban. Los eventos de Openpay
-        // usan PUNTOS (a diferencia de Alegra con guiones o ZapSign con
-        // underscores, donde sanitize_key sí funciona). lowercase+sanitize_text
-        // preserva el formato real del evento.
-        $event_type  = strtolower( sanitize_text_field( (string) ( $body['type'] ?? '' ) ) );
         $transaction = $body['transaction'] ?? [];
 
         if ( empty( $event_type ) || empty( $transaction ) ) {
@@ -169,7 +249,11 @@ class LTMS_Openpay_Webhook_Handler {
             case 'charge.failed':
                 $order->update_status( 'failed', __( 'Pago Openpay fallido vía webhook.', 'ltms' ) );
                 break;
+            // OPENPAY-WEBHOOK-EVENTS FIX: la doc oficial lista 'charge.refunded'
+            // como el evento de reembolso; 'refund.succeeded' se conserva como
+            // alias legacy para no perder webhooks ya configurados.
             case 'refund.succeeded':
+            case 'charge.refunded':
                 // CICLO24-P1-AD-GAP-001 FIX: validar monto del refund antes de marcar el
                 // pedido como 'refunded'. Antes, este case hacia update_status('refunded')
                 // incondicionalmente — si un admin o API externa procesaba un refund
@@ -245,6 +329,43 @@ class LTMS_Openpay_Webhook_Handler {
         }
 
         return new WP_REST_Response( [ 'received' => true ], 200 );
+    }
+
+    /**
+     * Handshake de verificación de webhook (protocolo de 2 pasos de Openpay).
+     *
+     * Payload documentado: {"type":"verification","verification_code":"..."}.
+     * Se responde 200 y se persiste el código para que un admin lo copie al
+     * dashboard de Openpay. No hay transacción ni efecto financiero aquí.
+     *
+     * @param array $body Payload ya decodificado.
+     * @return WP_REST_Response
+     */
+    private static function handle_verification( array $body ): WP_REST_Response {
+        $code = substr( sanitize_text_field( (string) ( $body['verification_code'] ?? '' ) ), 0, 128 );
+        if ( '' === $code ) {
+            return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
+        }
+
+        update_option(
+            self::VERIFICATION_OPTION,
+            [
+                'code'        => $code,
+                'received_at' => time(),
+                'ip'          => self::client_ip(),
+            ],
+            false
+        );
+
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::info(
+                'OPENPAY_WEBHOOK_VERIFICATION',
+                'Código de verificación de webhook Openpay recibido. Válido 24 h para confirmar el endpoint en el dashboard.',
+                [ 'code' => $code ]
+            );
+        }
+
+        return new WP_REST_Response( [ 'ok' => true ], 200 );
     }
 
     /**

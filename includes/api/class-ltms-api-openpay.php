@@ -9,7 +9,7 @@
  * @package    LTMS
  * @subpackage LTMS/includes/api
  * @version    1.5.0
- * @see        https://www.openpay.mx/docs/api/
+ * @see        https://documents.openpay.co/api/
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -226,8 +226,10 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             $payload['device_session_id'] = sanitize_text_field( $device_id );
         }
 
-        // INTEGRATIONS-AUDIT P0 FIX: Idempotency-Key on charge to prevent
-        // duplicate charges on 5xx retry. Openpay supports this header.
+        // OPENPAY-DOCS-ALIGN: 'Idempotency-Key' NO está documentado por Openpay
+        // (la referencia oficial de /charges no lo menciona). Se mantiene como
+        // best-effort, pero NO se asume dedupe server-side: la protección real
+        // contra duplicados es no reintentar POST /charges (ver E2EFIX-01 abajo).
         // E2EFIX-01 (AUDIT-E2E-PAY-2026-11-17, P1): el source_id (token de tarjeta)
         // es de UN solo uso. Si el 1er intento llega a Openpay y la respuesta se
         // pierde (5xx/timeout), el cargo ya existe y el token ya fue consumido —
