@@ -188,4 +188,21 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 
 		$this->assertStringContainsString( 'abc123', $output );
 	}
+
+	// ── 5. Alias legacy de la URL guardada en el dashboard ───────────────────
+
+	public function test_register_route_exposes_canonical_and_legacy_alias(): void {
+		$registered = [];
+		Functions\when( 'register_rest_route' )->alias(
+			static function ( $namespace, $route, $args ) use ( &$registered ): bool {
+				$registered[] = $namespace . $route;
+				return true;
+			}
+		);
+
+		\LTMS_Openpay_Webhook_Handler::register_route();
+
+		$this->assertContains( 'ltms/v1/webhooks/openpay', $registered );
+		$this->assertContains( 'ltms/v1/webhook/openpay', $registered );
+	}
 }

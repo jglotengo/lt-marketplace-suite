@@ -58,7 +58,6 @@ $expected_fields = [
     'openpay_public_key'     => 'Openpay CO — Public Key',
     'openpay_private_key'    => 'Openpay CO — Private Key',
     'openpay_pse_enabled'    => 'Openpay CO — PSE activo',
-    'openpay_webhook_token'  => 'Openpay CO — Token Webhook',
     // Addi BNPL
     'addi_enabled'           => 'Addi BNPL activo (flag)',
     'addi_client_id'         => 'Addi — Client ID',
@@ -203,30 +202,35 @@ if ( $pse_enabled ) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// T-06  Openpay CO — Webhook token configurado
+// T-06  Openpay CO — Webhook (ruta REST + handshake)
 // ══════════════════════════════════════════════════════════════
-section( 'T-06 · Openpay CO — Webhook token' );
+section( 'T-06 · Openpay CO — Webhook (ruta REST + handshake)' );
 
-$webhook_token = $settings['openpay_webhook_token'] ?? get_option( 'ltms_openpay_webhook_token', '' );
-if ( $webhook_token ) {
-    qa_ok( $qa, 'Webhook token configurado', '***' . substr( $webhook_token, -6 ) );
-} else {
-    qa_warn( $qa, 'Webhook token', 'No configurado — webhooks de Openpay no podrán verificarse' );
+$openpay_webhook_routes = [
+    '/ltms/v1/webhooks/openpay' => 'canónica',
+    '/ltms/v1/webhook/openpay'  => 'alias legacy (dashboard)',
+];
+$openpay_rest_routes = rest_get_server()->get_routes();
+foreach ( $openpay_webhook_routes as $route => $label ) {
+    if ( array_key_exists( $route, $openpay_rest_routes ) ) {
+        qa_ok( $qa, 'Webhook route', "{$route} ({$label})" );
+    } else {
+        qa_fail( $qa, 'Webhook route', "{$route} ({$label}) NO registrada" );
+    }
 }
 
-// URL del webhook endpoint
-$webhook_url = home_url( '/wp-json/ltms/v1/webhook/openpay' );
-$resp        = wp_remote_get( $webhook_url, [ 'timeout' => 8, 'sslverify' => false ] );
-if ( ! is_wp_error( $resp ) ) {
-    $code = wp_remote_retrieve_response_code( $resp );
-    // 200, 400 o 401 son aceptables (endpoint existe pero rechaza GET sin payload)
-    if ( in_array( $code, [ 200, 400, 401, 403, 405 ], true ) ) {
-        qa_ok( $qa, 'Webhook endpoint accesible', "GET {$webhook_url} → HTTP {$code}" );
+if ( class_exists( 'LTMS_Openpay_Webhook_Handler' )
+    && method_exists( 'LTMS_Openpay_Webhook_Handler', 'get_pending_verification_code' ) ) {
+    qa_ok( $qa, 'Webhook verification', 'handshake type=verification soportado' );
+
+    $pending = LTMS_Openpay_Webhook_Handler::get_pending_verification_code();
+    if ( ! empty( $pending['code'] ) ) {
+        qa_ok( $qa, 'Verification code pendiente', '***' . substr( (string) $pending['code'], -6 ) );
     } else {
-        qa_warn( $qa, 'Webhook endpoint', "HTTP {$code} — revisar registro de ruta REST" );
+        qa_warn( $qa, 'Verification code pendiente', 'ninguno — re-guarda la URL en el dashboard para generarlo' );
     }
 } else {
-    qa_warn( $qa, 'Webhook endpoint', 'Error al verificar: ' . $resp->get_error_message() );
+    qa_fail( $qa, 'Webhook verification', 'handshake no soportado por el handler' );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -490,12 +494,10 @@ section( 'T-14 · REST API — endpoints de pago registrados' );
 
 $rest_routes = rest_get_server()->get_routes();
 $payment_routes = [
-    '/ltms/v1/webhook/openpay'    => 'Webhook Openpay CO',
-    '/ltms/v1/webhook/stripe'     => 'Webhook Stripe',
-    '/ltms/v1/webhook/addi'       => 'Webhook Addi',
-    '/ltms/v1/payment/openpay'    => 'Payment Openpay',
-    '/ltms/v1/payment/stripe'     => 'Payment Stripe',
-    '/ltms/v1/payment/addi'       => 'Payment Addi',
+    '/ltms/v1/webhooks/openpay'   => 'Webhook Openpay CO (canónico)',
+    '/ltms/v1/webhook/openpay'    => 'Webhook Openpay CO (alias legacy dashboard)',
+    '/ltms/v1/webhooks/stripe'    => 'Webhook Stripe',
+    '/ltms/v1/webhooks/addi'      => 'Webhook Addi',
 ];
 
 foreach ( $payment_routes as $route => $label ) {
