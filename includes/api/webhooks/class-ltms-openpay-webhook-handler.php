@@ -14,6 +14,45 @@ class LTMS_Openpay_Webhook_Handler {
     public static function init(): void {
         add_action( 'rest_api_init', [ __CLASS__, 'register_route' ] );
         add_action( 'admin_notices', [ __CLASS__, 'maybe_render_verification_notice' ] );
+
+        // OPENPAY-WEBHOOK-BASIC-CORE-BYPASS (2026-11-19): WP core (Application
+        // Passwords) intercepta cualquier header Authorization: Basic en REST y,
+        // si las credenciales no son un usuario WP válido, responde 401 ANTES de
+        // ejecutar el callback de la ruta. El webhook de Openpay usa HTTP Basic
+        // propio, así que para sus rutas se ignora ese error de core; la
+        // validación real queda en handle() (fail-closed con hash_equals).
+        add_filter( 'rest_authentication_errors', [ __CLASS__, 'bypass_core_basic_auth_for_webhook' ], 1000 );
+    }
+
+    /**
+     * Permite que las peticiones con Authorization: Basic lleguen al callback
+     * del webhook Openpay. WP core valida Basic contra Application Passwords
+     * (usuarios WP) y bloquea con 401 credenciales ajenas; este filtro corre en
+     * prioridad 1000 (después del collector de core, prioridad 100) y solo para
+     * las rutas del webhook Openpay sustituye ese error por "sin error". El
+     * handler hace la validación real y sigue fail-closed.
+     *
+     * @param WP_Error|bool|null $errors Error de autenticación de core o null/true.
+     * @return WP_Error|bool|null
+     */
+    public static function bypass_core_basic_auth_for_webhook( $errors ) {
+        if ( ! is_wp_error( $errors ) ) {
+            return $errors;
+        }
+
+        // Pretty permalinks: /wp-json/ltms/v1/webhooks/openpay (y alias singular).
+        $uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
+        if ( '' !== $uri && preg_match( '#/ltms/v1/webhooks?/openpay#', $uri ) ) {
+            return true;
+        }
+
+        // Plain permalinks: /?rest_route=/ltms/v1/webhooks/openpay (URL-encoded).
+        $rest_route = isset( $_GET['rest_route'] ) ? (string) $_GET['rest_route'] : '';
+        if ( '' !== $rest_route && preg_match( '#ltms/v1/webhooks?/openpay#', rawurldecode( $rest_route ) ) ) {
+            return true;
+        }
+
+        return $errors;
     }
 
     /**

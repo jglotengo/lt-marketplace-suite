@@ -299,6 +299,37 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$this->assertSame( [ 'ok' => true ], $response->get_data() );
 	}
 
+	// ── 3c. Bypass del error de Basic de WP core (Application Passwords) ─────
+
+	public function test_core_basic_auth_error_is_bypassed_for_openpay_webhook_routes(): void {
+		$error = new \WP_Error( 'incorrect_password', 'Invalid credentials' );
+
+		$_SERVER['REQUEST_URI'] = '/wp-json/ltms/v1/webhooks/openpay';
+		$this->assertTrue( \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $error ) );
+
+		$_SERVER['REQUEST_URI'] = '/wp-json/ltms/v1/webhook/openpay';
+		$this->assertTrue( \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $error ) );
+
+		// Otras rutas REST: el error de core pasa sin cambios.
+		$_SERVER['REQUEST_URI'] = '/wp-json/wc/v3/orders';
+		$this->assertSame( $error, \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $error ) );
+
+		unset( $_SERVER['REQUEST_URI'] );
+	}
+
+	public function test_core_basic_auth_error_is_bypassed_via_rest_route_query_param(): void {
+		$error = new \WP_Error( 'incorrect_password', 'Invalid credentials' );
+
+		$_GET['rest_route'] = rawurlencode( '/ltms/v1/webhooks/openpay' );
+		$this->assertTrue( \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $error ) );
+
+		// Sin error de core, el filtro no interviene.
+		$_SERVER['REQUEST_URI'] = '/wp-json/ltms/v1/webhooks/openpay';
+		$this->assertTrue( \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( true ) );
+
+		unset( $_GET['rest_route'], $_SERVER['REQUEST_URI'] );
+	}
+
 	// ── 4. Vigencia y exposición del código ──────────────────────────────────
 
 	public function test_pending_verification_code_expires_after_24_hours(): void {
