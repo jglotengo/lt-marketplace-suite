@@ -320,7 +320,8 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 	public function test_core_basic_auth_error_is_bypassed_via_rest_route_query_param(): void {
 		$error = new \WP_Error( 'incorrect_password', 'Invalid credentials' );
 
-		$_GET['rest_route'] = rawurlencode( '/ltms/v1/webhooks/openpay' );
+		// En producción PHP ya decodifica la query; $_GET trae el valor decoded.
+		$_GET['rest_route'] = '/ltms/v1/webhooks/openpay';
 		$this->assertTrue( \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $error ) );
 
 		// Sin error de core, el filtro no interviene.
@@ -328,6 +329,52 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$this->assertTrue( \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( true ) );
 
 		unset( $_GET['rest_route'], $_SERVER['REQUEST_URI'] );
+	}
+
+	public function test_bypass_does_not_fire_for_query_string_injection(): void {
+		$error = new \WP_Error( 'incorrect_password', 'Invalid credentials' );
+
+		// Substring del webhook dentro de la query de OTRA ruta: sin bypass.
+		$_SERVER['REQUEST_URI'] = '/wp-json/wc/v3/orders/123?_wpnonce=x&x=/ltms/v1/webhooks/openpay';
+		$this->assertSame( $error, \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $error ) );
+
+		// La ruta propia con query string sigue siendo bypassable.
+		$_SERVER['REQUEST_URI'] = '/wp-json/ltms/v1/webhooks/openpay?_wpnonce=bad';
+		$this->assertTrue( \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $error ) );
+
+		unset( $_SERVER['REQUEST_URI'] );
+	}
+
+	public function test_bypass_only_clears_application_password_errors(): void {
+		$_SERVER['REQUEST_URI'] = '/wp-json/ltms/v1/webhooks/openpay';
+
+		// Error ajeno a Basic (nonce de cookie inválido): el bypass NO interviene.
+		$nonce_error = new \WP_Error( 'rest_cookie_invalid_nonce', 'Cookie nonce is invalid' );
+		$this->assertSame( $nonce_error, \LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( $nonce_error ) );
+
+		// Códigos de Application Passwords (Basic de un no-usuario WP): se limpian.
+		foreach ( [ 'invalid_username', 'incorrect_password', 'application_passwords_disabled', 'application_passwords_disabled_for_user' ] as $code ) {
+			$this->assertTrue(
+				\LTMS_Openpay_Webhook_Handler::bypass_core_basic_auth_for_webhook( new \WP_Error( $code, 'x' ) ),
+				"Código $code debe pasar el bypass"
+			);
+		}
+
+		unset( $_SERVER['REQUEST_URI'] );
+	}
+
+	public function test_scalar_transaction_is_rejected_with_400_not_500(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$payload = wp_json_encode( [ 'type' => 'payout.created', 'transaction' => 'abc' ] );
+		$auth    = 'Basic ' . base64_encode( 'ltms_wh:super-secret' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle(
+			$this->make_request( $payload, '', [ 'authorization' => $auth ] )
+		);
+
+		$this->assertSame( 400, $response->get_status() );
 	}
 
 	// ── 4. Vigencia y exposición del código ──────────────────────────────────

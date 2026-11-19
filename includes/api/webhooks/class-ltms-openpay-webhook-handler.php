@@ -11,6 +11,21 @@ class LTMS_Openpay_Webhook_Handler {
      */
     private const VERIFICATION_TTL = 86400;
 
+    /**
+     * OPENPAY-WEBHOOK-AUTH-HARDEN (2026-11-19): códigos de error que WP core
+     * produce al validar un header Authorization: Basic contra Application
+     * Passwords (credenciales que no corresponden a un usuario WP). SOLO estos
+     * se limpian en bypass_core_basic_auth_for_webhook(); cualquier otro error
+     * de rest_authentication_errors (nonces de cookie, WAF de terceros, etc.)
+     * pasa intacto — el bypass no debe relajar controles ajenos al webhook.
+     */
+    private const APP_PASSWORD_ERROR_CODES = [
+        'invalid_username',
+        'incorrect_password',
+        'application_passwords_disabled',
+        'application_passwords_disabled_for_user',
+    ];
+
     public static function init(): void {
         add_action( 'rest_api_init', [ __CLASS__, 'register_route' ] );
         add_action( 'admin_notices', [ __CLASS__, 'maybe_render_verification_notice' ] );
@@ -40,15 +55,30 @@ class LTMS_Openpay_Webhook_Handler {
             return $errors;
         }
 
-        // Pretty permalinks: /wp-json/ltms/v1/webhooks/openpay (y alias singular).
-        $uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
-        if ( '' !== $uri && preg_match( '#/ltms/v1/webhooks?/openpay#', $uri ) ) {
-            return true;
+        // AUTH-HARDEN: allowlist de códigos. Solo se limpian errores de
+        // credenciales Basic ajenas a WP (Application Passwords).
+        if ( ! in_array( $errors->get_error_code(), self::APP_PASSWORD_ERROR_CODES, true ) ) {
+            return $errors;
         }
 
-        // Plain permalinks: /?rest_route=/ltms/v1/webhooks/openpay (URL-encoded).
-        $rest_route = isset( $_GET['rest_route'] ) ? (string) $_GET['rest_route'] : '';
-        if ( '' !== $rest_route && preg_match( '#ltms/v1/webhooks?/openpay#', rawurldecode( $rest_route ) ) ) {
+        // Pretty permalinks: /wp-json/ltms/v1/webhooks/openpay (y alias singular).
+        // AUTH-HARDEN: el match es SOLO sobre el path (sin query string) y
+        // anclado al final — un substring del webhook dentro de la query de
+        // otra ruta REST (ej. ?_wpnonce=x&x=/ltms/v1/webhooks/openpay) no abre
+        // el bypass.
+        $uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
+        if ( '' !== $uri ) {
+            $qpos = strpos( $uri, '?' );
+            $path = ( false === $qpos ) ? $uri : substr( $uri, 0, $qpos );
+            if ( '' !== $path && preg_match( '#/ltms/v1/webhooks?/openpay/?$#', $path ) ) {
+                return true;
+            }
+        }
+
+        // Plain permalinks: /?rest_route=/ltms/v1/webhooks/openpay. PHP ya
+        // decodifica $_GET; se matchea el valor tal cual lo despacha core.
+        $rest_route = isset( $_GET['rest_route'] ) ? wp_unslash( (string) $_GET['rest_route'] ) : '';
+        if ( '' !== $rest_route && preg_match( '#/ltms/v1/webhooks?/openpay/?$#', $rest_route ) ) {
             return true;
         }
 
@@ -277,6 +307,16 @@ class LTMS_Openpay_Webhook_Handler {
         }
 
         $transaction = $body['transaction'] ?? [];
+
+        // OPENPAY-WEBHOOK-AUTH-HARDEN: transaction debe ser objeto/array. Un
+        // escalar (ej. {"transaction":"abc"}) pasaba el empty() y en eventos
+        // payout.* moría con TypeError dentro de handle_payout_event() (firma
+        // array $txn) → 500 en la ruta plural y fatal en el alias singular
+        // (sin try/catch del router). Ante payload malformado autenticado se
+        // responde 400, nunca 500.
+        if ( ! is_array( $transaction ) ) {
+            return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
+        }
 
         if ( empty( $event_type ) || empty( $transaction ) ) {
             return new WP_REST_Response( [ 'error' => 'Invalid payload' ], 400 );
