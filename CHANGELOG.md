@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-17
 
+### Fixed — `OPENPAY-WEBHOOK-REG-2026-11-19` (webhook de producción creado/verificado; ping vacío de la API)
+
+> La validación de URL al crear un webhook por API envía `{}` y exige HTTP 200;
+> el handler lo trataba como evento sin firma y devolvía 401, causando
+> 412/6002. Fix `1faaa928`: ACK 200 sin persistir nada. Webhook nuevo
+> `w1bzpfyqb5lecstocrcf` → `https://lo-tengo.com.co/wp-json/ltms/v1/webhooks/openpay`
+> `verified` con `charge.*`, `payout.*`, `chargeback.*`, `transaction.expired`
+> + `charge.refunded`; eliminados los viejos `wmzjvtuj2nd8ybusy8ru` (singular,
+> unverified, solo payouts) y `wy6f9eqrxjialnke0af8` (PSE muerto). Cadena:
+> `345bfce5` (docs) → `ec7b5645` (alias singular) → `1faaa928` (ping vacío).
+> Suite 5,419 tests / 12,179 assertions / 3 skipped.
+
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 
 > Owner confirmó: Stripe no se usa y nadie consume el endpoint legacy
