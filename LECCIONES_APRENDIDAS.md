@@ -4755,3 +4755,60 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    estructural, buscar la cantidad codificada o el símbolo contado
    (`substr_count`, "call-sites", el nombre del método) en `tests/` para
    localizar invariantes fuente relacionadas.
+
+## 35. v2.9.435 - OPENPAY-WEBHOOK-REG-2026-11-19: alta de webhook por API y auditoría de webhooks registrados (2 lecciones nuevas)
+
+### Lección #208: la validación de URL de un webhook puede ser un POST con body vacío `{}` — un handler fail-closed lo confunde con un evento sin firma y devuelve 401 (OPENPAY-WEBHOOK-REG, 2026-11-19)
+
+1. **Caso real:** `POST /v1/{merchant}/webhooks` de Openpay devolvía
+   **412/6002** "Expected 200 response from .../webhooks/openpay but was 401".
+   El endpoint respondía 401 a la petición de validación porque el handler
+   hacía `get_json_params()` → `[]`, pasaba la guarda `is_array()` y caía en la
+   validación HMAC de eventos de transacción. El log del router genérico
+   (`bkr_lt_webhook_logs` id 28) mostró payload `{"provider":"openpay"}` (solo
+   el route param) e IP de Openpay: no había `type` ni `transaction`. El issue
+   de Magento de Openpay lo confirma: la plataforma manda `{}` y espera 200; el
+   código de verificación manual llega en un POST separado con
+   `type=verification`.
+
+2. **Diagnóstico:** `get_json_params()` devuelve `[]` para un body vacío (no
+   `null`), así que la guarda `is_array()` no distingue "ping de validación" de
+   "evento". Fail-closed es correcto para eventos, pero no debe aplicarse a un
+   body sin evento: sin `type`/`transaction` no hay nada que procesar y el
+   proveedor solo comprueba conectividad. El 401 era un falso negativo de
+   seguridad, no una protección.
+
+3. **Regla preventiva:** (1) En handlers de webhook, distinguir explícitamente
+   el body vacío (`empty($body)`) y responder 200 `{"ok":true}` sin persistir
+   nada, antes de cualquier validación de firma. (2) Mantener fail-closed para
+   cualquier body no vacío sin firma/evento conocido (test explícito:
+   `{"foo":"bar"}` → 401). (3) Al integrar un proveedor nuevo, probar el alta
+   por API y no solo el evento manual: el ping de validación tiene su propio
+   contrato. (4) Si el alta falla con 412/6002, revisar el body crudo del
+   request en el log del router antes de tocar la firma.
+
+### Lección #209: "webhook verified" no significa "webhook funcional" — auditar URL, eventos y handler; un webhook verificado a un endpoint muerto explica eventos perdidos (OPENPAY-WEBHOOK-REG, 2026-11-19)
+
+1. **Caso real:** la cuenta tenía dos webhooks: `wy6f9...` en
+   `https://lo-tengo.com.co/wc-api/Openpay_PSE` (`verified`, todos los
+   `charge.*`/payout/chargeback) y `wmzj...` en la URL singular LTMS
+   (`unverified`, solo payouts). El primero estaba verificado pero su endpoint
+   no tenía handler en LTMS → los eventos de cargos se perdían; el segundo no
+   tenía eventos de cargos. El webhook nuevo `w1bz...` en la URL plural con
+   todos los eventos quedó `verified` y los dos viejos se eliminaron por API.
+
+2. **Diagnóstico:** el dashboard mostraba "verified" y eso se tomó como señal
+   de salud; el estado verifica que el endpoint respondió al alta, no que el
+   evento tenga consumidor, URL vigente ni los event types necesarios. La
+   combinación "verified + endpoint sin handler + eventos completos" es
+   especialmente engañosa: parece la configuración buena y es la que más
+   eventos pierde.
+
+3. **Regla preventiva:** (1) Auditar los webhooks registrados en el proveedor
+   con `GET /webhooks`: URL, `status` y `event_types`, no solo el estado.
+   (2) Cruzar cada URL con un handler real en el plugin (`grep` de la ruta /
+   `rest_get_server()->get_routes()`); "verified" no es evidencia de consumo.
+   (3) Al migrar, crear el webhook nuevo, verificar `status=verified` y recién
+   entonces borrar los viejos; confirmar con un GET final que queda solo el
+   correcto. (4) Documentar los IDs de webhook (no son secretos) en el ticket
+   para que soporte pueda correlacionar entregas.
