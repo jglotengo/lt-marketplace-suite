@@ -10,6 +10,8 @@
  *   3. Eventos de transacción sin firma siguen rechazados con 401 (fail-closed).
  *   4. Alias documentado `charge.refunded` despacha igual que `refund.succeeded`.
  *   5. El código persistido expira a las 24 h y se muestra a manage_woocommerce.
+ *   6. HTTP Basic (mecanismo soportado por Openpay CO) aceptado sin HMAC;
+ *      credenciales inválidas/ausentes → 401 cuando está configurado.
  *
  * Runtime real: instancia WP_REST_Request/Response (stubs mínimos en
  * tests/stubs/wp-rest-api-stubs.php) y ejecuta LTMS_Openpay_Webhook_Handler::handle().
@@ -41,13 +43,25 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		Functions\when( 'get_transient' )->justReturn( false );
 		Functions\when( 'set_transient' )->justReturn( true );
 		Functions\when( 'absint' )->alias( static fn( $value ): int => abs( (int) $value ) );
+
+		// Aislar credenciales entre tests: las claves/secretos se cachean en
+		// LTMS_Core_Config y podrían filtrarse de un test a otro.
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', '' );
+		\LTMS_Core_Config::set( 'ltms_openpay_private_key', '' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', '' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', '' );
+		\LTMS_Core_Config::set( 'ltms_openpay_webhook_basic_user', '' );
+		\LTMS_Core_Config::set( 'ltms_openpay_webhook_basic_password', '' );
 	}
 
-	private function make_request( string $json, string $signature = '' ): \WP_REST_Request {
+	private function make_request( string $json, string $signature = '', array $headers = [] ): \WP_REST_Request {
 		$request = new \WP_REST_Request( 'POST', '/ltms/v1/webhooks/openpay' );
 		$request->set_body( $json );
 		if ( '' !== $signature ) {
 			$request->set_header( 'x-openpay-signature', $signature );
+		}
+		foreach ( $headers as $name => $value ) {
+			$request->set_header( (string) $name, (string) $value );
 		}
 		return $request;
 	}
@@ -170,6 +184,119 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( [ 'received' => true ], $response->get_data() );
+	}
+
+	// ── 3b. HTTP Basic (mecanismo documentado por Openpay) ───────────────────
+
+	public function test_basic_auth_event_is_accepted_without_hmac(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( false );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$payload = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [
+					'id'       => 'tr_basic_auth',
+					'order_id' => '123',
+				],
+			]
+		);
+		$auth    = 'Basic ' . base64_encode( 'ltms_wh:super-secret' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle(
+			$this->make_request( $payload, '', [ 'authorization' => $auth ] )
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [ 'received' => true ], $response->get_data() );
+	}
+
+	public function test_basic_auth_invalid_credentials_are_rejected(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$payload = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [
+					'id'       => 'tr_basic_bad',
+					'order_id' => '123',
+				],
+			]
+		);
+		$auth    = 'Basic ' . base64_encode( 'ltms_wh:wrong' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle(
+			$this->make_request( $payload, '', [ 'authorization' => $auth ] )
+		);
+
+		$this->assertSame( 401, $response->get_status() );
+	}
+
+	public function test_basic_auth_missing_header_is_rejected_when_configured(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$payload = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [
+					'id'       => 'tr_basic_missing',
+					'order_id' => '123',
+				],
+			]
+		);
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload ) );
+
+		$this->assertSame( 401, $response->get_status() );
+	}
+
+	public function test_hmac_fallback_still_works_when_basic_is_configured(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( false );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [
+					'id'       => 'tr_hmac_fallback',
+					'order_id' => '123',
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [ 'received' => true ], $response->get_data() );
+	}
+
+	public function test_verification_event_still_needs_no_basic_auth(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+		Functions\when( 'update_option' )->justReturn( true );
+
+		$payload  = wp_json_encode(
+			[
+				'type'              => 'verification',
+				'verification_code' => 'basic-order-check',
+			]
+		);
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [ 'ok' => true ], $response->get_data() );
 	}
 
 	// ── 4. Vigencia y exposición del código ──────────────────────────────────

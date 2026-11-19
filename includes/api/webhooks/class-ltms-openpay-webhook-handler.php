@@ -26,7 +26,8 @@ class LTMS_Openpay_Webhook_Handler {
             'methods'             => 'POST',
             'callback'            => [ __CLASS__, 'handle' ],
             // SEC-H2: '__return_true' es intencional — webhooks de Openpay deben ser públicamente
-            // accesibles. La autenticación se aplica dentro de handle() via HMAC-SHA256.
+            // accesibles. La autenticación se aplica dentro de handle() via HTTP Basic
+            // (mecanismo documentado por Openpay) o HMAC-SHA256 (legacy/fixtures).
             'permission_callback' => '__return_true',
         ];
 
@@ -138,59 +139,102 @@ class LTMS_Openpay_Webhook_Handler {
             return self::handle_verification( $body );
         }
 
-        // M-104: Verificar firma HMAC-SHA256 del payload con la clave privada.
+        // OPENPAY-WEBHOOK-AUTH (2026-11-19): la doc oficial de Openpay CO
+        // (docs.openpay.co/docs/webhooks.html) NO firma las notificaciones con
+        // HMAC; el mecanismo soportado es HTTP Basic opcional. Antes el handler
+        // exigía X-Openpay-Signature y rechazaba con 401 todo evento real.
         //
-        // OPENPAY-DOCS-ALIGN (2026-11-19): la doc oficial de webhooks NO
-        // documenta el header X-Openpay-Signature ni ningún HMAC — solo el
-        // verification_code y HTTP Basic opcional. Se mantiene fail-closed
-        // (401 sin firma) hasta que soporte de Openpay confirme si firma las
-        // notificaciones; pregunta abierta en el ticket 2026-11-19. Si se
-        // confirma que no firma, la alternativa es re-consultar el cargo vía
-        // GET /charges con la private key y validar contra la orden.
-        //
-        // WH1 FIX (v2.8.9) CRÍTICO: si private_key está vacío, RECHAZAR el webhook
-        // (fail-closed). Antes, si no había key configurada, se omitía la validación
-        // de firma → cualquier atacante podía forjar webhooks y completar pedidos.
-        $country     = LTMS_Core_Config::get_country();
-        // AUDIT-FUNNEL-PAY-03/PAY-17 FIX (loop comprador): antes se llamaba
-        // LTMS_Core_Security::decrypt() INCONDICIONALMENTE sobre la private key.
-        // El gateway WC de Openpay guarda la key en TEXTO PLANO (update_option en
-        // process_admin_options y en cada process_payment), y decrypt() lanza
-        // InvalidArgumentException para valores sin formato 'v1:'/'v2:' → todo
-        // webhook moría con 500 → PSE/Nequi/Daviplata/OXXO/SPEI (que dependen 100%
-        // del webhook para confirmar el pago) quedaban 'pending' para siempre con
-        // dinero cobrado. maybe_decrypt() tolera ambos formatos + fallback a la
-        // key genérica (el cliente API lo tiene, el webhook no — PAY-17).
-        $raw_key     = (string) LTMS_Core_Config::get( "ltms_openpay_{$country}_private_key", '' );
-        if ( '' === $raw_key ) {
-            $raw_key = (string) LTMS_Core_Config::get( 'ltms_openpay_private_key', '' );
-        }
-        $private_key = LTMS_Core_Security::maybe_decrypt( $raw_key );
+        // Estrategia:
+        //  - Si hay Basic configurado (opciones ltms_openpay[_CO]_webhook_basic_*),
+        //    se exige Authorization: Basic válido.
+        //  - HMAC-SHA256 sigue aceptándose como fallback legacy/fixtures (requiere
+        //    la private key). Así los tests firmados y una eventual firma futura
+        //    de Openpay siguen funcionando.
+        //  - Si no hay Basic configurado, se mantiene el fail-closed histórico
+        //    con HMAC obligatorio (WH1 FIX v2.8.9).
+        // El ping vacío y `verification` ya retornaron arriba: no tienen efectos
+        // financieros y no requieren autenticación.
+        $country = LTMS_Core_Config::get_country();
 
-        if ( empty( $private_key ) ) {
+        $basic_user     = (string) LTMS_Core_Config::get( "ltms_openpay_{$country}_webhook_basic_user", '' );
+        $basic_pass_raw = (string) LTMS_Core_Config::get( "ltms_openpay_{$country}_webhook_basic_password", '' );
+        if ( '' === $basic_user ) {
+            $basic_user = (string) LTMS_Core_Config::get( 'ltms_openpay_webhook_basic_user', '' );
+        }
+        if ( '' === $basic_pass_raw ) {
+            $basic_pass_raw = (string) LTMS_Core_Config::get( 'ltms_openpay_webhook_basic_password', '' );
+        }
+
+        $basic_config_error = false;
+        $basic_pass         = '';
+        if ( '' !== $basic_pass_raw ) {
+            try {
+                $basic_pass = LTMS_Core_Security::maybe_decrypt( $basic_pass_raw );
+            } catch ( \Throwable $e ) {
+                $basic_config_error = true;
+            }
+        }
+
+        if ( $basic_config_error ) {
             if ( class_exists( 'LTMS_Core_Logger' ) ) {
                 LTMS_Core_Logger::warning(
-                    'OPENPAY_WEBHOOK_NO_SECRET',
-                    'Openpay private key no configurado. Webhook rechazado (fail-closed).'
+                    'OPENPAY_WEBHOOK_BASIC_CONFIG_ERROR',
+                    'No se pudo descifrar la clave HTTP Basic del webhook Openpay. Webhook rechazado (fail-closed).'
                 );
             }
             return new WP_REST_Response( [ 'error' => 'Webhook endpoint not configured' ], 401 );
         }
 
-        // Validar firma HMAC-SHA256 (obligatorio).
-        $raw_body      = $request->get_body();
-        $expected_hmac = 'sha256=' . hash_hmac( 'sha256', $raw_body, $private_key );
-        $received_hmac = $request->get_header( 'x-openpay-signature' ) ?: '';
+        $basic_configured = ( '' !== $basic_user && '' !== $basic_pass );
+        $basic_valid      = $basic_configured && self::is_basic_auth_valid( $request, $basic_user, $basic_pass );
 
-        if ( ! hash_equals( $expected_hmac, $received_hmac ) ) {
-            if ( class_exists( 'LTMS_Core_Logger' ) ) {
-                LTMS_Core_Logger::warning(
-                    'OPENPAY_WEBHOOK_INVALID_SIG',
-                    'Firma HMAC inválida en webhook Openpay.',
-                    [ 'received_sig' => substr( $received_hmac, 0, 40 ) ]
-                );
+        // AUDIT-FUNNEL-PAY-03/PAY-17 FIX (loop comprador): la private key puede
+        // estar cifrada (Admin Settings) o en texto plano (gateway WC). Se usa
+        // maybe_decrypt() para tolerar ambos formatos + fallback a la key genérica.
+        $raw_key = (string) LTMS_Core_Config::get( "ltms_openpay_{$country}_private_key", '' );
+        if ( '' === $raw_key ) {
+            $raw_key = (string) LTMS_Core_Config::get( 'ltms_openpay_private_key', '' );
+        }
+        $private_key = LTMS_Core_Security::maybe_decrypt( $raw_key );
+
+        $hmac_valid = false;
+        if ( '' !== $private_key ) {
+            $expected_hmac = 'sha256=' . hash_hmac( 'sha256', $request->get_body(), $private_key );
+            $received_hmac = (string) ( $request->get_header( 'x-openpay-signature' ) ?: '' );
+            $hmac_valid    = ( '' !== $received_hmac && hash_equals( $expected_hmac, $received_hmac ) );
+        }
+
+        if ( $basic_configured ) {
+            if ( ! $basic_valid && ! $hmac_valid ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'OPENPAY_WEBHOOK_INVALID_BASIC',
+                        'HTTP Basic inválido o ausente en webhook Openpay (HMAC tampoco válido).'
+                    );
+                }
+                return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
             }
-            return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
+        } else {
+            if ( '' === $private_key ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'OPENPAY_WEBHOOK_NO_SECRET',
+                        'Openpay private key no configurado. Webhook rechazado (fail-closed).'
+                    );
+                }
+                return new WP_REST_Response( [ 'error' => 'Webhook endpoint not configured' ], 401 );
+            }
+
+            if ( ! $hmac_valid ) {
+                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                    LTMS_Core_Logger::warning(
+                        'OPENPAY_WEBHOOK_INVALID_SIG',
+                        'Firma HMAC inválida en webhook Openpay.',
+                        [ 'received_sig' => substr( (string) ( $request->get_header( 'x-openpay-signature' ) ?: '' ), 0, 40 ) ]
+                    );
+                }
+                return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
+            }
         }
 
         $transaction = $body['transaction'] ?? [];
@@ -343,6 +387,39 @@ class LTMS_Openpay_Webhook_Handler {
         }
 
         return new WP_REST_Response( [ 'received' => true ], 200 );
+    }
+
+    /**
+     * Valida el header `Authorization: Basic` contra las credenciales
+     * configuradas para el webhook. Comparación en tiempo constante.
+     *
+     * @param WP_REST_Request $request       Request entrante.
+     * @param string          $expected_user Usuario configurado.
+     * @param string          $expected_pass Password configurado (texto plano).
+     * @return bool
+     */
+    private static function is_basic_auth_valid( WP_REST_Request $request, string $expected_user, string $expected_pass ): bool {
+        $header = (string) $request->get_header( 'authorization' );
+
+        // Algunos SAPIs eliminan Authorization del request; fallback a las
+        // variables PHP_AUTH_* cuando el header no está disponible.
+        if ( '' === $header && isset( $_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW'] ) ) {
+            return hash_equals( $expected_user, (string) $_SERVER['PHP_AUTH_USER'] )
+                && hash_equals( $expected_pass, (string) $_SERVER['PHP_AUTH_PW'] );
+        }
+
+        if ( 0 !== stripos( $header, 'Basic ' ) ) {
+            return false;
+        }
+
+        $decoded = base64_decode( substr( $header, 6 ), true );
+        if ( false === $decoded || ! str_contains( $decoded, ':' ) ) {
+            return false;
+        }
+
+        [ $user, $pass ] = explode( ':', $decoded, 2 );
+
+        return hash_equals( $expected_user, $user ) && hash_equals( $expected_pass, $pass );
     }
 
     /**
