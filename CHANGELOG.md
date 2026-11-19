@@ -27,7 +27,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > unverified), `wy6f9eqrxjialnke0af8` (PSE muerto), `w1bzpfyqb5lecstocrcf` y
 > `wxn9hkrrgejvxxmadojj` (sin Basic). Cadena: `345bfce5` (docs) →
 > `ec7b5645` (alias singular) → `1faaa928` (ping vacío) → `6dcb3957` (Basic) →
-> `4bd33495` (bypass core). Suite 5,426 tests / 12,194 assertions / 3 skipped.
+> `4bd33495` (bypass core) → `badcbeba` (hardening del bypass: match solo del
+> path anclado al final + allowlist de códigos de Application Passwords; la
+> segunda pasada de revisión encontró que un substring del webhook en la query
+> de una ruta REST arbitraria saltaba el control CSRF — verificado en prod:
+> `?_wpnonce=x&x=/ltms/v1/webhooks/openpay` pasó de 200 a 403). P3: transaction
+> escalar en payout.* daba TypeError/500, ahora 400. Suite 5,429 tests /
+> 12,202 assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 

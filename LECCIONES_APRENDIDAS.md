@@ -4846,6 +4846,18 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (3) Nunca abrir el bypass para rutas ajenas: devolver `$errors` intacto
    cuando la URI no coincide (test de passthrough). (4) E2E obligatorio tras
    el bypass: Basic válido → 200, sin auth → 401, ping `{}` → 200.
+   (5) AUTH-HARDEN: el match de ruta debe ser SOLO sobre el PATH (truncar
+   `REQUEST_URI` en `?`) y anclado al final (`#/ruta/?$#`) — un substring del
+   webhook dentro de la QUERY de otra ruta no debe abrir el bypass. (6) Solo
+   limpiar los códigos de error de Application Passwords
+   (`invalid_username`, `incorrect_password`,
+   `application_passwords_disabled[_for_user]`); un nonce de cookie inválido
+   (`rest_cookie_invalid_nonce`) o un error de WAF NUNCA se limpian — limpiar
+   cualquier WP_Error convierte el bypass en un bypass de CSRF para rutas
+   arbitrarias. (7) `$_GET` ya viene decodificado por PHP: el test debe
+   asignar el valor decoded, no `rawurlencode()` (el viejo `rawurldecode()`
+   en el filtro compensaba un test mal escrito). (8) Verificación empírica
+   del cierre: `?_wpnonce=x&x=/ruta/del/webhook` debe responder 403, no 200.
 
 ### Lección #211: Openpay permite UN webhook por URL (6001) — borrar antes de crear, y guardar las credenciales Basic ANTES del create (OPENPAY-WEBHOOK-AUTH, 2026-11-19)
 
