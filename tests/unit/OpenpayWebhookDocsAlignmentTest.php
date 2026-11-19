@@ -42,6 +42,7 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 
 		Functions\when( 'get_transient' )->justReturn( false );
 		Functions\when( 'set_transient' )->justReturn( true );
+		Functions\when( 'delete_transient' )->justReturn( true );
 		Functions\when( 'absint' )->alias( static fn( $value ): int => abs( (int) $value ) );
 
 		// Aislar credenciales entre tests: las claves/secretos se cachean en
@@ -375,6 +376,177 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		);
 
 		$this->assertSame( 400, $response->get_status() );
+	}
+
+	// ── 3d. Idempotencia: el lock se libera si el procesamiento falla ────────
+
+	/**
+	 * Transients en memoria para poder observar el ciclo lock → release.
+	 *
+	 * @param array<string,mixed> $store Almacén compartido (por referencia).
+	 * @return array{0:\Closure,1:\Closure,2:\Closure} [get, set, delete]
+	 */
+	private function make_transient_store( array &$store ): array {
+		// OJO: closures con use (&$store) — las arrow fn (fn() =>) capturan por
+		// VALOR (snapshot vacío) y el get nunca vería lo que el set escribió.
+		$get = static function ( $key ) use ( &$store ) {
+			return $store[ $key ] ?? false;
+		};
+
+		$set = static function ( $key, $value, $ttl = 0 ) use ( &$store ): bool {
+			$store[ $key ] = $value;
+			return true;
+		};
+
+		$del = static function ( $key ) use ( &$store ): bool {
+			unset( $store[ $key ] );
+			return true;
+		};
+
+		return [ $get, $set, $del ];
+	}
+
+	private function seen_keys_in_store( array $store ): array {
+		return array_values(
+			array_filter(
+				array_keys( $store ),
+				static fn( $key ) => str_contains( (string) $key, 'ltms_wh_seen_openpay_' )
+			)
+		);
+	}
+
+	public function test_failed_processing_releases_idempotency_lock_and_retry_reprocesses(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$store = [];
+		[ $get, $set, $del ] = $this->make_transient_store( $store );
+		Functions\when( 'get_transient' )->alias( $get );
+		Functions\when( 'set_transient' )->alias( $set );
+		Functions\when( 'delete_transient' )->alias( $del );
+
+		$payload = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [ 'id' => 'tr_idem_fail', 'order_id' => '123' ],
+			]
+		);
+		$auth = 'Basic ' . base64_encode( 'ltms_wh:super-secret' );
+
+		// Primer intento: el proceso lanza a mitad (needs_payment explota).
+		$exploding = Mockery::mock( \WC_Order::class );
+		$exploding->shouldReceive( 'needs_payment' )->once()->andThrow( new \RuntimeException( 'db down' ) );
+		Functions\when( 'wc_get_order' )->justReturn( $exploding );
+
+		try {
+			\LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, '', [ 'authorization' => $auth ] ) );
+			$this->fail( 'El RuntimeException debe propagarse fuera de handle().' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertSame( 'db down', $e->getMessage() );
+		}
+
+		$this->assertSame(
+			[],
+			$this->seen_keys_in_store( $store ),
+			'El lock de idempotencia debe liberarse cuando el procesamiento lanza.'
+		);
+
+		// Reintento de Openpay: mismo evento, proceso OK → reprocesa (no "Already processed").
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( false );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle(
+			$this->make_request( $payload, '', [ 'authorization' => $auth ] )
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [ 'received' => true ], $response->get_data() );
+	}
+
+	public function test_order_not_found_releases_lock_so_retry_can_find_it(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$store = [];
+		[ $get, $set, $del ] = $this->make_transient_store( $store );
+		Functions\when( 'get_transient' )->alias( $get );
+		Functions\when( 'set_transient' )->alias( $set );
+		Functions\when( 'delete_transient' )->alias( $del );
+
+		$payload = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [ 'id' => 'tr_idem_404', 'order_id' => '999' ],
+			]
+		);
+		$auth = 'Basic ' . base64_encode( 'ltms_wh:super-secret' );
+
+		// Primer intento: orden aún no visible → 404 y lock liberado.
+		Functions\when( 'wc_get_order' )->justReturn( null );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle(
+			$this->make_request( $payload, '', [ 'authorization' => $auth ] )
+		);
+
+		$this->assertSame( 404, $response->get_status() );
+		$this->assertSame(
+			[],
+			$this->seen_keys_in_store( $store ),
+			'Un 404 (orden no encontrada) debe liberar el lock para el reintento.'
+		);
+
+		// Reintento: la orden ya existe → el evento se procesa.
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( false );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$retry = \LTMS_Openpay_Webhook_Handler::handle(
+			$this->make_request( $payload, '', [ 'authorization' => $auth ] )
+		);
+
+		$this->assertSame( 200, $retry->get_status() );
+		$this->assertSame( [ 'received' => true ], $retry->get_data() );
+	}
+
+	public function test_successful_processing_keeps_lock_and_replays_are_ignored(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$store = [];
+		[ $get, $set, $del ] = $this->make_transient_store( $store );
+		Functions\when( 'get_transient' )->alias( $get );
+		Functions\when( 'set_transient' )->alias( $set );
+		Functions\when( 'delete_transient' )->alias( $del );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( false );
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$payload = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [ 'id' => 'tr_idem_ok', 'order_id' => '123' ],
+			]
+		);
+		$auth = 'Basic ' . base64_encode( 'ltms_wh:super-secret' );
+		$request = $this->make_request( $payload, '', [ 'authorization' => $auth ] );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [ 'received' => true ], $response->get_data() );
+		$this->assertCount(
+			1,
+			$this->seen_keys_in_store( $store ),
+			'El éxito debe conservar el lock de idempotencia.'
+		);
+
+		// Replay del mismo evento → "Already processed" (dedup intacto).
+		$replay = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, '', [ 'authorization' => $auth ] ) );
+
+		$this->assertSame( 200, $replay->get_status() );
+		$this->assertSame( [ 'message' => 'Already processed' ], $replay->get_data() );
 	}
 
 	// ── 4. Vigencia y exposición del código ──────────────────────────────────

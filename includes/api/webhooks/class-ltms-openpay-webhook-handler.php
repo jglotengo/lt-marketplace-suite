@@ -327,6 +327,9 @@ class LTMS_Openpay_Webhook_Handler {
         // and re-fire ltms_payout_failed actions. Key scoped to (event_type, txn.id).
         // API-BUG-18 FIX: return 200 immediately if already processed, so OpenPay
         // stops retrying. (Full async migration is a documented follow-up.)
+        // OPENPAY-WEBHOOK-IDEMPOTENCY-RELEASE: el lock NO es permanente a toda
+        // costa — si dispatch_event() lanza o responde 4xx, el lock se libera
+        // (ver bloque try/catch más abajo).
         $openpay_id = sanitize_text_field( $transaction['id'] ?? '' );
         $event_id   = $openpay_id ?: ( $event_type . '_' . md5( wp_json_encode( $transaction ) ) );
         $seen_key   = 'ltms_wh_seen_openpay_' . md5( $event_type . '|' . $event_id );
@@ -338,6 +341,37 @@ class LTMS_Openpay_Webhook_Handler {
         }
         set_transient( $seen_key, 1, HOUR_IN_SECONDS );
 
+        // OPENPAY-WEBHOOK-IDEMPOTENCY-RELEASE (2026-11-19): el transient marca
+        // el evento como visto ANTES de procesar (lock anti-concurrencia), pero
+        // si el procesamiento falla — Throwable o respuesta 4xx — el lock se
+        // LIBERA para que el reintento de Openpay pueda reprocesar. Antes, un
+        // error a mitad (ej. un listener de payment_complete lanzando) dejaba
+        // el lock puesto 1h: el reintento recibia 200 "Already processed" y el
+        // evento se perdia con dinero cobrado y orden sin pagar.
+        try {
+            $response = self::dispatch_event( $event_type, $transaction );
+        } catch ( \Throwable $e ) {
+            delete_transient( $seen_key );
+            throw $e;
+        }
+
+        if ( $response->get_status() >= 400 ) {
+            delete_transient( $seen_key );
+        }
+
+        return $response;
+    }
+
+    /**
+     * Procesa un evento ya autenticado, desduplicado y con lock activo. No
+     * gestiona el transient de idempotencia: handle() lo libera si este método
+     * lanza o responde 4xx, para que el reintento de Openpay reprocese.
+     *
+     * @param string $event_type  Tipo de evento (charge.*|payout.*|...).
+     * @param array  $transaction Payload transaction del evento.
+     * @return WP_REST_Response
+     */
+    private static function dispatch_event( string $event_type, array $transaction ): WP_REST_Response {
         $openpay_id  = sanitize_text_field( $transaction['id'] ?? '' );
         $order_ref   = sanitize_text_field( $transaction['order_id'] ?? '' );
 
