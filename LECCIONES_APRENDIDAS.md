@@ -4756,7 +4756,7 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (`substr_count`, "call-sites", el nombre del método) en `tests/` para
    localizar invariantes fuente relacionadas.
 
-## 35. v2.9.435 - OPENPAY-WEBHOOK-REG-2026-11-19: alta de webhook por API y auditoría de webhooks registrados (2 lecciones nuevas)
+## 35. v2.9.435 - OPENPAY-WEBHOOK-REG-2026-11-19: alta de webhook por API y auditoría de webhooks registrados (4 lecciones nuevas)
 
 ### Lección #208: la validación de URL de un webhook puede ser un POST con body vacío `{}` — un handler fail-closed lo confunde con un evento sin firma y devuelve 401 (OPENPAY-WEBHOOK-REG, 2026-11-19)
 
@@ -4812,3 +4812,66 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    entonces borrar los viejos; confirmar con un GET final que queda solo el
    correcto. (4) Documentar los IDs de webhook (no son secretos) en el ticket
    para que soporte pueda correlacionar entregas.
+
+### Lección #210: WP core (Application Passwords) intercepta `Authorization: Basic` en REST y responde 401 ANTES del callback — un webhook con Basic propio necesita un bypass de `rest_authentication_errors` (OPENPAY-WEBHOOK-AUTH, 2026-11-19)
+
+1. **Caso real:** la creación del webhook con credenciales Basic
+   (`user`/`password`) devolvía **412/6002** "Expected 200 response ... but was
+   401 - Unauthorized", aunque el handler ya respondía 200 al ping vacío (lección
+   #208). El log del router (`bkr_lt_webhook_logs`) registraba el ping del
+   restore SIN Basic (fila única con body vacío) pero **no registraba ninguna
+   fila** para el ping del create CON Basic: el request nunca llegó al callback.
+   La doc de Openpay CO no firma los webhooks — el mecanismo documentado es
+   HTTP Basic opcional — así que el handler exigir HMAC-SHA256 rechazaba todo
+   evento real con 401.
+
+2. **Diagnóstico:** WordPress core trata todo header `Authorization: Basic`
+   en REST como intento de Application Password: decodifica `user:pass`, busca
+   un usuario WP y, si no coincide, colecta un `WP_Error` que
+   `rest_authentication_errors` (prioridad 100) convierte en 401 **antes de
+   ejecutar el `permission_callback` o el callback de la ruta**. Cualquier
+   proveedor que use Basic con credenciales ajenas a WP queda bloqueado en la
+   puerta, sin importar el `__return_true` de la ruta. Un filtro en prioridad
+   baja no basta: el collector de core corre en 100 y no respeta el return
+   anterior; hay que correr DESPUÉS (prioridad 1000) y reemplazar el error.
+
+3. **Regla preventiva:** (1) Para rutas REST con Basic propio (webhooks),
+   registrar
+   `add_filter('rest_authentication_errors', [...], 1000)` y, SOLO si la URI
+   es la ruta del webhook (pretty y `?rest_route=` plain), devolver `true`
+   para que el request llegue al callback; la validación real queda en el
+   handler (fail-closed con `hash_equals`). (2) Diagnosticar este bloqueo por
+   abscencia en el log del router: request del proveedor sin fila en
+   `bkr_lt_webhook_logs` + 401 reportado = core bloqueó antes del callback.
+   (3) Nunca abrir el bypass para rutas ajenas: devolver `$errors` intacto
+   cuando la URI no coincide (test de passthrough). (4) E2E obligatorio tras
+   el bypass: Basic válido → 200, sin auth → 401, ping `{}` → 200.
+
+### Lección #211: Openpay permite UN webhook por URL (6001) — borrar antes de crear, y guardar las credenciales Basic ANTES del create (OPENPAY-WEBHOOK-AUTH, 2026-11-19)
+
+1. **Caso real:** intentar crear el webhook con Basic sin borrar el anterior
+   devolvió **409 / error_code 6001** "The webhook with url %s already
+   exists". Y tras borrar primero, el create con Basic devolvió **412/6002**
+   porque Openpay valida la URL en el momento del create y esa petición llegó
+   con header Basic a un handler que aún no tenía las credenciales guardadas
+   (más el bloqueo de core de la lección #210).
+
+2. **Diagnóstico:** la secuencia correcta es: (1) guardar credenciales Basic
+   en options, (2) borrar el webhook viejo de la misma URL, (3) crear el nuevo
+   con `user`/`password`, (4) exigir en la respuesta 201 + `status=verified` +
+   `user` eco (prueba de que Openpay registró el Basic; la password nunca se
+   devuelve), (5) solo entonces considerar configurado el sistema. Si el
+   create falla tras guardar credenciales, hacer rollback (delete_option) y
+   best-effort recreate sin Basic para no dejar el endpoint en un estado peor
+   que el original.
+
+3. **Regla preventiva:** (1) Antes de crear un webhook, hacer
+   `GET /webhooks` y filtrar por URL; si existe, borrar primero (6001). (2)
+   El orden creds-antes-de-create es obligatorio cuando el proveedor valida la
+   URL en el create con las credenciales que registra. (3) Todo script de
+   setup server-side debe: generar secretos en el server (nunca
+   imprimirlos/traerlos del local), cifrar la password con
+   `LTMS_Core_Security::encrypt_if_plain()` y verificar round-trip
+   `maybe_decrypt()` ANTES de tocar nada. (4) Confirmar el alta con el eco de
+   `user` en la respuesta y un GET final: un solo webhook, `verified`, con
+   `user`.

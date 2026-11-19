@@ -6,17 +6,28 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-17
 
-### Fixed — `OPENPAY-WEBHOOK-REG-2026-11-19` (webhook de producción creado/verificado; ping vacío de la API)
+### Fixed — `OPENPAY-WEBHOOK-REG-2026-11-19` (webhook funcional E2E: ping vacío + HTTP Basic + bypass de core)
 
 > La validación de URL al crear un webhook por API envía `{}` y exige HTTP 200;
 > el handler lo trataba como evento sin firma y devolvía 401, causando
-> 412/6002. Fix `1faaa928`: ACK 200 sin persistir nada. Webhook nuevo
-> `w1bzpfyqb5lecstocrcf` → `https://lo-tengo.com.co/wp-json/ltms/v1/webhooks/openpay`
-> `verified` con `charge.*`, `payout.*`, `chargeback.*`, `transaction.expired`
-> + `charge.refunded`; eliminados los viejos `wmzjvtuj2nd8ybusy8ru` (singular,
-> unverified, solo payouts) y `wy6f9eqrxjialnke0af8` (PSE muerto). Cadena:
-> `345bfce5` (docs) → `ec7b5645` (alias singular) → `1faaa928` (ping vacío).
-> Suite 5,419 tests / 12,179 assertions / 3 skipped.
+> 412/6002. Fix `1faaa928`: ACK 200 sin persistir nada. Adicionalmente, la doc
+> oficial de Openpay CO NO firma los webhooks (solo HTTP Basic opcional): fix
+> `6dcb3957` acepta `Authorization: Basic` configurable
+> (`ltms_openpay[_CO]_webhook_basic_user/password`, password cifrada con
+> `LTMS_Core_Security::encrypt_if_plain`) con HMAC como fallback legacy y
+> fail-closed sin Basic. WP core (Application Passwords) intercepta Basic en
+> REST y 401aba ANTES del callback: fix `4bd33495` agrega filtro
+> `rest_authentication_errors` (prioridad 1000) solo para las rutas del
+> webhook Openpay; el handler sigue validando fail-closed. Webhook final
+> `w9zrwuedxsib5lf6rkee` → `https://lo-tengo.com.co/wp-json/ltms/v1/webhooks/openpay`
+> `verified` con Basic registrado (Openpay ecoa el usuario), eventos
+> `charge.*`, `payout.*`, `chargeback.*`, `transaction.expired` +
+> `charge.refunded`; verificación E2E: Basic válido → 200, sin auth → 401,
+> ping `{}` → 200. Webhooks eliminados: `wmzjvtuj2nd8ybusy8ru` (singular,
+> unverified), `wy6f9eqrxjialnke0af8` (PSE muerto), `w1bzpfyqb5lecstocrcf` y
+> `wxn9hkrrgejvxxmadojj` (sin Basic). Cadena: `345bfce5` (docs) →
+> `ec7b5645` (alias singular) → `1faaa928` (ping vacío) → `6dcb3957` (Basic) →
+> `4bd33495` (bypass core). Suite 5,426 tests / 12,194 assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 
