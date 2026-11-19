@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-10-28
-> **Versión del plugin:** 2.9.432
-> **Total de lecciones:** 198 (… + 5 del ciclo AUDIT-FUNNEL-2026-10-28, #194-198)
+> **Última actualización:** 2026-11-19
+> **Versión del plugin:** 2.9.435
+> **Total de lecciones:** 211 (… + 4 del ciclo OPENPAY-WEBHOOK-REG/AUTH 2026-11-19, #208-211)
 
 ---
 
