@@ -714,7 +714,23 @@ Equipo Lo Tengo",
                 // Banco rechazó la transferencia — volver a approved para reintento
                 $error_msg = sanitize_text_field( $txn['error_message'] ?? $txn['description'] ?? 'Error bancario' );
 
-                if ( $payout['status'] !== 'rejected' ) {
+                // OPENPAY-WEBHOOK-PAYOUT-GUARD (2026-11-19): el guard histórico
+                // (!== 'rejected') re-firiaba wp_mail + do_action en cada
+                // re-entrega del mismo evento: tras el primer procesamiento el
+                // payout queda en 'approved' y el guard volvía a pasar (el
+                // re-update es inofensivo, pero email/log/action se duplicaban
+                // — riesgo amplificado desde IDEMPOTENCY-RELEASE, que libera el
+                // lock de dedup ante Throwable/4xx). Guard nuevo: disparar solo
+                // si el payout está en un estado desde el que un fallo bancario
+                // es legítimo (processing/completed/approved) y las notes aún
+                // no marcan el fallo (prefijo 'Fallo bancario Openpay:'). El
+                // caso approved+notes-limpias cubre payout.created perdido;
+                // 'rejected' sigue siendo terminal.
+                $notes           = (string) ( $payout['notes'] ?? '' );
+                $already_flagged = str_starts_with( $notes, 'Fallo bancario Openpay:' );
+                $in_flight       = in_array( $payout['status'], [ 'processing', 'completed', 'approved' ], true );
+
+                if ( $in_flight && ! $already_flagged ) {
                     // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                     $wpdb->update(
                         $table,
@@ -756,6 +772,13 @@ Equipo Lo Tengo",
                     );
 
                     do_action( 'ltms_payout_failed', $payout_id, $vendor_id, $error_msg );
+                } else {
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::info(
+                            'OPENPAY_PAYOUT_FAILED_SKIPPED',
+                            "payout.failed ignorado para payout #{$payout_id} (status={$payout['status']}, fallo ya procesado o estado terminal)."
+                        );
+                    }
                 }
                 break;
         }

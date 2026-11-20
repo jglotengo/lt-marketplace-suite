@@ -549,6 +549,161 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$this->assertSame( [ 'message' => 'Already processed' ], $replay->get_data() );
 	}
 
+	// ── 3e. Payout guard: payout.failed no re-fiere en re-entregas ───────────
+
+	private function make_wpdb_payout( array $row, array &$updates ): object {
+		return new class( $row, $updates ) {
+			public string $prefix = 'wp_';
+			private array $row;
+			private array $updates;
+
+			public function __construct( array $row, array &$updates ) {
+				$this->row     = $row;
+				$this->updates = &$updates;
+			}
+
+			public function get_row( mixed $query = null, string $output = 'OBJECT', int $y = 0 ): mixed {
+				return empty( $this->row ) ? null : $this->row;
+			}
+
+			public function prepare( string $query, mixed ...$args ): string {
+				return $query;
+			}
+
+			public function update( string $table, array $data, array $where, mixed $format = null, mixed $where_format = null ): int|bool {
+				$this->updates[] = [ 'table' => $table, 'data' => $data, 'where' => $where ];
+				return 1;
+			}
+
+			public function get_var( mixed $query = null ): mixed {
+				return null;
+			}
+
+			public function get_results( mixed $query = null, string $output = 'OBJECT' ): array {
+				return [];
+			}
+		};
+	}
+
+	private function run_payout_failed( array $payout_row, array &$updates, array &$mails, array &$actions ): \WP_REST_Response {
+		$GLOBALS['wpdb'] = $this->make_wpdb_payout( $payout_row, $updates );
+
+		Functions\when( 'admin_url' )->justReturn( 'http://localhost/wp-admin/admin.php' );
+		Functions\when( 'wp_mail' )->alias(
+			static function ( ...$args ) use ( &$mails ): bool {
+				$mails[] = $args;
+				return true;
+			}
+		);
+		Functions\when( 'do_action' )->alias(
+			static function ( $tag, ...$args ) use ( &$actions ) {
+				$actions[] = [ $tag, $args ];
+				return null;
+			}
+		);
+		$this->mock_options( [ 'admin_email' => 'admin@ltms.test' ] );
+
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_user', 'ltms_wh' );
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_webhook_basic_password', 'super-secret' );
+
+		$payload = wp_json_encode(
+			[
+				'type'        => 'payout.failed',
+				'transaction' => [
+					'id'            => 'po_guard_1',
+					'error_message' => 'Fondos insuficientes en cuenta destino',
+				],
+			]
+		);
+		$auth = 'Basic ' . base64_encode( 'ltms_wh:super-secret' );
+
+		return \LTMS_Openpay_Webhook_Handler::handle(
+			$this->make_request( $payload, '', [ 'authorization' => $auth ] )
+		);
+	}
+
+	public function test_payout_failed_first_delivery_fires_action_once(): void {
+		$updates = [];
+		$mails   = [];
+		$actions = [];
+		$row     = [
+			'id'         => 7,
+			'vendor_id'  => 3,
+			'status'     => 'processing',
+			'notes'      => null,
+			'amount'     => '50000',
+			'net_amount' => '48500',
+		];
+
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertCount( 1, $updates, 'Debe actualizar el payout exactamente una vez.' );
+		$this->assertSame( 'approved', $updates[0]['data']['status'] );
+		$this->assertStringStartsWith( 'Fallo bancario Openpay:', (string) $updates[0]['data']['notes'] );
+		$this->assertCount( 1, $mails );
+		$this->assertCount( 1, $actions );
+		$this->assertSame( 'ltms_payout_failed', $actions[0][0] );
+		$this->assertSame( [ 7, 3, 'Fondos insuficientes en cuenta destino' ], $actions[0][1] );
+	}
+
+	public function test_payout_failed_duplicate_delivery_is_ignored_without_refire(): void {
+		$updates = [];
+		$mails   = [];
+		$actions = [];
+		$row     = [
+			'id'        => 7,
+			'vendor_id' => 3,
+			'status'    => 'approved',
+			'notes'     => 'Fallo bancario Openpay: Fondos insuficientes',
+		];
+
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [], $updates, 'Re-entrega no debe re-actualizar el payout.' );
+		$this->assertSame( [], $mails, 'Re-entrega no debe re-enviar el email.' );
+		$this->assertSame( [], $actions, 'Re-entrega no debe re-firear ltms_payout_failed.' );
+	}
+
+	public function test_payout_failed_terminal_rejected_is_ignored(): void {
+		$updates = [];
+		$mails   = [];
+		$actions = [];
+		$row     = [
+			'id'        => 7,
+			'vendor_id' => 3,
+			'status'    => 'rejected',
+			'notes'     => '',
+		];
+
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [], $updates );
+		$this->assertSame( [], $mails );
+		$this->assertSame( [], $actions );
+	}
+
+	public function test_payout_failed_on_completed_payout_still_processes(): void {
+		$updates = [];
+		$mails   = [];
+		$actions = [];
+		$row     = [
+			'id'        => 7,
+			'vendor_id' => 3,
+			'status'    => 'completed',
+			'notes'     => '',
+		];
+
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertCount( 1, $updates, 'El revert edge completed->approved debe preservarse.' );
+		$this->assertCount( 1, $mails );
+		$this->assertCount( 1, $actions );
+	}
+
 	// ── 4. Vigencia y exposición del código ──────────────────────────────────
 
 	public function test_pending_verification_code_expires_after_24_hours(): void {
