@@ -32,8 +32,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > segunda pasada de revisión encontró que un substring del webhook en la query
 > de una ruta REST arbitraria saltaba el control CSRF — verificado en prod:
 > `?_wpnonce=x&x=/ltms/v1/webhooks/openpay` pasó de 200 a 403). P3: transaction
-> escalar en payout.* daba TypeError/500, ahora 400. Suite 5,429 tests /
-> 12,202 assertions / 3 skipped.
+> escalar en payout.* daba TypeError/500, ahora 400. Fix `fb66caae`
+> (idempotency-release): el transient de dedup se marcaba ANTES de procesar —
+> un Throwable a mitad (ej. listener de payment_complete de comisiones/wallet
+> lanzando) dejaba el lock 1h y el reintento recibía 200 "Already processed"
+> con dinero cobrado y orden sin pagar; ahora el procesamiento vive en
+> `dispatch_event()` y `handle()` libera el lock ante Throwable o respuesta
+> 4xx (reintento reprocesa; `needs_payment` evita doble pago). Suite 5,432
+> tests / 12,219 assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 

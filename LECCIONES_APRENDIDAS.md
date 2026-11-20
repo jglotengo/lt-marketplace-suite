@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-11-19
 > **Versión del plugin:** 2.9.435
-> **Total de lecciones:** 211 (… + 4 del ciclo OPENPAY-WEBHOOK-REG/AUTH 2026-11-19, #208-211)
+> **Total de lecciones:** 212 (… + 5 del ciclo OPENPAY-WEBHOOK-REG/AUTH 2026-11-19, #208-212)
 
 ---
 
@@ -4756,7 +4756,7 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    (`substr_count`, "call-sites", el nombre del método) en `tests/` para
    localizar invariantes fuente relacionadas.
 
-## 35. v2.9.435 - OPENPAY-WEBHOOK-REG-2026-11-19: alta de webhook por API y auditoría de webhooks registrados (4 lecciones nuevas)
+## 35. v2.9.435 - OPENPAY-WEBHOOK-REG-2026-11-19: alta de webhook por API y auditoría de webhooks registrados (5 lecciones nuevas)
 
 ### Lección #208: la validación de URL de un webhook puede ser un POST con body vacío `{}` — un handler fail-closed lo confunde con un evento sin firma y devuelve 401 (OPENPAY-WEBHOOK-REG, 2026-11-19)
 
@@ -4887,3 +4887,39 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    `maybe_decrypt()` ANTES de tocar nada. (4) Confirmar el alta con el eco de
    `user` en la respuesta y un GET final: un solo webhook, `verified`, con
    `user`.
+
+### Lección #212: el transient de idempotencia marcado ANTES de procesar convierte cualquier fallo a mitad en evento perdido — el lock es anti-concurrencia, no comprobante de éxito (OPENPAY-WEBHOOK-IDEMPOTENCY-RELEASE, 2026-11-19)
+
+1. **Caso real:** el handler marcaba `set_transient('ltms_wh_seen_openpay_*',
+   1, HOUR_IN_SECONDS)` ANTES del procesamiento del evento. Si un Throwable
+   saltaba a mitad (el caso real: cualquier listener de
+   `woocommerce_payment_complete` — comisiones, wallet, order split, emails —
+   lanzando, o un error de DB), el lock quedaba puesto: el reintento de
+   Openpay (que recibe el 500 y reintenta hasta ~6 veces) leía el lock y
+   recibía 200 "Already processed" → evento NUNCA procesado con dinero cobrado
+   y orden sin pagar.
+
+2. **Diagnóstico:** el transient jugaba dos papeles que se confundían: (a) lock
+   anti-concurrencia para entregas paralelas (necesita estar ANTES) y (b)
+   comprobante de "evento procesado con éxito" (necesita quedar SOLO si el
+   procesamiento terminó bien). Al marcar antes de procesar, el fallo quedaba
+   amortiguado como si fuera éxito. La corrección separa los papeles: el lock
+   se pone antes (concurrencia) y se LIBERA si el proceso lanza
+   (`delete_transient` + rethrow) o responde 4xx; solo un 2xx lo conserva.
+   El reproceso es seguro porque los guards financieros ya existentes
+   (`needs_payment()`, `status !== 'completed'`) hacen del reintento un no-op
+   cuando el primer pase alcanzó el efecto principal.
+
+3. **Regla preventiva:** (1) En handlers de webhook, el marcador de dedup NUNCA
+   es comprobante de éxito: liberarlo en Throwable/4xx y conservarlo solo en
+   2xx. (2) El reproceso tras liberar el lock debe apoyarse en guards de
+   idempotencia del lado del dominio (`needs_payment`, comparación de estado)
+   — si una operación no es re-ejecutable de forma segura, no liberes el lock
+   o usa un ledger por event_id. (3) Limitación conocida: un Throwable a mitad
+   de la CADENA de listeners deja efectos parciales que el reintento no
+   completa (los guards cortan la re-ejecución) — la solución definitiva es
+   migración async/event-ledger, no más parches en el lock. (4) Testear el
+   ciclo completo: excepción → lock liberado → reintento reprocesa; 4xx →
+   ídem; 2xx → lock conservado + replay "Already processed". (5) En tests, las
+   arrow fn (`fn() =>`) capturan variables POR VALOR (snapshot): para observar
+   mutaciones entre llamadas usar closures con `use (&$var)`.
