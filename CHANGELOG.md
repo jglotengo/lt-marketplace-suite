@@ -39,7 +39,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > con dinero cobrado y orden sin pagar; ahora el procesamiento vive en
 > `dispatch_event()` y `handle()` libera el lock ante Throwable o respuesta
 > 4xx (reintento reprocesa; `needs_payment` evita doble pago). Suite 5,432
-> tests / 12,219 assertions / 3 skipped.
+> tests / 12,219 assertions / 3 skipped. Fix `c6e511b0` (payout-guard): el
+> guard de `payout.failed` (`!== 'rejected'`) re-firiaba `wp_mail` +
+> `do_action('ltms_payout_failed')` en cada re-entrega (tras el primer pase el
+> payout queda 'approved' y el guard volvía a pasar — amplificado por
+> idempotency-release, que libera el lock de dedup ante Throwable/4xx); ahora
+> solo dispara con status processing/completed/approved y notes sin flag
+> `Fallo bancario Openpay:` (approved+notes limpias cubre payout.created
+> perdido; rejected/pending → skip con log `OPENPAY_PAYOUT_FAILED_SKIPPED`).
+> P2 pendiente: el reenvío manual de un payout debe limpiar notes (si no, un
+> segundo fallo bancario real sería ignorado; traza en
+> `OPENPAY_PAYOUT_FAILED_SKIPPED`). Suite 5,436 tests / 12,239 assertions /
+> 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 

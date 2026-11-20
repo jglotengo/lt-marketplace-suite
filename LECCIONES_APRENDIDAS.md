@@ -2,9 +2,9 @@
 
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
-> **Última actualización:** 2026-11-19
+> **Última actualización:** 2026-11-20
 > **Versión del plugin:** 2.9.435
-> **Total de lecciones:** 212 (… + 5 del ciclo OPENPAY-WEBHOOK-REG/AUTH 2026-11-19, #208-212)
+> **Total de lecciones:** 213 (… + 6 del ciclo OPENPAY-WEBHOOK 2026-11-19/20, #208-213)
 
 ---
 
@@ -4923,3 +4923,41 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    ídem; 2xx → lock conservado + replay "Already processed". (5) En tests, las
    arrow fn (`fn() =>`) capturan variables POR VALOR (snapshot): para observar
    mutaciones entre llamadas usar closures con `use (&$var)`.
+
+### Lección #213: un guard de webhook que solo comprueba "no terminal" NO es idempotente si el efecto tiene side-effects (email/action/log) — el estado resultante del primer pase debe reconocerse como "ya procesado" (OPENPAY-WEBHOOK-PAYOUT-GUARD, 2026-11-19)
+
+1. **Caso real:** el `case 'payout.failed'` del webhook Openpay procesaba con
+   `if ( $payout['status'] !== 'rejected' )`. El procesamiento deja el payout
+   en 'approved' (con notes = "Fallo bancario Openpay: {error}"), así que cada
+   re-entrega del MISMO evento volvía a pasar el guard: re-update (inofensivo)
+   + re-envío de `wp_mail` al admin + re-fire de
+   `do_action('ltms_payout_failed')` + re-log. El riesgo se amplificó con el
+   fix IDEMPOTENCY-RELEASE (#212), que libera el lock de dedup ante
+   Throwable/4xx: ahora las re-entregas sí llegan al case con frecuencia.
+
+2. **Diagnóstico:** el guard confundía "no está terminal" con "no fue
+   procesado". El estado 'approved' es AMBOS: resultado legítimo de un fallo
+   ya notificado (con flag en notes) Y estado desde el que un fallo es
+   legítimo (payout.created perdido). La desambiguación vive en las notes:
+   el propio handler escribe el prefijo "Fallo bancario Openpay:" al
+   procesar, así que ese prefijo es el marcador de "fallo ya procesado".
+   Guard nuevo: `in_array($status, ['processing','completed','approved']) &&
+   ! str_starts_with($notes, 'Fallo bancario Openpay:')` — processing=
+   primer fallo, completed=revert edge del banco (preservado), approved+
+   notes limpias=cubre payout.created perdido, approved+flaggeado=skip,
+   rejected/pending=skip con log `OPENPAY_PAYOUT_FAILED_SKIPPED`.
+
+3. **Regla preventiva:** (1) Todo guard de webhook debe responder "¿ya
+   procesé ESTE efecto?", no "¿estoy en un estado compatible?" — si el
+   efecto dispara emails/actions/logs, un guard solo-de-estado re-fiere en
+   cada re-entrega. (2) Si el efecto escribe un marcador en el propio
+   dominio (notes, meta, columna de estado intermedio), úsalo como flag de
+   "ya notificado" en el guard — es la memoria más barata y no requiere
+   tabla nueva. (3) Limitación conocida (P2): el reenvío MANUAL de un
+   payout debe limpiar las notes del fallo previo — si un humano devuelve
+   el payout a 'pending' y re-aprueba sin limpiar notes, un segundo fallo
+   bancario real llegará con flag puesto y será ignorado (queda traza en
+   `OPENPAY_PAYOUT_FAILED_SKIPPED`). (4) En tests, para clases anónimas con
+   estado por referencia el `&` va en la FIRMA del constructor
+   (`function __construct(array &$updates)`), NO en la instanciación
+   (`new class($row, $updates)` — con `&` ahí es parse error).
