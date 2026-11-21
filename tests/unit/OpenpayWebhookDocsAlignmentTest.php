@@ -641,6 +641,7 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$this->assertCount( 1, $updates, 'Debe actualizar el payout exactamente una vez.' );
 		$this->assertSame( 'approved', $updates[0]['data']['status'] );
 		$this->assertStringStartsWith( 'Fallo bancario Openpay:', (string) $updates[0]['data']['notes'] );
+		$this->assertSame( '', $updates[0]['data']['gateway_ref'], 'El disbursement muerto debe limpiarse para que el reintento no salte el gateway.' );
 		$this->assertCount( 1, $mails );
 		$this->assertCount( 1, $actions );
 		$this->assertSame( 'ltms_payout_failed', $actions[0][0] );

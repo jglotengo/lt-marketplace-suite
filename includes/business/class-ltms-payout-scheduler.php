@@ -399,15 +399,29 @@ final class LTMS_Payout_Scheduler {
         // Only one of two concurrent admin clicks will see rows_affected = 1.
         // In unit tests (mock wpdb) this UPDATE always returns 1, which is fine because
         // the Step 1 guard already filtered non-pending payouts.
+        $claim_data    = [
+            'status'       => 'processing',
+            'approved_by'  => $admin_id,
+            'processed_at' => LTMS_Utils::now_utc(),
+        ];
+        $claim_formats = [ '%s', '%d', '%s' ];
+
+        // PAYOUT-RETRY-NOTES-CLEAR (2026-11-20): limpiar el flag de fallo bancario previo
+        // ('Fallo bancario Openpay: ...', lección #213) al re-aprobar un reintento. Sin
+        // esto, el guard del webhook vería el payout como "ya notificado" y un segundo
+        // fallo bancario REAL sería ignorado en silencio (solo log INFO). approve() es el
+        // único punto in-code que re-ejecuta un payout (pending→processing, tras el
+        // reseteo manual del status por el admin).
+        if ( str_starts_with( (string) ( $payout['notes'] ?? '' ), 'Fallo bancario Openpay:' ) ) {
+            $claim_data['notes'] = '';
+            $claim_formats[]     = '%s';
+        }
+
         $rows = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
             $wpdb->prefix . 'lt_payout_requests',
-            [
-                'status'       => 'processing',
-                'approved_by'  => $admin_id,
-                'processed_at' => LTMS_Utils::now_utc(),
-            ],
+            $claim_data,
             [ 'id' => $payout_id, 'status' => 'pending' ],
-            [ '%s', '%d', '%s' ],
+            $claim_formats,
             [ '%d', '%s' ]
         );
         if ( $rows === false || $rows === 0 ) {

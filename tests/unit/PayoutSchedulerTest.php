@@ -636,6 +636,7 @@ class PayoutSchedulerTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             public string $prefix     = 'wp_';
             public string $last_error = '';
             public mixed  $last_result = null;
+            public array  $updates     = [];
 
             public function __construct(
                 private float   $balance,
@@ -681,7 +682,10 @@ class PayoutSchedulerTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
             public function prepare( string $q, mixed ...$args ): string { return $q; }
             public function query( string $q ): int|bool { return true; }
             public function insert( string $t, array $d, mixed $f = null ): int|bool { return 1; }
-            public function update( string $t, array $d, array $w, mixed $f = null, mixed $wf = null ): int|bool { return 1; }
+            public function update( string $t, array $d, array $w, mixed $f = null, mixed $wf = null ): int|bool {
+                $this->updates[] = [ 'table' => $t, 'data' => $d, 'where' => $w ];
+                return 1;
+            }
             public function delete( string $t, array $w, mixed $f = null ): int|bool { return 1; }
             public function esc_like( string $text ): string { return addcslashes( $text, '_%\\' ); }
             public function get_charset_collate(): string { return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'; }
@@ -746,6 +750,54 @@ class PayoutSchedulerTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         $result = LTMS_Payout_Scheduler::approve( 999, 1 );
 
         $this->assertIsBool( $result['success'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // PAYOUT-RETRY-NOTES-CLEAR — approve() limpia el flag de fallo previo
+    // -----------------------------------------------------------------------
+
+    public function test_approve_clears_bank_failure_flag_from_notes_on_claim(): void {
+        Functions\when( '__' )->returnArg();
+        Functions\when( 'wp_mail' )->justReturn( true );
+        Functions\when( 'get_userdata' )->justReturn( null );
+        \LTMS_Core_Config::set( 'ltms_kyc_required_for_payout', 'no' );
+
+        $payout = [
+            'id' => 5, 'vendor_id' => 10, 'amount' => '100000.00', 'net_amount' => '100000.00',
+            'status' => 'pending', 'method' => 'bank_transfer', 'gateway_ref' => '',
+            'notes' => 'Fallo bancario Openpay: Fondos insuficientes',
+        ];
+        $wpdb = $this->make_payout_wpdb( payout_row: $payout, balance: 500000.0, balance_pending: 100000.0 );
+        $GLOBALS['wpdb'] = $wpdb;
+
+        LTMS_Payout_Scheduler::approve( 5, 1 );
+
+        $claim = $wpdb->updates[0] ?? [];
+        $this->assertSame( 'wp_lt_payout_requests', $claim['table'] ?? '', 'El primer UPDATE debe ser el claim sobre payout_requests.' );
+        $this->assertSame( 'processing', $claim['data']['status'] ?? '', 'El claim debe mover pending -> processing.' );
+        $this->assertArrayHasKey( 'notes', $claim['data'], 'El claim debe limpiar el flag de fallo previo.' );
+        $this->assertSame( '', $claim['data']['notes'], 'Las notes deben quedar limpias para que un segundo fallo real dispare.' );
+    }
+
+    public function test_approve_preserves_notes_when_clean(): void {
+        Functions\when( '__' )->returnArg();
+        Functions\when( 'wp_mail' )->justReturn( true );
+        Functions\when( 'get_userdata' )->justReturn( null );
+        \LTMS_Core_Config::set( 'ltms_kyc_required_for_payout', 'no' );
+
+        $payout = [
+            'id' => 6, 'vendor_id' => 10, 'amount' => '100000.00', 'net_amount' => '100000.00',
+            'status' => 'pending', 'method' => 'bank_transfer', 'gateway_ref' => '',
+            'notes' => 'Nota operativa previa',
+        ];
+        $wpdb = $this->make_payout_wpdb( payout_row: $payout, balance: 500000.0, balance_pending: 100000.0 );
+        $GLOBALS['wpdb'] = $wpdb;
+
+        LTMS_Payout_Scheduler::approve( 6, 1 );
+
+        $claim = $wpdb->updates[0] ?? [];
+        $this->assertSame( 'processing', $claim['data']['status'] ?? '' );
+        $this->assertArrayNotHasKey( 'notes', $claim['data'], 'Notes sin el flag no deben tocarse.' );
     }
 
     // -----------------------------------------------------------------------

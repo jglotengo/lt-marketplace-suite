@@ -731,16 +731,22 @@ Equipo Lo Tengo",
                 $in_flight       = in_array( $payout['status'], [ 'processing', 'completed', 'approved' ], true );
 
                 if ( $in_flight && ! $already_flagged ) {
+                    // PAYOUT-RETRY-SAFETY (2026-11-20): el disbursement rechazado por el
+                    // banco queda muerto — se limpia gateway_ref para que un reintento
+                    // vía approve() no lo trate como "gateway ya pagado" (guard PO-CRASH-3)
+                    // y salte la re-ejecución marcando el payout como completed sin que el
+                    // banco reciba el dinero. El openpay_id muerto queda en el log ctx.
                     // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                     $wpdb->update(
                         $table,
                         [
-                            'status'     => 'approved', // devolver a approved para reintento manual
-                            'notes'      => "Fallo bancario Openpay: {$error_msg}",
-                            'updated_at' => $now,
+                            'status'      => 'approved', // devolver a approved para reintento manual
+                            'notes'       => "Fallo bancario Openpay: {$error_msg}",
+                            'gateway_ref' => '',
+                            'updated_at'  => $now,
                         ],
                         [ 'id' => $payout_id ],
-                        [ '%s', '%s', '%s' ],
+                        [ '%s', '%s', '%s', '%s' ],
                         [ '%d' ]
                     );
 
@@ -768,7 +774,7 @@ Equipo Lo Tengo",
                     LTMS_Core_Logger::error(
                         'OPENPAY_PAYOUT_FAILED',
                         "Payout #{$payout_id} rechazado por banco. Motivo: {$error_msg}",
-                        [ 'payout_id' => $payout_id, 'vendor_id' => $vendor_id, 'error' => $error_msg ]
+                        [ 'payout_id' => $payout_id, 'vendor_id' => $vendor_id, 'error' => $error_msg, 'openpay_id' => $openpay_id ]
                     );
 
                     do_action( 'ltms_payout_failed', $payout_id, $vendor_id, $error_msg );
