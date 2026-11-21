@@ -4959,12 +4959,17 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    2026-11-20), y el fallo del gateway debe limpiar el gateway_ref muerto
    (PAYOUT-RETRY-SAFETY, 2026-11-20) — si no, approve() salta el gateway
    por el guard anti-doble-cobro (PO-CRASH-3) y marca completed sin que el
-   banco reciba dinero. (4) Limitación conocida (P2, backlog): ventana
-   estrecha de evento stale — un payout.failed viejo re-entregado DESPUÉS
-   de un re-approve (notes ya limpiadas) pasa el guard vía fallback por
-   reference y podría re-limpiar el gateway_ref nuevo; se auto-repara con
-   el payout.succeeded posterior y la dedup por event_id filtra las
-   re-entregas normales. (5) En tests, para clases anónimas con
+   banco reciba dinero.    (4) Ventana stale de evento viejo tras re-approve: en producción ya la
+   neutraliza el lookup (find_payout_by_gateway_ref: ref nueva ≠ id viejo →
+   fila no encontrada → OPENPAY_PAYOUT_WEBHOOK_UNKNOWN); el guard
+   PAYOUT-RETRY-REF-MATCH (2026-11-20) la blinda además a nivel de guard
+   (dispara solo con gateway_ref = openpay_id del evento o vacío) — la
+   identidad del disbursement es gateway_ref, no el status. P2 backlog
+   real: el fallback por reference del lookup es CÓDIGO MUERTO —
+   create_request persiste reference='PAY-YYMMDD-XXXXXX' random mientras el
+   disbursement usa order_id='PAY-{id}' (jamás matchean); repararlo
+   (persistir 'PAY-{id}' como reference o parsear order_ref) haría real la
+   rama ref='' del guard. (5) En tests, para clases anónimas con
    estado por referencia el `&` va en la FIRMA del constructor
    (`function __construct(array &$updates)`), NO en la instanciación
    (`new class($row, $updates)` — con `&` ahí es parse error).

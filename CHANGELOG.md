@@ -57,7 +57,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > hacía que el reintento saltara el gateway (guard PO-CRASH-3) y marcara
 > completed sin que el banco recibiera dinero. P2 backlog: ventana stale de
 > evento viejo re-entregado post-re-approve (auto-repara con
-> payout.succeeded). Suite 5,438 tests / 12,246 assertions / 3 skipped.
+> payout.succeeded). Suite 5,438 tests / 12,246 assertions / 3 skipped. Fix
+> `e53738f6` (ref-match): el guard de `payout.failed` exige además identidad
+> de disbursement (`gateway_ref === openpay_id` o vacío) — defense-in-depth
+> (el lookup ya neutraliza el evento stale en producción) para cuando el
+> fallback por `reference` se repare, que hoy es código muerto
+> (`reference='PAY-YYMMDD-XXXXXX'` random vs `order_id='PAY-{id}'`; P2
+> backlog, lección #213 regla 4). Suite 5,439 tests / 12,250 assertions /
+> 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 
