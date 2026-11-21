@@ -726,11 +726,21 @@ Equipo Lo Tengo",
                 // no marcan el fallo (prefijo 'Fallo bancario Openpay:'). El
                 // caso approved+notes-limpias cubre payout.created perdido;
                 // 'rejected' sigue siendo terminal.
+                // PAYOUT-RETRY-REF-MATCH (2026-11-20): la identidad del disbursement es
+                // gateway_ref, no el status. Un payout.failed VIEJO re-entregado tras un
+                // re-approve solo dispara si gateway_ref coincide con el openpay_id del
+                // evento o está vacío. En producción el lookup (find_payout_by_gateway_ref)
+                // ya neutraliza el evento stale (ref nueva ≠ id viejo → fila no encontrada
+                // → OPENPAY_PAYOUT_WEBHOOK_UNKNOWN): este guard es defense-in-depth para
+                // cuando el fallback por reference se repare (hoy es código muerto —
+                // reference='PAY-YYMMDD-XXXXXX' random vs order_id='PAY-{id}').
                 $notes           = (string) ( $payout['notes'] ?? '' );
                 $already_flagged = str_starts_with( $notes, 'Fallo bancario Openpay:' );
                 $in_flight       = in_array( $payout['status'], [ 'processing', 'completed', 'approved' ], true );
+                $ref_current     = (string) ( $payout['gateway_ref'] ?? '' );
+                $ref_is_current  = ( $ref_current === $openpay_id || $ref_current === '' );
 
-                if ( $in_flight && ! $already_flagged ) {
+                if ( $in_flight && ! $already_flagged && $ref_is_current ) {
                     // PAYOUT-RETRY-SAFETY (2026-11-20): el disbursement rechazado por el
                     // banco queda muerto — se limpia gateway_ref para que un reintento
                     // vía approve() no lo trate como "gateway ya pagado" (guard PO-CRASH-3)

@@ -691,10 +691,11 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$mails   = [];
 		$actions = [];
 		$row     = [
-			'id'        => 7,
-			'vendor_id' => 3,
-			'status'    => 'completed',
-			'notes'     => '',
+			'id'          => 7,
+			'vendor_id'   => 3,
+			'status'      => 'completed',
+			'notes'       => '',
+			'gateway_ref' => 'po_guard_1',
 		];
 
 		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
@@ -703,6 +704,29 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$this->assertCount( 1, $updates, 'El revert edge completed->approved debe preservarse.' );
 		$this->assertCount( 1, $mails );
 		$this->assertCount( 1, $actions );
+	}
+
+	public function test_payout_failed_stale_event_with_new_disbursement_is_ignored(): void {
+		$updates = [];
+		$mails   = [];
+		$actions = [];
+		// PAYOUT-RETRY-REF-MATCH: evento VIEJO re-entregado tras un re-approve
+		// (notes limpiadas, gateway_ref apunta al disbursement NUEVO). El guard no
+		// debe disparar: la identidad del disbursement es gateway_ref.
+		$row = [
+			'id'          => 7,
+			'vendor_id'   => 3,
+			'status'      => 'processing',
+			'notes'       => '',
+			'gateway_ref' => 'po_new_456',
+		];
+
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [], $updates, 'Evento stale no debe tocar el disbursement nuevo.' );
+		$this->assertSame( [], $mails, 'Evento stale no debe re-alertar al admin.' );
+		$this->assertSame( [], $actions, 'Evento stale no debe re-firear ltms_payout_failed.' );
 	}
 
 	// ── 4. Vigencia y exposición del código ──────────────────────────────────
