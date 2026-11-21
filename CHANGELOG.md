@@ -50,7 +50,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > P2 pendiente: el reenvío manual de un payout debe limpiar notes (si no, un
 > segundo fallo bancario real sería ignorado; traza en
 > `OPENPAY_PAYOUT_FAILED_SKIPPED`). Suite 5,436 tests / 12,239 assertions /
-> 3 skipped.
+> 3 skipped. Fix `56091877` (retry-safety): cierra ese P2 — `approve()` limpia
+> el flag `Fallo bancario Openpay:` del claim pending→processing
+> (PAYOUT-RETRY-NOTES-CLEAR) y el webhook `payout.failed` limpia el
+> `gateway_ref` del disbursement muerto (PAYOUT-RETRY-SAFETY), que sin fix
+> hacía que el reintento saltara el gateway (guard PO-CRASH-3) y marcara
+> completed sin que el banco recibiera dinero. P2 backlog: ventana stale de
+> evento viejo re-entregado post-re-approve (auto-repara con
+> payout.succeeded). Suite 5,438 tests / 12,246 assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 

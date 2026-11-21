@@ -4953,11 +4953,18 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    cada re-entrega. (2) Si el efecto escribe un marcador en el propio
    dominio (notes, meta, columna de estado intermedio), úsalo como flag de
    "ya notificado" en el guard — es la memoria más barata y no requiere
-   tabla nueva. (3) Limitación conocida (P2): el reenvío MANUAL de un
-   payout debe limpiar las notes del fallo previo — si un humano devuelve
-   el payout a 'pending' y re-aprueba sin limpiar notes, un segundo fallo
-   bancario real llegará con flag puesto y será ignorado (queda traza en
-   `OPENPAY_PAYOUT_FAILED_SKIPPED`). (4) En tests, para clases anónimas con
+   tabla nueva. (3) El flag de fallo y el gateway_ref son PAR del ciclo de
+   reintento: si un guard usa un flag en notes, el flujo que re-ejecuta la
+   operación (approve()) debe limpiar ese flag (PAYOUT-RETRY-NOTES-CLEAR,
+   2026-11-20), y el fallo del gateway debe limpiar el gateway_ref muerto
+   (PAYOUT-RETRY-SAFETY, 2026-11-20) — si no, approve() salta el gateway
+   por el guard anti-doble-cobro (PO-CRASH-3) y marca completed sin que el
+   banco reciba dinero. (4) Limitación conocida (P2, backlog): ventana
+   estrecha de evento stale — un payout.failed viejo re-entregado DESPUÉS
+   de un re-approve (notes ya limpiadas) pasa el guard vía fallback por
+   reference y podría re-limpiar el gateway_ref nuevo; se auto-repara con
+   el payout.succeeded posterior y la dedup por event_id filtra las
+   re-entregas normales. (5) En tests, para clases anónimas con
    estado por referencia el `&` va en la FIRMA del constructor
    (`function __construct(array &$updates)`), NO en la instanciación
    (`new class($row, $updates)` — con `&` ahí es parse error).
