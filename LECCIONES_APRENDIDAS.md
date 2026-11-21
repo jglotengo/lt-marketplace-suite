@@ -4973,7 +4973,11 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    del guard. Lección anexa (de la revisión): al añadir una ruta de lookup,
    re-verificar que los tests de skip del guard siguen ejercitando el GUARD y
    no el "payout no encontrado" — pueden pasar verdes por el camino
-   equivocado (patrón test huérfano, #119). (5) En tests, para clases anónimas con
+   equivocado (patrón test huérfano, #119). Deuda menor pre-existente (P2, no
+   agravada por el fix): openpay_id='' en el payload matchea el primer payout
+   con gateway_ref vacío en el lookup 1, y payout.created/succeeded no tienen
+   ref-guard (self-heal por eventos siguientes + Openpay no re-entrega eventos
+   ack'd con 200). (5) En tests, para clases anónimas con
    estado por referencia el `&` va en la FIRMA del constructor
    (`function __construct(array &$updates)`), NO en la instanciación
    (`new class($row, $updates)` — con `&` ahí es parse error).
