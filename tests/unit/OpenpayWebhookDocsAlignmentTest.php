@@ -562,12 +562,36 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 				$this->updates = &$updates;
 			}
 
-			public function get_row( mixed $query = null, string $output = 'OBJECT', int $y = 0 ): mixed {
-				return empty( $this->row ) ? null : $this->row;
+			public function prepare( string $query, mixed ...$args ): string {
+				$i = 0;
+				return (string) preg_replace_callback(
+					'/%[sd]/',
+					static function ( array $mm ) use ( $args, &$i ): string {
+						$arg = $args[ $i++ ] ?? '';
+						return is_int( $arg ) || is_float( $arg )
+							? (string) (int) $arg
+							: "'" . addslashes( (string) $arg ) . "'";
+					},
+					$query
+				);
 			}
 
-			public function prepare( string $query, mixed ...$args ): string {
-				return $query;
+			public function get_row( mixed $query = null, string $output = 'OBJECT', int $y = 0 ): mixed {
+				$q = (string) $query;
+				// Lookup 1: gateway_ref — solo matchea si el ref del row coincide.
+				if ( str_contains( $q, 'WHERE gateway_ref' ) ) {
+					preg_match( "/gateway_ref = '([^']*)'/", $q, $mm );
+					return ( ( $mm[1] ?? '~none~' ) === (string) ( $this->row['gateway_ref'] ?? '' ) ) ? $this->row : null;
+				}
+				// Lookup 2: reference (fallback legacy, muerto en producción).
+				if ( str_contains( $q, 'WHERE reference' ) ) {
+					return null;
+				}
+				// Lookup 3: id parseado de order_ref 'PAY-{id}' (PAYOUT-LOOKUP-ORDERID).
+				if ( preg_match( '/WHERE id = (\d+)/', $q, $mm ) ) {
+					return ( (int) $mm[1] === (int) ( $this->row['id'] ?? 0 ) ) ? $this->row : null;
+				}
+				return empty( $this->row ) ? null : $this->row;
 			}
 
 			public function update( string $table, array $data, array $where, mixed $format = null, mixed $where_format = null ): int|bool {
@@ -585,7 +609,7 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		};
 	}
 
-	private function run_payout_failed( array $payout_row, array &$updates, array &$mails, array &$actions ): \WP_REST_Response {
+	private function run_payout_failed( array $payout_row, array &$updates, array &$mails, array &$actions, string $txn_id = 'po_guard_1', string $order_id = '' ): \WP_REST_Response {
 		$GLOBALS['wpdb'] = $this->make_wpdb_payout( $payout_row, $updates );
 
 		Functions\when( 'admin_url' )->justReturn( 'http://localhost/wp-admin/admin.php' );
@@ -610,8 +634,9 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 			[
 				'type'        => 'payout.failed',
 				'transaction' => [
-					'id'            => 'po_guard_1',
+					'id'            => $txn_id,
 					'error_message' => 'Fondos insuficientes en cuenta destino',
+					'order_id'      => $order_id,
 				],
 			]
 		);
@@ -627,12 +652,13 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$mails   = [];
 		$actions = [];
 		$row     = [
-			'id'         => 7,
-			'vendor_id'  => 3,
-			'status'     => 'processing',
-			'notes'      => null,
-			'amount'     => '50000',
-			'net_amount' => '48500',
+			'id'          => 7,
+			'vendor_id'   => 3,
+			'status'      => 'processing',
+			'notes'       => null,
+			'gateway_ref' => 'po_guard_1',
+			'amount'      => '50000',
+			'net_amount'  => '48500',
 		];
 
 		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
@@ -652,19 +678,46 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$updates = [];
 		$mails   = [];
 		$actions = [];
-		$row     = [
+		// Tras el primer procesamiento: ref limpiado ('') + notes flaggeadas. La
+		// re-entrega llega con order_id='PAY-7' y es encontrada vía el fallback
+		// PAYOUT-LOOKUP-ORDERID — el flag de notes la salta.
+		$row = [
 			'id'        => 7,
 			'vendor_id' => 3,
 			'status'    => 'approved',
 			'notes'     => 'Fallo bancario Openpay: Fondos insuficientes',
 		];
 
-		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions, 'po_guard_1', 'PAY-7' );
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( [], $updates, 'Re-entrega no debe re-actualizar el payout.' );
 		$this->assertSame( [], $mails, 'Re-entrega no debe re-enviar el email.' );
 		$this->assertSame( [], $actions, 'Re-entrega no debe re-firear ltms_payout_failed.' );
+	}
+
+	public function test_payout_failed_falls_back_to_order_id_parse(): void {
+		$updates = [];
+		$mails   = [];
+		$actions = [];
+		// PAYOUT-LOOKUP-ORDERID: gateway_ref vacío (crash pre-persist), el evento
+		// llega con order_id='PAY-7' — el fallback por id debe encontrar el payout
+		// y la rama ref='' del guard PAYOUT-RETRY-REF-MATCH debe disparar.
+		$row = [
+			'id'        => 7,
+			'vendor_id' => 3,
+			'status'    => 'processing',
+			'notes'     => '',
+		];
+
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions, 'po_x9', 'PAY-7' );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertCount( 1, $updates, 'El fallback por order_id debe encontrar el payout y procesar el fallo.' );
+		$this->assertSame( 'approved', $updates[0]['data']['status'] );
+		$this->assertSame( '', $updates[0]['data']['gateway_ref'] );
+		$this->assertCount( 1, $mails );
+		$this->assertCount( 1, $actions );
 	}
 
 	public function test_payout_failed_terminal_rejected_is_ignored(): void {
@@ -678,7 +731,7 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 			'notes'     => '',
 		];
 
-		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions, 'po_guard_1', 'PAY-7' );
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( [], $updates );
@@ -721,7 +774,7 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 			'gateway_ref' => 'po_new_456',
 		];
 
-		$response = $this->run_payout_failed( $row, $updates, $mails, $actions );
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions, 'po_guard_1', 'PAY-7' );
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( [], $updates, 'Evento stale no debe tocar el disbursement nuevo.' );

@@ -581,7 +581,7 @@ class LTMS_Openpay_Webhook_Handler {
      *   - payout.failed    → el banco rechazó la transferencia
      *
      * Busca el payout en lt_payout_requests por gateway_ref = openpay_id
-     * o por reference = order_ref (PAY-{id}).
+     * o por reference = order_ref (legacy) o por id parseado de order_ref 'PAY-{id}'.
      *
      * @param string $event_type  Tipo de evento (payout.succeeded, etc.)
      * @param array  $txn         Datos de la transacción Openpay.
@@ -615,6 +615,22 @@ class LTMS_Openpay_Webhook_Handler {
                 $wpdb->prepare(
                     "SELECT * FROM `{$table}` WHERE reference = %s LIMIT 1",
                     $order_ref
+                ),
+                ARRAY_A
+            );
+        }
+
+        // PAYOUT-LOOKUP-ORDERID (2026-11-20): el fallback por reference es código
+        // muerto — create_request persiste reference='PAY-YYMMDD-XXXXXX' random
+        // mientras el disbursement usa order_id='PAY-{id}' (jamás matchean,
+        // lección #213 regla 4). Fallback definitivo: parsear el id del order_ref.
+        // Hace alcanzable la rama ref='' del guard PAYOUT-RETRY-REF-MATCH.
+        if ( ! $payout && $order_ref !== '' && preg_match( '/^PAY-(\d+)$/', $order_ref, $order_ref_m ) ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            $payout = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT * FROM `{$table}` WHERE id = %d LIMIT 1",
+                    (int) $order_ref_m[1]
                 ),
                 ARRAY_A
             );
