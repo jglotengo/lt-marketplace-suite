@@ -68,7 +68,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > muerto del lookup — tercer lookup que parsea el id de `order_ref`
 > (`PAY-{id}` → WHERE id), haciendo alcanzable la rama `ref=''` del guard
 > para payouts con gateway_ref vacío por crash pre-persist. Suite 5,440
-> tests / 12,256 assertions / 3 skipped.
+> tests / 12,256 assertions / 3 skipped. Fix `b653a133`
+> (PAYOUT-EMPTY-ID-GUARD): eventos payout.* sin transaction.id se ignoran con
+> log + ACK 200 antes de los lookups — sin esto, el lookup 1 matcheaba el
+> primer payout con ref vacía y se procesaba un fallo falso ante payload
+> malformado. Suite 5,441 tests / 12,260 assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 
