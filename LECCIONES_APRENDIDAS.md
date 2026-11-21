@@ -4965,11 +4965,15 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    PAYOUT-RETRY-REF-MATCH (2026-11-20) la blinda además a nivel de guard
    (dispara solo con gateway_ref = openpay_id del evento o vacío) — la
    identidad del disbursement es gateway_ref, no el status. P2 backlog
-   real: el fallback por reference del lookup es CÓDIGO MUERTO —
+   real: el fallback por reference del lookup era CÓDIGO MUERTO —
    create_request persiste reference='PAY-YYMMDD-XXXXXX' random mientras el
-   disbursement usa order_id='PAY-{id}' (jamás matchean); repararlo
-   (persistir 'PAY-{id}' como reference o parsear order_ref) haría real la
-   rama ref='' del guard. (5) En tests, para clases anónimas con
+   disbursement usa order_id='PAY-{id}' (jamás matchean); REPARADO con
+   PAYOUT-LOOKUP-ORDERID (2026-11-20): tercer lookup que parsea el id de
+   order_ref (`/^PAY-(\d+)$/` → WHERE id), haciendo alcanzable la rama ref=''
+   del guard. Lección anexa (de la revisión): al añadir una ruta de lookup,
+   re-verificar que los tests de skip del guard siguen ejercitando el GUARD y
+   no el "payout no encontrado" — pueden pasar verdes por el camino
+   equivocado (patrón test huérfano, #119). (5) En tests, para clases anónimas con
    estado por referencia el `&` va en la FIRMA del constructor
    (`function __construct(array &$updates)`), NO en la instanciación
    (`new class($row, $updates)` — con `&` ahí es parse error).

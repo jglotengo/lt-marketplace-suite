@@ -64,7 +64,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > fallback por `reference` se repare, que hoy es código muerto
 > (`reference='PAY-YYMMDD-XXXXXX'` random vs `order_id='PAY-{id}'`; P2
 > backlog, lección #213 regla 4). Suite 5,439 tests / 12,250 assertions /
-> 3 skipped.
+> 3 skipped. Fix `c9d364d1` (PAYOUT-LOOKUP-ORDERID): repara el fallback
+> muerto del lookup — tercer lookup que parsea el id de `order_ref`
+> (`PAY-{id}` → WHERE id), haciendo alcanzable la rama `ref=''` del guard
+> para payouts con gateway_ref vacío por crash pre-persist. Suite 5,440
+> tests / 12,256 assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 
