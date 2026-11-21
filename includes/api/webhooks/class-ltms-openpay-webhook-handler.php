@@ -598,6 +598,20 @@ class LTMS_Openpay_Webhook_Handler {
         global $wpdb;
         $table = $wpdb->prefix . 'lt_payout_requests';
 
+        // PAYOUT-EMPTY-ID-GUARD (2026-11-20): un evento payout.* sin transaction.id
+        // no puede referir a ningún disbursement real. Sin este guard, el lookup 1
+        // (gateway_ref = '') matchearía el PRIMER payout con ref vacía y la rama
+        // ref='' del guard PAYOUT-RETRY-REF-MATCH procesaría un fallo falso sobre
+        // un payout arbitrario. Openpay siempre envía id en eventos legítimos —
+        // fail-closed: log + ACK 200.
+        if ( $openpay_id === '' ) {
+            LTMS_Core_Logger::warning(
+                'OPENPAY_PAYOUT_WEBHOOK_NO_ID',
+                "Payout webhook {$event_type} sin transaction.id — ignorado."
+            );
+            return new WP_REST_Response( [ 'ok' => true ], 200 );
+        }
+
         // Buscar por gateway_ref = openpay_id primero
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $payout = $wpdb->get_row(

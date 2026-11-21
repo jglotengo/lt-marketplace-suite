@@ -696,6 +696,29 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$this->assertSame( [], $actions, 'Re-entrega no debe re-firear ltms_payout_failed.' );
 	}
 
+	public function test_payout_event_without_transaction_id_is_ignored(): void {
+		$updates = [];
+		$mails   = [];
+		$actions = [];
+		// PAYOUT-EMPTY-ID-GUARD: evento sin transaction.id no puede referir a un
+		// disbursement real — sin el guard, el lookup 1 (gateway_ref = '')
+		// matchearía el primer payout con ref vacía y se procesaría un fallo
+		// falso sobre un payout arbitrario.
+		$row = [
+			'id'        => 7,
+			'vendor_id' => 3,
+			'status'    => 'processing',
+			'notes'     => '',
+		];
+
+		$response = $this->run_payout_failed( $row, $updates, $mails, $actions, '', 'PAY-7' );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( [], $updates, 'Evento sin id no debe tocar ningún payout.' );
+		$this->assertSame( [], $mails );
+		$this->assertSame( [], $actions );
+	}
+
 	public function test_payout_failed_falls_back_to_order_id_parse(): void {
 		$updates = [];
 		$mails   = [];
