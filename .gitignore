@@ -98,3 +98,13 @@ deploy/ltms-fpm-opcache-reset.php
 ltms-ajax-debug.log
 ltms-fatal-debug.txt
 coverage/
+
+# Artefactos de sesión IA / tooling local (2026-11-20) — commands sí van al repo (workflow documentado en AGENTS.md)
+.opencode/*
+!.opencode/commands/
+.firecrawl/
+opencode.json
+lee-archivo.txt
+docs/temp/
+check_order.php
+check_plugins_order.ps1
