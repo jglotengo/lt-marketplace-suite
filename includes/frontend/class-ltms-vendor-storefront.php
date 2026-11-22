@@ -79,6 +79,12 @@ class LTMS_Vendor_Storefront {
         } );
         add_filter( 'woocommerce_add_to_cart_fragments', [ __CLASS__, 'cart_count_fragment' ] );
 
+        // E2E-BUYER-VENDOR-URL FIX (2026-11-20, P2): el filtro ltms_vendor_store_url
+        // lo consumían las cards del catálogo pero nadie registraba una
+        // implementación — generaban /vendor/{id}/ (404). Default aquí, dueño de
+        // la ruta /vendedor/{slug} (register_rewrite_rule + get_user_by('login')).
+        add_filter( 'ltms_vendor_store_url', [ __CLASS__, 'vendor_store_url' ], 10, 2 );
+
         // AJAX handlers — UX improvements Sprint 2+3
         add_action( 'wp_ajax_ltms_sf_quick_view',        [ __CLASS__, 'ajax_quick_view' ] );
         add_action( 'wp_ajax_nopriv_ltms_sf_quick_view', [ __CLASS__, 'ajax_quick_view' ] );
@@ -94,6 +100,32 @@ class LTMS_Vendor_Storefront {
 
     public static function register_rewrite_rule(): void {
         add_rewrite_rule( '^vendedor/([\w-]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
+    }
+
+    /**
+     * E2E-BUYER-VENDOR-URL FIX (2026-11-20): URL canónica de la tienda de un
+     * vendedor para las cards del catálogo. La ruta real es
+     * /vendedor/{user_login} (register_rewrite_rule + resolución por
+     * get_user_by('login')). Los callers pueden sobreescribir con prioridad >10.
+     *
+     * @param mixed $url       URL por defecto del caller (fallback si no hay vendor).
+     * @param mixed $vendor_id ID del vendedor.
+     * @return string
+     */
+    public static function vendor_store_url( $url, $vendor_id ): string {
+        $vendor = get_userdata( (int) $vendor_id );
+        if ( ! $vendor ) {
+            return (string) $url;
+        }
+        // Revisión E2E-BUYER-2026-11-20 (P2 del fix): el resolver
+        // (get_vendor_by_slug) busca primero la meta 'ltms_store_slug' (fuente de
+        // verdad tras ltms-backfill-store-slugs.php, sanitizada con sanitize_title).
+        // Preferir la meta; fallback: título del login.
+        $slug = (string) get_user_meta( (int) $vendor_id, 'ltms_store_slug', true );
+        if ( '' === $slug ) {
+            $slug = sanitize_title( $vendor->user_login );
+        }
+        return home_url( '/vendedor/' . rawurlencode( $slug ) . '/' );
     }
 
     /**

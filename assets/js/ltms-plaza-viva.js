@@ -1432,6 +1432,14 @@
             li.classList.remove('is-selected');
           });
           radio.closest('.pv-shipping-option').classList.add('is-selected');
+          /* E2E-BUYER-SHIPPING-SYNC (2026-11-20, P1): solo la clase CSS cambiaba —
+             WC nunca actualizaba chosen_shipping_methods ni el order review, así
+             que el total mostrado no correspondía a la tarifa marcada. El trigger
+             estándar de WC (wc-checkout.js activo: form.checkout.woocommerce-checkout)
+             recalcula totales y persiste la elección en sesión. */
+          if (window.jQuery) {
+            window.jQuery(document.body).trigger('update_checkout');
+          }
         });
       });
 

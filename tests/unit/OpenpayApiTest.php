@@ -388,7 +388,7 @@ class OpenpayApiTest extends TestCase
 
     /**
      * @test
-     * E2EFIX-01: POST /charges (tarjeta) NO debe reintentar tras un 5xx —
+     * E2EFIX-01: POST /charges (tarjeta) NO debe reintentar tras un 5xx —"
      * el token de tarjeta es de un solo uso y el reintento responde 422
      * "This source_id was already used", enmascarando el cargo ya creado.
      */
@@ -405,7 +405,7 @@ class OpenpayApiTest extends TestCase
                 'tok_test_abc123',
                 149000.0,
                 'Pedido #22192',
-                [ 'name' => 'QA', 'email' => 'qa@example.com', 'city' => 'Bogotá' ],
+                [ 'name' => 'QA', 'email' => 'qa@example.com', 'city' => 'Bogotǭ' ],
                 'order_001'
             );
             $this->fail('Se esperaba RuntimeException tras HTTP 500');
@@ -414,6 +414,47 @@ class OpenpayApiTest extends TestCase
         }
 
         $this->assertSame(1, $calls, 'POST /charges debe hacer exactamente 1 intento con 5xx (no reintentable)');
+    }
+
+    /**
+     * @test
+     * OPENPAY-PHONE-CONTRACT (E2E-BUYER-2026-11-20, P1): los gateways CO/MX
+     * envían 'phone_number' pero create_charge leía 'phone' — cada cargo de
+     * tarjeta salía con customer.phone_number vacío (antifraude Openpay ciego).
+     * El payload HTTP debe llevar el teléfono del contrato del gateway.
+     */
+    public function test_create_charge_sends_phone_number_from_gateway_contract(): void
+    {
+        $client = $this->make_client();
+
+        $captured_body = '';
+        Functions\when('wp_remote_request')->alias(
+            static function ( string $url, array $args ) use ( &$captured_body ): mixed {
+                $captured_body = (string) ( $args['body'] ?? '' );
+                return [
+                    'response' => [ 'code' => 200, 'message' => 'OK' ],
+                    'body'     => '{"id":"tr_phone_1","status":"completed"}',
+                ];
+            }
+        );
+        Functions\when('wp_remote_retrieve_response_code')->justReturn(200);
+        Functions\when('wp_remote_retrieve_body')->justReturn('{"id":"tr_phone_1","status":"completed"}');
+        Functions\when('is_wp_error')->justReturn(false);
+
+        $client->create_charge(
+            'tok_phone_1',
+            100000.0,
+            'Pedido phone contract',
+            [ 'name' => 'QA', 'email' => 'qa@example.com', 'phone_number' => '3001234567' ],
+            'order_phone_1'
+        );
+
+        $data = json_decode( $captured_body, true );
+        $this->assertSame(
+            '3001234567',
+            $data['customer']['phone_number'] ?? '',
+            'El teléfono del gateway (key phone_number) debe llegar al payload de Openpay.'
+        );
     }
 
     /**

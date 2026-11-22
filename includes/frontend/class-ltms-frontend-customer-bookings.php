@@ -463,7 +463,14 @@ final class LTMS_Frontend_Customer_Bookings {
             return [ 'amount' => $total ];
         }
 
-        $hours_to_checkin = ( strtotime( $booking['checkin_date'] ) - time() ) / HOUR_IN_SECONDS;
+        // E2E-BUYER-REFUND-TZ FIX (2026-11-20, P2): port del fix FASE1-REAUDIT P1
+        // (policy-handler:176) — strtotime() parsea en el timezone del servidor
+        // mientras time() es UTC; el comprador veía un tier de reembolso equivocado
+        // cerca del corte. mysql2date('U', ..., true) fuerza interpretación GMT.
+        $checkin_ts = function_exists( 'mysql2date' )
+            ? (int) mysql2date( 'U', $booking['checkin_date'], true )
+            : (int) strtotime( $booking['checkin_date'] . ' UTC' );
+        $hours_to_checkin = ( $checkin_ts - time() ) / HOUR_IN_SECONDS;
 
         if ( 'strict' === $policy_type ) {
             $amount = 0.0;

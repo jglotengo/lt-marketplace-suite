@@ -412,13 +412,63 @@ class LTMS_Openpay_Webhook_Handler {
 
         switch ( $event_type ) {
             case 'charge.succeeded':
+                // E2E-BUYER-AMOUNT-GUARD (2026-11-20, P2): validar el monto del cargo
+                // contra el total de la orden antes de payment_complete (patrón
+                // CICLO24-P1-AD-GAP-001 de la rama refund, defense-in-depth). Un cargo
+                // parcial o de otra orden con order_id colisionado no debe marcar
+                // pagada la orden completa. Fail-safe: monto inválido/ausente → NO
+                // marcar, log + nota para reconciliación.
                 if ( $order->needs_payment() ) {
-                    $order->payment_complete( $openpay_id );
-                    $order->add_order_note( __( 'Pago Openpay confirmado vía webhook.', 'ltms' ) );
+                    $pv_charge_amount = ( is_numeric( $charge['amount'] ?? null ) ) ? (float) $charge['amount'] : null;
+                    $pv_order_total   = (float) $order->get_total();
+
+                    if ( $pv_charge_amount === null || abs( $pv_charge_amount - $pv_order_total ) >= 0.01 ) {
+                        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                            LTMS_Core_Logger::error(
+                                'OPENPAY_CHARGE_AMOUNT_MISMATCH',
+                                sprintf(
+                                    'charge.succeeded para pedido #%d con amount=%s vs total=%s — payment_complete NO ejecutado. Requiere reconciliación manual.',
+                                    $order_id,
+                                    $pv_charge_amount === null ? '(ausente)' : (string) $pv_charge_amount,
+                                    (string) $pv_order_total
+                                )
+                            );
+                        }
+                        $order->add_order_note(
+                            sprintf(
+                                /* translators: 1: monto del cargo, 2: total de la orden */
+                                __( 'Webhook Openpay: cargo de %1$s no coincide con el total del pedido (%2$s). Pago NO confirmado — revisar en dashboard Openpay.', 'ltms' ),
+                                $pv_charge_amount === null ? '(sin monto)' : number_format( $pv_charge_amount, 2, '.', ',' ),
+                                number_format( $pv_order_total, 2, '.', ',' )
+                            )
+                        );
+                    } else {
+                        $order->payment_complete( $openpay_id );
+                        $order->add_order_note( __( 'Pago Openpay confirmado vía webhook.', 'ltms' ) );
+                    }
                 }
                 break;
             case 'charge.failed':
-                $order->update_status( 'failed', __( 'Pago Openpay fallido vía webhook.', 'ltms' ) );
+                // E2E-BUYER-FAILED-GUARD (2026-11-20, P2): solo voltear a 'failed'
+                // órdenes realmente pendientes de pago. Un charge.failed tardío o
+                // re-entregado (txn id distinto → el dedup no protege) sobre una
+                // orden YA pagada revertía el pago — escrow/comisiones
+                // desincronizadas.
+                if ( $order->needs_payment() ) {
+                    $order->update_status( 'failed', __( 'Pago Openpay fallido vía webhook.', 'ltms' ) );
+                } else {
+                    if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                        LTMS_Core_Logger::warning(
+                            'OPENPAY_CHARGE_FAILED_IGNORED',
+                            sprintf(
+                                'charge.failed para pedido #%d ignorado: la orden ya no está pendiente de pago (status=%s).',
+                                $order_id,
+                                $order->get_status()
+                            )
+                        );
+                    }
+                    $order->add_order_note( __( 'Webhook Openpay: evento de fallo ignorado — el pedido ya fue pagado/confirmado.', 'ltms' ) );
+                }
                 break;
             // OPENPAY-WEBHOOK-EVENTS FIX: la doc oficial lista 'charge.refunded'
             // como el evento de reembolso; 'refund.succeeded' se conserva como

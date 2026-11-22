@@ -341,6 +341,10 @@ get_header( 'shop' );
                                     </div>
                                     <?php
                                 else :
+                                    // PAYOUT-SHIPPING-CHOSEN FIX (E2E-BUYER-2026-11-20, P1): leer
+                                    // una vez las tarifas elegidas en sesión (carrito) para
+                                    // pre-checkear la tarifa REAL del comprador en cada paquete.
+                                    $pv_chosen_methods = (array) ( WC()->session ? WC()->session->get( 'chosen_shipping_methods' ) : [] );
                                     $ship_idx = 0;
                                     $has_rates = false;
                                     foreach ( $shipping_packages as $i => $package ) :
@@ -366,7 +370,13 @@ get_header( 'shop' );
                                                 $carrier_label = $meta ? $meta['label'] : $method_label;
 
                                                 $input_id = 'shipping_method_' . $i . '_' . sanitize_title( $method_id );
-                                                $checked  = ( $ship_idx === 0 ); // Primera opción por defecto.
+                                                // PAYOUT-SHIPPING-CHOSEN FIX (E2E-BUYER-2026-11-20, P1): antes
+                                                // $checked era SIEMPRE la primera tarifa — el order review
+                                                // mostraba el total con la tarifa elegida en sesión pero el
+                                                // POST llevaba la primera (cobro ≠ mostrado). Respetar la
+                                                // elección por paquete; fallback: primera opción.
+                                                $pv_chosen_for_pkg = isset( $pv_chosen_methods[ $i ] ) ? (string) $pv_chosen_methods[ $i ] : '';
+                                                $checked  = ( '' !== $pv_chosen_for_pkg ) ? ( $pv_chosen_for_pkg === $method_id ) : ( $ship_idx === 0 );
                                                 $ship_idx++;
                                                 ?>
                                                 <li class="pv-shipping-option <?php echo $checked ? 'is-selected' : ''; ?>">

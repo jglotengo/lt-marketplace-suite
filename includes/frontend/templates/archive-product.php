@@ -249,7 +249,12 @@ $pv_cats     = array_slice( is_array( $pv_cats_raw ) ? $pv_cats_raw : [], 0, 15 
                         </a>
                         <?php if ( $_pv_p->is_purchasable() && $_pv_p->is_in_stock() ) : ?>
                             <div class="woocommerce-loop-product__buttons">
-                                <a href="<?php echo esc_url( $_pv_p->add_to_cart_url() ); ?>" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="<?php echo esc_attr( $_pv_p->get_id() ); ?>" data-product_sku="<?php echo esc_attr( $_pv_p->get_sku() ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Añadir al carrito: %s', 'ltms' ), $_pv_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Añadir al carrito', 'ltms' ); ?></a>
+                                <?php if ( $_pv_p->is_type( 'variable' ) ) : ?>
+                                    <?php // E2E-BUYER-ATC-VARIABLE FIX (2026-11-20, P2): el anchor hardcodeaba product_type_simple/ajax_add_to_cart con el ID del PADRE — el JS de WC posteaba el padre y fallaba la validación ("elige opciones") sin navegar. Las variables navegan a la ficha a elegir variación. ?>
+                                    <a href="<?php echo esc_url( $_pv_p->get_permalink() ); ?>" class="button product_type_variable" aria-label="<?php echo esc_attr( sprintf( __( 'Elegir opciones: %s', 'ltms' ), $_pv_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Elegir opciones', 'ltms' ); ?></a>
+                                <?php else : ?>
+                                    <a href="<?php echo esc_url( $_pv_p->add_to_cart_url() ); ?>" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="<?php echo esc_attr( $_pv_p->get_id() ); ?>" data-product_sku="<?php echo esc_attr( $_pv_p->get_sku() ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Añadir al carrito: %s', 'ltms' ), $_pv_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Añadir al carrito', 'ltms' ); ?></a>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
                     </li>

@@ -754,12 +754,13 @@ JS;
         $pct = (float) $data['percentage'];
         $done = $pct >= 100;
 
+        // E2E-BUYER-MINICART-ESCAPE FIX (2026-11-20, P2): esc_html mangleaba el HTML de wc_price y la entidad del emoji — corregido a emoji real + wp_kses_post.
         echo '<div class="ltms-mini-cart-shipping" data-ltms-mini-shipping="1">';
         echo '<div class="ltms-mini-cart-shipping__msg">';
         if ( $done ) {
-            echo '<span>' . esc_html__( '&#x1F389; Â¡Tienes envÃ­o gratis!', 'ltms' ) . '</span>';
+            echo '<span>' . esc_html__( '🎉 ¡Tienes envío gratis!', 'ltms' ) . '</span>';
         } else {
-            echo '<span>' . esc_html( sprintf( __( 'Te faltan %s para envÃ­o gratis', 'ltms' ), wp_kses_post( $data['remaining_formatted'] ) ) ) . '</span>';
+            echo '<span>' . wp_kses_post( sprintf( __( 'Te faltan %s para envío gratis', 'ltms' ), $data['remaining_formatted'] ) ) . '</span>';
         }
         echo '</div>';
         echo '<div class="ltms-mini-cart-shipping__track"><div class="ltms-mini-cart-shipping__fill" style="width:' . esc_attr( min( 100, $pct ) ) . '%"></div></div>';

@@ -110,7 +110,12 @@ if ( WC()->cart->is_empty() ) {
                                 </a>
                                 <?php if ( $_p->is_purchasable() && $_p->is_in_stock() ) : ?>
                                     <div class="woocommerce-loop-product__buttons">
-                                        <a href="<?php echo esc_url( $_p->add_to_cart_url() ); ?>" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="<?php echo esc_attr( $_p->get_id() ); ?>" data-product_sku="<?php echo esc_attr( $_p->get_sku() ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Añadir al carrito: %s', 'ltms' ), $_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Añadir al carrito', 'ltms' ); ?></a>
+                                        <?php if ( $_p->is_type( 'variable' ) ) : ?>
+                                            <?php // E2E-BUYER-ATC-VARIABLE FIX (2026-11-20, P2): mismo fix del archive — variables navegan a la ficha en vez de postear el ID del padre. ?>
+                                            <a href="<?php echo esc_url( $_p->get_permalink() ); ?>" class="button product_type_variable" aria-label="<?php echo esc_attr( sprintf( __( 'Elegir opciones: %s', 'ltms' ), $_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Elegir opciones', 'ltms' ); ?></a>
+                                        <?php else : ?>
+                                            <a href="<?php echo esc_url( $_p->add_to_cart_url() ); ?>" data-quantity="1" class="button product_type_simple add_to_cart_button ajax_add_to_cart" data-product_id="<?php echo esc_attr( $_p->get_id() ); ?>" data-product_sku="<?php echo esc_attr( $_p->get_sku() ); ?>" aria-label="<?php echo esc_attr( sprintf( __( 'Añadir al carrito: %s', 'ltms' ), $_p->get_name() ) ); ?>" rel="nofollow"><?php esc_html_e( 'Añadir al carrito', 'ltms' ); ?></a>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                             </li>

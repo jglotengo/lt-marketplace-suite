@@ -32,7 +32,19 @@ class LTMS_Frontend_Live_Search {
         // La búsqueda en vivo es pública (productos/vendedores) y también interna (pedidos del vendedor).
         // Para usuarios no autenticados usamos un nonce público; para autenticados el nonce del dashboard.
         if ( is_user_logged_in() ) {
-            check_ajax_referer( 'ltms_dashboard_nonce', 'nonce' );
+            // E2E-BUYER-SEARCH-NONCE FIX (2026-11-20, P1): el JS del header envía el
+            // nonce público ltms_plaza_viva, no ltms_dashboard_nonce — cada
+            // sugerencia daba 403 para cualquier usuario logueado (compradores
+            // incluidos). check_ajax_referer con $die=false: quien no traiga el
+            // nonce de dashboard (vendedores buscando pedidos) cae al alcance
+            // público (productos/vendedores) en vez de morir con 403.
+            $dashboard_nonce_ok = (bool) check_ajax_referer( 'ltms_dashboard_nonce', 'nonce', false );
+            if ( ! $dashboard_nonce_ok ) {
+                $type_check = sanitize_key( $_POST['type'] ?? 'products' );
+                if ( ! in_array( $type_check, [ 'products', 'vendors' ], true ) ) {
+                    wp_send_json_error( 'Nonce inválido', 403 );
+                }
+            }
         } else {
             // Verificar nonce público para búsquedas anónimas (productos y vendedores).
             // Si no se provee nonce válido, limitamos a búsquedas de solo lectura (no pedidos).

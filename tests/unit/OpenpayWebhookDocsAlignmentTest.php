@@ -187,6 +187,118 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 		$this->assertSame( [ 'received' => true ], $response->get_data() );
 	}
 
+	// ── 3a-bis. E2E-BUYER: amount-guard en charge.succeeded y failed-guard ──
+
+	public function test_charge_succeeded_matching_amount_completes_order(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( true );
+		$order->shouldReceive( 'get_total' )->once()->andReturn( 100.0 );
+		$order->shouldReceive( 'payment_complete' )->once()->with( 'tr_amount_ok' )->andReturn( true );
+		$order->shouldReceive( 'add_order_note' )->once()->with( Mockery::type( 'string' ) );
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [
+					'id'       => 'tr_amount_ok',
+					'order_id' => '123',
+					'amount'   => 100,
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	public function test_charge_succeeded_amount_mismatch_does_not_complete_order(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( true );
+		$order->shouldReceive( 'get_total' )->once()->andReturn( 100.0 );
+		$order->shouldReceive( 'payment_complete' )->never();
+		$order->shouldReceive( 'add_order_note' )->once()->with( Mockery::type( 'string' ) );
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [
+					'id'       => 'tr_amount_bad',
+					'order_id' => '123',
+					'amount'   => 50,
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	public function test_charge_succeeded_amount_missing_is_fail_safe(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( true );
+		$order->shouldReceive( 'get_total' )->once()->andReturn( 100.0 );
+		$order->shouldReceive( 'payment_complete' )->never();
+		$order->shouldReceive( 'add_order_note' )->once()->with( Mockery::type( 'string' ) );
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.succeeded',
+				'transaction' => [
+					'id'       => 'tr_amount_none',
+					'order_id' => '123',
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	public function test_charge_failed_ignores_order_already_paid(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'needs_payment' )->once()->andReturn( false );
+		$order->shouldReceive( 'get_status' )->once()->andReturn( 'completed' );
+		$order->shouldReceive( 'update_status' )->never();
+		$order->shouldReceive( 'add_order_note' )->once()->with( Mockery::type( 'string' ) );
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.failed',
+				'transaction' => [
+					'id'       => 'tr_failed_late',
+					'order_id' => '123',
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
 	// ── 3b. HTTP Basic (mecanismo documentado por Openpay) ───────────────────
 
 	public function test_basic_auth_event_is_accepted_without_hmac(): void {

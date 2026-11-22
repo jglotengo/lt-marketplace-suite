@@ -218,7 +218,11 @@ final class LTMS_Api_Openpay extends LTMS_Abstract_API_Client {
             'customer'      => [
                 'name'         => sanitize_text_field( $customer['name'] ?? '' ),
                 'email'        => sanitize_email( $customer['email'] ?? '' ),
-                'phone_number' => LTMS_Utils::sanitize_phone( $customer['phone'] ?? '' ),
+                // OPENPAY-PHONE-CONTRACT FIX (E2E-BUYER-2026-11-20, P1): los gateways
+                // CO/MX envían 'phone_number' (nombre del campo Openpay) pero aquí se
+                // leía 'phone' — cada cargo de tarjeta salía con phone_number vacío
+                // (antifraude Openpay ciego). Leer ambas keys, priorizando phone_number.
+                'phone_number' => LTMS_Utils::sanitize_phone( (string) ( $customer['phone_number'] ?? $customer['phone'] ?? '' ) ),
             ],
         ];
 

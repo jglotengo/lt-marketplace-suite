@@ -737,8 +737,19 @@ final class LTMS_Frontend_Checkout_Handler {
     public static function optimize_checkout_fields( array $fields ): array {
         // 1. Eliminar código postal (irrelevante para Colombia)
         // Las transportadoras usan Departamento + Ciudad + Dirección, no CP.
+        // E2E-BUYER-COUNTRY-GUARD FIX (2026-11-20, P2): los defaults CO/CP-Bogotá
+        // solo aplican cuando la base de la tienda es Colombia — en stores MX
+        // ocultaban el país y metían un CP falso rompiendo zonas de envío.
+        $pv_base_country = ( function_exists( 'WC' ) && null !== WC() && isset( WC()->countries ) )
+            ? (string) WC()->countries->get_base_country()
+            : 'CO';
+        $pv_is_co = ( 'CO' === $pv_base_country );
+
         $cp_keys = [ 'billing_postcode', 'shipping_postcode' ];
         foreach ( $cp_keys as $key ) {
+            if ( ! $pv_is_co ) {
+                continue; // MX necesita el CP visible para las zonas de envío.
+            }
             if ( isset( $fields[ $key ] ) ) {
                 // No eliminar completamente (WC puede necesitarlo internamente),
                 // pero hacerlo oculto y opcional.
@@ -749,12 +760,12 @@ final class LTMS_Frontend_Checkout_Handler {
             }
         }
 
-        // 2. Eliminar país (siempre Colombia en este marketplace)
+        // 2. Eliminar país (tienda de un solo país — default = país base)
         $country_keys = [ 'billing_country', 'shipping_country' ];
         foreach ( $country_keys as $key ) {
             if ( isset( $fields[ $key ] ) ) {
                 $fields[ $key ]['type']    = 'hidden';
-                $fields[ $key ]['default'] = 'CO';
+                $fields[ $key ]['default'] = $pv_base_country; // E2E-BUYER-COUNTRY-GUARD: era 'CO' hardcodeado
                 $fields[ $key ]['class']   = [ 'form-row-hidden' ];
             }
         }
@@ -822,24 +833,31 @@ final class LTMS_Frontend_Checkout_Handler {
      * woocommerce_billing_fields, así que necesitamos interceptarlo también.
      */
     public static function optimize_checkout_fields_late( array $fields ): array {
+        // E2E-BUYER-COUNTRY-GUARD FIX (2026-11-20, P2): mismo guard del fix temprano
+        // — los defaults CO/CP-Bogotá solo aplican con base de tienda Colombia.
+        $pv_base_country = ( function_exists( 'WC' ) && null !== WC() && isset( WC()->countries ) )
+            ? (string) WC()->countries->get_base_country()
+            : 'CO';
+        $pv_is_co = ( 'CO' === $pv_base_country );
+
         // Aplicar a billing y shipping
         foreach ( [ 'billing', 'shipping' ] as $group ) {
             if ( ! isset( $fields[ $group ] ) ) continue;
 
-            // Ocultar código postal
+            // Ocultar código postal (solo CO — MX necesita el CP para zonas de envío)
             $cp_key = $group . '_postcode';
-            if ( isset( $fields[ $group ][ $cp_key ] ) ) {
+            if ( $pv_is_co && isset( $fields[ $group ][ $cp_key ] ) ) {
                 $fields[ $group ][ $cp_key ]['required'] = false;
                 $fields[ $group ][ $cp_key ]['class'][]  = 'form-row-hidden';
                 $fields[ $group ][ $cp_key ]['type']     = 'hidden';
                 $fields[ $group ][ $cp_key ]['default']  = '110111';
             }
 
-            // Ocultar país
+            // Ocultar país (default = país base de la tienda)
             $country_key = $group . '_country';
             if ( isset( $fields[ $group ][ $country_key ] ) ) {
                 $fields[ $group ][ $country_key ]['type']    = 'hidden';
-                $fields[ $group ][ $country_key ]['default'] = 'CO';
+                $fields[ $group ][ $country_key ]['default'] = $pv_base_country; // E2E-BUYER-COUNTRY-GUARD: era 'CO' hardcodeado
                 $fields[ $group ][ $country_key ]['class'][] = 'form-row-hidden';
             }
 
