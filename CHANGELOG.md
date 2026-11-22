@@ -72,7 +72,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > (PAYOUT-EMPTY-ID-GUARD): eventos payout.* sin transaction.id se ignoran con
 > log + ACK 200 antes de los lookups — sin esto, el lookup 1 matcheaba el
 > primer payout con ref vacía y se procesaba un fallo falso ante payload
-> malformado. Suite 5,441 tests / 12,260 assertions / 3 skipped.
+> malformado. Suite 5,441 tests / 12,260 assertions / 3 skipped. Fix `bbe2b317`
+> (ciclo **E2E-BUYER-2026-11-20**, auditoría E2E del viaje completo del
+> comprador — 3 P1 + 7 P2): P1 `PAYOUT-SHIPPING-CHOSEN` (radios de envío
+> respetan `chosen_shipping_methods` — antes SIEMPRE primera tarifa → total
+> mostrado ≠ cobrado — y el JS dispara `update_checkout`); P1
+> `OPENPAY-PHONE-CONTRACT` (`create_charge` leía `phone` pero los gateways
+> envían `phone_number` → teléfono vacío en cada cargo de tarjeta); P1
+> `E2E-BUYER-SEARCH-NONCE` (búsqueda viva 403 para logueados); P2
+> `E2E-BUYER-FAILED-GUARD` (charge.failed no revierte órdenes pagadas), P2
+> `E2E-BUYER-AMOUNT-GUARD` (charge.succeeded valida monto vs total), P2
+> `E2E-BUYER-COUNTRY-GUARD` (defaults CO/CP solo con base CO), P2
+> `E2E-BUYER-VENDOR-URL` (cards enlazaban a 404; slug vía meta
+> `ltms_store_slug`), P2 `E2E-BUYER-ATC-VARIABLE` (variables navegan a ficha),
+> P2 `E2E-BUYER-MINICART-ESCAPE`, P2 `E2E-BUYER-REFUND-TZ`. Backlog P2/P3:
+> `ltms-openpay-mx.js` inexistente (tarjeta MX rota — decisión de producto),
+> refund webhook sin `wc_create_refund` ni acumulación de parciales. Suite
+> 5,455 tests / 12,307 assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 

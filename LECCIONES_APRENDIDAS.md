@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-11-20
 > **Versión del plugin:** 2.9.435
-> **Total de lecciones:** 213 (… + 6 del ciclo OPENPAY-WEBHOOK 2026-11-19/20, #208-213)
+> **Total de lecciones:** 214 (… + 7 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-214)
 
 ---
 
@@ -4983,3 +4983,36 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    estado por referencia el `&` va en la FIRMA del constructor
    (`function __construct(array &$updates)`), NO en la instanciación
    (`new class($row, $updates)` — con `&` ahí es parse error).
+
+### Lección #214: el "total mostrado" y el "total cobrado" viven en superficies distintas (sesión WC vs POST del form) — cualquier UI custom de checkout debe sincronizar ambas (E2E-BUYER-2026-11-20)
+
+1. **Caso real:** auditoría E2E del viaje del comprador (3 frentes paralelos)
+   encontró 3 P1 + 7 P2. Los graves: (a) los radios de envío del template
+   nativo pre-chequeaban SIEMPRE la primera tarifa — el order review mostraba
+   el total con la tarifa elegida en sesión (carrito) pero el POST llevaba la
+   primera (cobro ≠ mostrado), y el JS solo cambiaba la clase CSS sin disparar
+   `update_checkout`; (b) `create_charge()` leía `$customer['phone']` pero los
+   gateways CO/MX enviaban `'phone_number'` — CADA cargo de tarjeta salía con
+   teléfono vacío (antifraude Openpay ciego) sin ningún error visible; (c) la
+   búsqueda viva exigía `ltms_dashboard_nonce` a todo usuario logueado cuando
+   el header envía el nonce público → 403 en cada sugerencia.
+
+2. **Diagnóstico:** tres clases de bug recurrente: (1) duplicación de estado
+   entre superficies (sesión WC vs radios del form) sin sincronización; (2)
+   deriva de contrato entre capas (gateway construye el array con el nombre de
+   campo del API de Openpay, el API client esperaba el nombre interno) —
+   invisible porque `?? ''` no explota; (3) nonces de teatro (exigir un nonce
+   que el frontend nunca manda = feature muerta para el 90% de usuarios).
+
+3. **Regla preventiva:** (1) En UIs custom de checkout, cada input que afecte
+   el total debe disparar el trigger estándar de WC (`update_checkout`) y el
+   render inicial debe leer `chosen_shipping_methods` de sesión — nunca
+   hardcodear "primera opción". (2) Al construir payloads para APIs externas,
+   testear el JSON REAL que sale por HTTP (capturar `$args['body']` en el stub
+   de `wp_remote_request`), no solo el array interno — un key renombrado en
+   una capa no explota hasta producción. (3) Al exigir un nonce, verificar
+   QUÉ nonce envía realmente el frontend del flujo (grep del JS), y usar
+   `check_ajax_referer(..., false)` con fallback de alcance público para no
+   matar features de compradores. (4) Auditorías por viaje de usuario (E2E)
+   encuentran bugs que las auditorías por módulo no ven: el mismo dato pasa
+   por 4+ capas y el contrato se rompe en los bordes.
