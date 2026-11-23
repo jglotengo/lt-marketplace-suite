@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-11-20
 > **Versión del plugin:** 2.9.435
-> **Total de lecciones:** 214 (… + 7 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-214)
+> **Total de lecciones:** 215 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215)
 
 ---
 
@@ -5016,3 +5016,38 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    matar features de compradores. (4) Auditorías por viaje de usuario (E2E)
    encuentran bugs que las auditorías por módulo no ven: el mismo dato pasa
    por 4+ capas y el contrato se rompe en los bordes.
+
+### Lección #215: un registro financiero que "el otro lado ya tiene" se duplica si dos vías escriben — y una idempotencia que depende de estado previo mutable no deduplica (E2E-BUYER-2026-11-20)
+
+1. **Caso real:** la rama `charge.refunded` del webhook Openpay solo tocaba
+   status/notes — nunca creaba el refund WC (`get_total_refunded()` quedaba
+   en 0, reportes/comisiones no veían el dinero). Al corregirlo con
+   `wc_create_refund`, la primera revisión del fix encontró DOS agujeros
+   graves: (a) la key de idempotencia elegida (txn_id|amount|
+   total_refundado_previo) NO deduplicaba re-entregas — el acumulado ya
+   cambió cuando la re-entrega recalcula el key (`txn|100|0` guardado vs
+   `txn|100|100` recalculado → matchea nunca); (b) peor: el loop
+   admin→webhook — un refund hecho por el admin YA crea el refund WC
+   (process_refund) y LUEGO llega el webhook del mismo dinero → el webhook
+   creaba un SEGUNDO refund → pedido marcado refunded con solo una parte
+   realmente devuelta (comisiones/payouts desincronizados).
+
+2. **Diagnóstico:** (a) una idempotencia que depende de estado MUTABLE
+   (el acumulado de refunds) como parte del key nunca puede deduplicar:
+   el key de re-entrega ≠ key original por construcción; (b) cuando dos
+   rutas pueden escribir el mismo registro financiero (admin vía
+   process_refund y webhook vía API de eventos), una de ellas debe
+   CONOCER lo que la otra escribió — meta compartida con los ids ya
+   registrados.
+
+3. **Regla preventiva:** (1) La key de idempotencia debe ser INMUTABLE y
+   única del evento (id del refund Openpay) — jamás derivar keys de
+   totales/saldos que el propio procesamiento muta. (2) Antes de crear un
+   registro financiero desde un webhook, verificar el meta compartido de
+   "ids ya representados" que alimentan TODAS las rutas (admin, cron,
+   otros webhooks) — y hacer que las rutas admin registren ahí sus ids.
+   (3) El test de duplicado debe simular la realidad post-primera-aplicación
+   (acumulado YA actualizado), no un acumulado en cero — mockear el estado
+   previo en cero daba falsa confianza. (4) Inputs de tarjeta en JS de
+   tokenización: SIN atributo name — el PAN/CVV nunca debe postearse al
+   servidor, solo el token.

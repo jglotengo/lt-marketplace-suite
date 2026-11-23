@@ -85,10 +85,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > `E2E-BUYER-COUNTRY-GUARD` (defaults CO/CP solo con base CO), P2
 > `E2E-BUYER-VENDOR-URL` (cards enlazaban a 404; slug vía meta
 > `ltms_store_slug`), P2 `E2E-BUYER-ATC-VARIABLE` (variables navegan a ficha),
-> P2 `E2E-BUYER-MINICART-ESCAPE`, P2 `E2E-BUYER-REFUND-TZ`. Backlog P2/P3:
-> `ltms-openpay-mx.js` inexistente (tarjeta MX rota — decisión de producto),
-> refund webhook sin `wc_create_refund` ni acumulación de parciales. Suite
-> 5,455 tests / 12,307 assertions / 3 skipped.
+> P2 `E2E-BUYER-MINICART-ESCAPE`, P2 `E2E-BUYER-REFUND-TZ`. Fix `f421dcf6`
+> (cierra los 2 pendientes del ciclo): P2 `E2E-BUYER-MX-CARD` —
+> `ltms-openpay-mx.js` creado (nunca existió; tarjeta MX rota): tokenización
+> Openpay JS espejando el gateway CO, campos sin `name` (PAN/CVV jamás
+> postean), device session antifraude, i18n localizada; P2
+> `E2E-BUYER-REFUND-RECORD` — la rama `charge.refunded` ahora crea el refund
+> WC (`wc_create_refund`, antes `get_total_refunded()` quedaba 0), estado por
+> acumulado (parciales que suman el total → refunded), idempotencia por id
+> del refund Openpay en meta, y anti-loop admin→webhook: `process_refund` de
+> CO/MX registra el id del refund en la misma meta (hallazgo P1/P0 de la
+> revisión, corregido en el mismo ciclo). Suite 5,460 tests / 12,343
+> assertions / 3 skipped.
 
 ### Removed — `CHECKOUT-LEGACY-REMOVAL-2026-11-18` + `STRIPE-RETIRE` (autorización del owner)
 
