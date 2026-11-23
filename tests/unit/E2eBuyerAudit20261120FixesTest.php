@@ -56,6 +56,10 @@ final class E2eBuyerAudit20261120FixesTest extends LTMS_Unit_Test_Case {
 	private const CART_DRAWER    = __DIR__ . '/../../includes/frontend/class-ltms-cart-drawer.php';
 	private const BOOKINGS       = __DIR__ . '/../../includes/frontend/class-ltms-frontend-customer-bookings.php';
 	private const STOREFRONT     = __DIR__ . '/../../includes/frontend/class-ltms-vendor-storefront.php';
+	private const WEBHOOK_HANDLER = __DIR__ . '/../../includes/api/webhooks/class-ltms-openpay-webhook-handler.php';
+	private const GATEWAYS_CO    = __DIR__ . '/../../includes/api/gateways/class-ltms-api-gateways.php';
+	private const GATEWAYS_MX    = __DIR__ . '/../../includes/api/gateways/class-ltms-api-gateway-openpay-mx.php';
+	private const MX_JS          = __DIR__ . '/../../assets/js/ltms-openpay-mx.js';
 
 	// ── PAYOUT-SHIPPING-CHOSEN (P1) ──────────────────────────────────────────
 
@@ -238,5 +242,53 @@ final class E2eBuyerAudit20261120FixesTest extends LTMS_Unit_Test_Case {
 			$src,
 			'estimate_refund debe parsear el check-in en GMT (patrón FASE1-REAUDIT P1).'
 		);
+	}
+
+	// ── E2E-BUYER-MX-CARD + E2E-BUYER-REFUND-RECORD (P2) ─────────────────────
+
+	public function test_mx_gateway_has_tokenization_script_and_localizes_i18n(): void {
+		$this->assertFileExists(
+			__DIR__ . '/../../assets/js/ltms-openpay-mx.js',
+			'E2E-BUYER-MX-CARD: ltms-openpay-mx.js debe existir (antes el checkout MX card estaba roto: token vacío, validate_fields bloqueaba siempre).'
+		);
+
+		$js = (string) file_get_contents( __DIR__ . '/../../assets/js/ltms-openpay-mx.js' );
+		$this->assertStringContainsString( "checkout_place_order_ltms_openpay_mx", $js, 'El JS MX debe engancharse al evento nativo del gateway.' );
+		$this->assertStringContainsString( 'ltms_openpay_mx_token', $js, 'El JS MX debe setear el token que valida el gateway.' );
+		$this->assertStringContainsString( 'OpenPay.deviceData.setup', $js, 'El JS MX debe capturar device session id (antifraude).' );
+
+		$gateway = (string) file_get_contents( __DIR__ . '/../../includes/api/gateways/class-ltms-api-gateway-openpay-mx.php' );
+		$this->assertStringContainsString( "'i18n'", $gateway, 'El gateway MX debe localizar i18n para el JS de tokenización.' );
+	}
+
+	public function test_refund_webhook_creates_wc_refund_record(): void {
+		$src = (string) file_get_contents( self::WEBHOOK_HANDLER );
+
+		$this->assertStringContainsString(
+			'E2E-BUYER-REFUND-RECORD FIX',
+			$src,
+			'El fix de registro de refund WC debe estar marcado en el webhook.'
+		);
+		$this->assertStringContainsString(
+			'wc_create_refund',
+			$src,
+			'La rama refund debe crear el registro WC (reportes/comisiones/stock ven el dinero devuelto).'
+		);
+		$this->assertStringContainsString(
+			"_ltms_openpay_refund_events",
+			$src,
+			'La idempotencia de refunds por evento debe vivir en meta del pedido.'
+		);
+
+		// Anti-loop admin→webhook (revisión 2026-11-20): ambos gateways registran
+		// el id del refund en la MISMA meta que consulta el webhook.
+		$co  = (string) file_get_contents( self::GATEWAYS_CO );
+		$mx  = (string) file_get_contents( self::GATEWAYS_MX );
+		$this->assertStringContainsString( '_ltms_openpay_refund_events', $co, 'El gateway CO debe registrar el id del refund en la meta anti-duplicado.' );
+		$this->assertStringContainsString( '_ltms_openpay_refund_events', $mx, 'El gateway MX debe registrar el id del refund en la meta anti-duplicado.' );
+
+		// PAN/CVV nunca al servidor (revisión 2026-11-20): inputs de tarjeta sin name.
+		$js_mx = (string) file_get_contents( self::MX_JS );
+		$this->assertStringNotContainsString( 'name="ltms_mx_card', $js_mx, 'Los inputs de PAN/CVV no deben tener atributo name (no deben postearse al servidor).' );
 	}
 }

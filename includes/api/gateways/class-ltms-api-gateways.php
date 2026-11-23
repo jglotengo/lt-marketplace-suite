@@ -444,7 +444,22 @@ class LTMS_Api_Gateway_Openpay extends WC_Payment_Gateway {
 
         try {
             $client = LTMS_Api_Factory::get( 'openpay' );
-            $client->refund( $txn_id, (float) $amount, $reason );
+            $resp   = $client->refund( $txn_id, (float) $amount, $reason );
+
+            // E2E-BUYER-REFUND-RECORD (2026-11-20): registrar el id del refund
+            // Openpay en meta — el webhook charge.refunded lo consulta para NO
+            // crear un refund WC duplicado por dinero que el admin YA registró
+            // (el loop admin→webhook duplicaba el refund y podía marcar el
+            // pedido refunded con solo una parte realmente devuelta).
+            $refund_id = ( is_array( $resp ) && ! empty( $resp['id'] ) ) ? (string) $resp['id'] : '';
+            if ( $refund_id !== '' && $order ) {
+                $processed   = $order->get_meta( '_ltms_openpay_refund_events' );
+                $processed   = is_array( $processed ) ? $processed : [];
+                $processed[] = $refund_id;
+                $order->update_meta_data( '_ltms_openpay_refund_events', $processed );
+                $order->save_meta_data();
+            }
+
             return true;
         } catch ( \Throwable $e ) {
             return new WP_Error( 'refund_failed', esc_html( $e->getMessage() ) ); // EXCMSG-FIX (AUDIT-EXCMSG-API-001, P1)

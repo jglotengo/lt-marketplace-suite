@@ -137,12 +137,13 @@ class AuditCiclo24GatewayHardeningTest extends LTMS_Unit_Test_Case {
 		$this->assertFileExists( self::OPENPAY_HANDLER_PATH );
 		$source = file_get_contents( self::OPENPAY_HANDLER_PATH );
 
-		// La comparacion amount >= total - 0.01 (tolerancia float) decide
-		// si es refund completo (marcar refunded) o parcial (no cambiar status).
+		// E2E-BUYER-REFUND-RECORD (2026-11-20): la comparación es por ACUMULADO
+		// (get_total_refunded, tras crear el refund WC) >= total - 0.01 — maneja
+		// refunds completos Y parciales acumulables; decide refunded vs nota.
 		$this->assertStringContainsString(
-			'$refund_amount >= $order_total - 0.01',
+			'$total_refunded >= $order_total - 0.01',
 			$source,
-			'AD-GAP-001: el handler debe comparar refund_amount contra order_total con tolerancia 0.01.'
+			'AD-GAP-001/E2E-BUYER: el handler debe comparar el acumulado reembolsado contra order_total con tolerancia 0.01.'
 		);
 		$this->assertStringContainsString(
 			'(float) $order->get_total()',
@@ -167,14 +168,13 @@ class AuditCiclo24GatewayHardeningTest extends LTMS_Unit_Test_Case {
 		$this->assertFileExists( self::OPENPAY_HANDLER_PATH );
 		$source = file_get_contents( self::OPENPAY_HANDLER_PATH );
 
-		// En la rama parcial (amount < total), NO debe llamar update_status.
-		// Solo add_order_note + log.
-		// El comentario "Refund parcial — NO cambiar status del pedido. Solo registro."
-		// debe existir como marker del branch.
+		// En la rama parcial (acumulado < total), NO debe llamar update_status.
+		// Solo add_order_note + log (E2E-BUYER-REFUND-RECORD conserva el patrón).
+		// El comentario del branch parcial es el marker.
 		$this->assertStringContainsString(
-			'Refund parcial — NO cambiar status',
+			'Parcial acumulado — NO cambiar status',
 			$source,
-			'AD-GAP-001: rama refund parcial debe tener marker "Refund parcial — NO cambiar status".'
+			'AD-GAP-001/E2E-BUYER: rama refund parcial debe tener marker "Parcial acumulado — NO cambiar status".'
 		);
 		// La nota debe mencionar "PARCIAL" para que el admin vea en el log del pedido.
 		$this->assertStringContainsString(

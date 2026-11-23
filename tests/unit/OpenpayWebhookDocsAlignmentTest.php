@@ -162,12 +162,19 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 
 		$order = Mockery::mock( \WC_Order::class );
 		$order->shouldReceive( 'get_total' )->once()->andReturn( 100.0 );
+		// E2E-BUYER-REFUND-RECORD: crea refund WC → acumulado 100 → refunded.
+		$order->shouldReceive( 'get_total_refunded' )->once()->andReturn( 100.0 );
+		$order->shouldReceive( 'get_meta' )->once()->with( '_ltms_openpay_refund_events' )->andReturn( [] );
+		$order->shouldReceive( 'update_meta_data' )->once();
+		$order->shouldReceive( 'save_meta_data' )->once();
 		$order->shouldReceive( 'update_status' )
 			->once()
 			->with( 'refunded', Mockery::type( 'string' ) )
 			->andReturn( true );
 
 		Functions\when( 'wc_get_order' )->justReturn( $order );
+		Functions\when( 'wc_create_refund' )->justReturn( new \stdClass() );
+		Functions\when( 'is_wp_error' )->alias( static fn( $x ) => $x instanceof \WP_Error );
 
 		$payload   = wp_json_encode(
 			[
@@ -185,6 +192,102 @@ class OpenpayWebhookDocsAlignmentTest extends LTMS_Unit_Test_Case {
 
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( [ 'received' => true ], $response->get_data() );
+	}
+
+	public function test_refund_partial_creates_wc_refund_without_status_change(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'get_total' )->once()->andReturn( 100.0 );
+		$order->shouldReceive( 'get_total_refunded' )->once()->andReturn( 50.0 );
+		$order->shouldReceive( 'get_meta' )->once()->andReturn( [] );
+		$order->shouldReceive( 'update_meta_data' )->once();
+		$order->shouldReceive( 'save_meta_data' )->once();
+		$order->shouldReceive( 'update_status' )->never();
+		$order->shouldReceive( 'add_order_note' )->once()->with( Mockery::type( 'string' ) );
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		Functions\when( 'wc_create_refund' )->justReturn( new \stdClass() );
+		Functions\when( 'is_wp_error' )->alias( static fn( $x ) => $x instanceof \WP_Error );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.refunded',
+				'transaction' => [
+					'id'       => 'tr_refund_partial',
+					'order_id' => '123',
+					'amount'   => 50,
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	public function test_refund_duplicate_event_does_not_recreate_wc_refund(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'get_total' )->once()->andReturn( 100.0 );
+		$order->shouldReceive( 'get_meta' )->once()->andReturn( [ 'tr_refund_dup' ] );
+		$order->shouldReceive( 'get_total_refunded' )->never();
+		$order->shouldReceive( 'update_status' )->never();
+		$order->shouldReceive( 'add_order_note' )->never();
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		Functions\when( 'wc_create_refund' )->justReturn( new \stdClass() );
+		Functions\when( 'is_wp_error' )->alias( static fn( $x ) => $x instanceof \WP_Error );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.refunded',
+				'transaction' => [
+					'id'       => 'tr_refund_dup',
+					'order_id' => '123',
+					'amount'   => 100,
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	public function test_refund_wc_create_failure_is_fail_safe(): void {
+		\LTMS_Core_Config::set( 'ltms_openpay_CO_private_key', 'sk_test_abc' );
+
+		$order = Mockery::mock( \WC_Order::class );
+		$order->shouldReceive( 'get_total' )->once()->andReturn( 100.0 );
+		$order->shouldReceive( 'get_meta' )->once()->andReturn( [] );
+		$order->shouldReceive( 'get_total_refunded' )->never();
+		$order->shouldReceive( 'update_status' )->never();
+		$order->shouldReceive( 'update_meta_data' )->never();
+		$order->shouldReceive( 'add_order_note' )->once()->with( Mockery::type( 'string' ) );
+
+		Functions\when( 'wc_get_order' )->justReturn( $order );
+		Functions\when( 'wc_create_refund' )->justReturn( new \WP_Error( 'ltms_test', 'boom' ) );
+		Functions\when( 'is_wp_error' )->alias( static fn( $x ) => $x instanceof \WP_Error );
+
+		$payload   = wp_json_encode(
+			[
+				'type'        => 'charge.refunded',
+				'transaction' => [
+					'id'       => 'tr_refund_fail',
+					'order_id' => '123',
+					'amount'   => 100,
+				],
+			]
+		);
+		$signature = 'sha256=' . hash_hmac( 'sha256', $payload, 'sk_test_abc' );
+
+		$response = \LTMS_Openpay_Webhook_Handler::handle( $this->make_request( $payload, $signature ) );
+
+		$this->assertSame( 200, $response->get_status() );
 	}
 
 	// ── 3a-bis. E2E-BUYER: amount-guard en charge.succeeded y failed-guard ──

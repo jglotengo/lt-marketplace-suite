@@ -206,6 +206,19 @@ class LTMS_Api_Gateway_Openpay_MX extends WC_Payment_Gateway {
         if ( empty( $result['id'] ) && empty( $result['success'] ) ) {
             return new WP_Error( 'ltms_openpay_mx_refund', esc_html( $result['error_message'] ?? $result['error'] ?? 'Error' ) );
         }
+
+        // E2E-BUYER-REFUND-RECORD (2026-11-20): registrar el id del refund Openpay
+        // en meta — el webhook charge.refunded lo consulta para NO crear un refund
+        // WC duplicado por dinero que el admin YA registró (el refund WC ya existe
+        // en la ruta admin; el loop admin→webhook duplicaba el registro).
+        if ( ! empty( $result['id'] ) ) {
+            $processed   = $order->get_meta( '_ltms_openpay_refund_events' );
+            $processed   = is_array( $processed ) ? $processed : [];
+            $processed[] = (string) $result['id'];
+            $order->update_meta_data( '_ltms_openpay_refund_events', $processed );
+            $order->save_meta_data();
+        }
+
         $order->add_order_note( sprintf( __( 'Reembolso Openpay MX. Monto: %s | Motivo: %s', 'ltms' ), wc_price( $amount ?? (float) $order->get_total() ), $reason ?: __( 'No especificado', 'ltms' ) ) );
         return true;
     }
@@ -220,7 +233,22 @@ class LTMS_Api_Gateway_Openpay_MX extends WC_Payment_Gateway {
         wp_enqueue_script( 'openpay-mx-js',   $base . 'openpay.v1.min.js',      [], null, true );
         wp_enqueue_script( 'openpay-mx-data', $base . 'openpay-data.v1.min.js', [ 'openpay-mx-js' ], null, true );
         wp_enqueue_script( 'ltms-openpay-mx', LTMS_ASSETS_URL . 'js/ltms-openpay-mx.js', [ 'jquery', 'openpay-mx-js', 'openpay-mx-data' ], defined( 'LTMS_VERSION' ) ? LTMS_VERSION : '1.7.5', true );
-        wp_localize_script( 'ltms-openpay-mx', 'ltmsOpenpayMX', [ 'merchant_id' => $merchant_id, 'public_key' => $public_key, 'sandbox' => $sandbox, 'method' => $this->get_option( 'payment_method', 'card' ) ] );
+        wp_localize_script( 'ltms-openpay-mx', 'ltmsOpenpayMX', [
+            'merchant_id' => $merchant_id,
+            'public_key'  => $public_key,
+            'sandbox'     => $sandbox,
+            'method'      => $this->get_option( 'payment_method', 'card' ),
+            'i18n'        => [
+                'fill_all_fields'    => __( 'Completa todos los datos de tu tarjeta.', 'ltms' ),
+                'invalid_card'       => __( 'Número de tarjeta inválido.', 'ltms' ),
+                'card_declined'      => __( 'La tarjeta fue rechazada.', 'ltms' ),
+                'card_expired'       => __( 'La tarjeta está expirada.', 'ltms' ),
+                'insufficient_funds' => __( 'Fondos insuficientes.', 'ltms' ),
+                'card_blocked'       => __( 'La tarjeta está bloqueada.', 'ltms' ),
+                'card_error'         => __( 'No pudimos procesar tu tarjeta. Intenta de nuevo.', 'ltms' ),
+                'sdk_unavailable'    => __( 'El módulo de pago no está disponible. Recarga la página.', 'ltms' ),
+            ],
+        ] );
     }
 }
 

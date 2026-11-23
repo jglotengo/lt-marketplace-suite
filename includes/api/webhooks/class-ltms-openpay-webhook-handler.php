@@ -519,28 +519,107 @@ class LTMS_Openpay_Webhook_Handler {
                     $order->add_order_note(
                         __( 'Reembolso Openpay recibido vía webhook pero monto no reportado. Revisar manualmente en dashboard Openpay.', 'ltms' )
                     );
-                } elseif ( $refund_amount >= $order_total - 0.01 ) {
-                    // Refund completo (con tolerancia float 0.01) — seguro marcar como refunded.
-                    $order->update_status( 'refunded', __( 'Reembolso Openpay confirmado vía webhook (total).', 'ltms' ) );
                 } else {
-                    // Refund parcial — NO cambiar status del pedido. Solo registro.
-                    $order->add_order_note(
-                        sprintf(
-                            /* translators: 1: monto reembolsado, 2: total del pedido */
-                            __( 'Reembolso PARCIAL Openpay: %1$s de %2$s. Status del pedido NO modificado (no es fully refunded). Verificar en dashboard Openpay.', 'ltms' ),
-                            wc_price( $refund_amount ),
-                            wc_price( $order_total )
-                        )
-                    );
-                    LTMS_Core_Logger::info(
-                        'OPENPAY_REFUND_PARTIAL',
-                        sprintf(
-                            'Refund parcial Openpay para pedido #%d: %s/%s. Status NO cambiado (defense-in-depth AD-GAP-001).',
-                            $order_id,
-                            $refund_amount,
-                            $order_total
-                        )
-                    );
+                    // E2E-BUYER-REFUND-RECORD FIX (2026-11-20, P2): el evento refund
+                    // solo tocaba update_status/add_order_note — NUNCA creaba el
+                    // refund WC (wc_create_refund): get_total_refunded() quedaba en 0,
+                    // el stock no se gestionaba, analytics/comisiones/payouts no veían
+                    // el dinero devuelto, y los refunds PARCIALES acumulables nunca
+                    // marcaban el pedido refunded (N parciales que sumaban el total
+                    // lo dejaban processing/completed para siempre). Ahora: (1)
+                    // idempotencia por triple (txn_id|amount|total_refundado_previo)
+                    // en meta — re-entregas fuera de la ventana del transient no
+                    // duplican el refund WC; (2) wc_create_refund con el monto del
+                    // evento (sin restock automático: el evento no trae desglose de
+                    // ítems — queda en nota para el admin); (3) estado por ACUMULADO
+                    // (get_total_refunded) vs total: >= total → refunded, < total →
+                    // nota parcial (patrón AD-GAP-001 se conserva). Fail-safe: error
+                    // de wc_create_refund NO toca status.
+                    // Revisión E2E-BUYER (P1): la key es el id del refund Openpay SOLO
+                    // (único por evento de reembolso) — un triple con total_refundado
+                    // previo no deduplicaba re-entregas (el acumulado ya cambió cuando
+                    // la re-entrega llega). La misma lista registra los ids creados
+                    // por la ruta admin (process_refund de los gateways) — el webhook
+                    // NO crea un refund WC duplicado por dinero ya registrado.
+                    $event_key = $openpay_id;
+                    $processed = $order->get_meta( '_ltms_openpay_refund_events' );
+                    $processed = is_array( $processed ) ? $processed : [];
+
+                    if ( in_array( $event_key, $processed, true ) ) {
+                        // Re-entrega o refund ya registrado (webhook previo o ruta admin
+                        // process_refund) — el registro WC ya existe, no duplicar.
+                        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                            LTMS_Core_Logger::info(
+                                'OPENPAY_REFUND_DUPLICATE_SKIPPED',
+                                sprintf(
+                                    'Refund #%s para pedido #%d ya registrado en WooCommerce — refund WC no duplicado.',
+                                    $event_key,
+                                    $order_id
+                                )
+                            );
+                        }
+                    } else {
+                        $wc_refund = wc_create_refund(
+                            [
+                                'order_id' => $order_id,
+                                'amount'   => $refund_amount,
+                                'reason'   => __( 'Reembolso Openpay vía webhook.', 'ltms' ),
+                            ]
+                        );
+
+                        if ( is_wp_error( $wc_refund ) ) {
+                            // Fail-safe: el refund WC no se creó — NO tocar status.
+                            if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                                LTMS_Core_Logger::error(
+                                    'OPENPAY_REFUND_CREATE_FAILED',
+                                    sprintf(
+                                        'wc_create_refund falló para pedido #%d (amount=%s): %s. Status NO cambiado — requiere reconciliación manual.',
+                                        $order_id,
+                                        (string) $refund_amount,
+                                        is_object( $wc_refund ) && method_exists( $wc_refund, 'get_error_message' ) ? $wc_refund->get_error_message() : '(unknown)'
+                                    )
+                                );
+                            }
+                            $order->add_order_note(
+                                sprintf(
+                                    /* translators: 1: monto del reembolso */
+                                    __( 'Webhook Openpay: reembolso de %1$s recibido pero NO se pudo registrar en WooCommerce (error interno). Verificar manualmente.', 'ltms' ),
+                                    number_format( $refund_amount, 2, '.', ',' )
+                                )
+                            );
+                        } else {
+                            $processed[] = $event_key;
+                            $order->update_meta_data( '_ltms_openpay_refund_events', $processed );
+                            $order->save_meta_data();
+
+                            $total_refunded = (float) $order->get_total_refunded();
+                            if ( $total_refunded >= $order_total - 0.01 ) {
+                                // Acumulado >= total — refund completo, seguro marcar refunded.
+                                $order->update_status( 'refunded', __( 'Reembolso Openpay confirmado vía webhook (total).', 'ltms' ) );
+                            } else {
+                                // Parcial acumulado — NO cambiar status del pedido (AD-GAP-001).
+                                $order->add_order_note(
+                                    sprintf(
+                                        /* translators: 1: acumulado reembolsado, 2: total del pedido */
+                                        __( 'Reembolso PARCIAL Openpay registrado: %1$s de %2$s acumulado. Status del pedido NO modificado (no es fully refunded).', 'ltms' ),
+                                        number_format( $total_refunded, 2, '.', ',' ),
+                                        number_format( $order_total, 2, '.', ',' )
+                                    )
+                                );
+                                if ( class_exists( 'LTMS_Core_Logger' ) ) {
+                                    LTMS_Core_Logger::info(
+                                        'OPENPAY_REFUND_PARTIAL',
+                                        sprintf(
+                                            'Refund parcial Openpay para pedido #%d: %s/%s. Status NO cambiado (defense-in-depth AD-GAP-001).',
+                                            $order_id,
+                                            (string) $total_refunded,
+                                            (string) $order_total
+                                        )
+                                    );
+                                }
+                            }
+                        }
+                    }
                 }
                 break;
         }
