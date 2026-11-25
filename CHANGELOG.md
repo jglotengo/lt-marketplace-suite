@@ -4,7 +4,80 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 2026-11-17
+## [Unreleased] — 2026-11-24
+
+### Fixed — `E2E-BUYER-QV-HARDEN-2026-11-24` (hardening del quick view + carrito: cierre parcial del backlog P3 del ciclo E2E-BUYER-2026-11-20 — 5 fixes + 1 P0 de la validación E2E)
+
+> Continúa el backlog documentado del ciclo E2E-BUYER-2026-11-20 (items #2
+> quick view y #5 nonce-teatro). Commits `da5fcf49` (ciclo) + `3bab1c02`
+> (P0 de la re-auditoría E2E post-deploy). Suite 5,470 tests / 12,380
+> assertions / 3 skipped (baseline 5,460 / 12,343, cero regresiones).
+> Deploy CI success en ambos; verificación E2E en producción por SSH+curl
+> con nonces reales.
+>
+> - **E2E-BUYER-QV-VISGATE (P2):** los 2 handlers vivos de quick view
+>   (`ltms_quick_view` en `LTMS_Frontend_Checkout_Handler` y
+>   `ltms_pv_quick_view` en `LTMS_Native_Templates`) no aplicaban el gate de
+>   vendibilidad — el gate solo vivía en el handler muerto
+>   `LTMS_Quick_View::ajax_load_product` (acciones sin registrar desde
+>   v2.9.49). Producto oculto (sin stock/imagen/precio) era servible por
+>   enumeración de ID. Ahora ambos rechazan con `is_unsellable()` (paridad
+>   SYNC-VIS-GATE con content-product/live-search/vendor-storefront).
+> - **E2E-BUYER-QV-XSS-EXCERPT (P2):** `render_quick_view` (native-templates)
+>   imprimía la short description (HTML vendor-controlled) cruda al innerHTML
+>   del modal PV. Ahora `esc_html( wp_trim_words( wp_strip_all_tags(...) ) )`.
+> - **E2E-BUYER-QV-BROKEN-BTN (P2):** el botón legacy "Vista rápida"
+>   (`LTMS_Quick_View::render_quick_view_button`, enganchado a
+>   `woocommerce_after_shop_loop_item` y renderizado en toda card) posteba un
+>   nonce por producto (`ltms_quick_view_{id}`) contra el handler vivo que
+>   exige `ltms_ux_nonce` → 403 en cada click (nonce-teatro, lección #214), y
+>   su modal JS esperaba `response.data.html` que el handler estructurado
+>   nunca devolvió. Ahora emite el trigger canonical `data-pv-quickview`;
+>   eliminado el objeto JS muerto `LTMS_QuickView` de
+>   `ltms-product-enhancements.js` (+ min sync, lección #119: retirado el
+>   bloque de thumbs de `ProductImagesContainTest`). `LTMS_VERSION
+>   2.9.435 → 2.9.436`.
+> - **E2E-BUYER-QV-ACTION-MISMATCH (P1, hallazgo de la 2ª revisión):**
+>   `PV.quickView` (ltms-plaza-viva.js:265) llamaba la acción fantasma
+>   `ltms_plaza_viva_quick_view` sin handler registrado desde v2.9.183
+>   (`fe3174f9`) — el quick view de las cards PV respondía siempre error.
+>   Alineado a `ltms_pv_quick_view`.
+> - **E2E-BUYER-QV-AJAX-GUARD (P0, hallazgo de la validación E2E funcional
+>   post-deploy):** `LTMS_Native_Templates::init()` retornaba temprano con
+>   `if ( is_admin() )` — y en admin-ajax.php `is_admin()` es TRUE — de modo
+>   que `ltms_pv_quick_view` y `ltms_pv_product_vendor` NUNCA se registraban
+>   en runtime (ambos respondían '0' unknown-action en producción aunque el
+>   nonce fuera válido; verificado en vivo con `wp_create_nonce`
+>   server-side → '0'). Patrón estándar WP: `is_admin() && !
+>   wp_doing_ajax()`. Verificado post-fix en producción:
+>   `ltms_pv_quick_view` → `success:true` con el HTML del modal;
+>   `ltms_pv_product_vendor` → `success:true` con `vendor_name`/`vendor_url`
+>   (los nombres de vendor de las cards Elementor vuelven a hidratar); nonce
+>   inválido → '-1' (enforcement real).
+> - **E2E-BUYER-CART-NONCE (P3):** `ajax_get_cart` verificaba el nonce
+>   no-fatal (`check_ajax_referer(..., false)`) = teatro: un request sin
+>   nonce o con nonce inválido pasaba igual. Ahora fatal-if-invalid (403,
+>   patrón de los hermanos `ltms_drawer_update_qty`/`ltms_drawer_remove_item`).
+>   Verificado en vivo: con nonce → success:true; sin nonce → HTTP 403.
+> - **E2E-BUYER-PSE-REMOVAL (P3):** endpoint muerto `ltms_get_pse_banks`
+>   eliminado del checkout handler (const `PSE_BANKS_CO` + método + registros
+>   admin-ajax) — sin consumers desde E2EFIX-04 (su único JS fue borrado) y
+>   nonce "opcional" decorativo. El gateway conserva su propio
+>   `get_pse_banks` server-side (`LTMS_Api_Gateways`, AUDIT-FUNNEL-PAY-12) que
+>   renderiza el select PSE — intacto. Verificado en vivo: POST a la acción
+>   eliminada → HTTP 400 '0'. Harness `bin/ltms-integration-tests.php` y 3
+>   tests huérfanos actualizados (lección #119).
+> - **Tests:** nueva suite `tests/unit/E2eBuyerQuickViewHardeningTest.php`
+>   (+10 tests, 35 assertions, source-based) + re-anclaje de
+>   `SyncVisibilityGateTest` (gate apunta a los handlers vivos, no al muerto)
+>   + inversión del assert de `AuditE2ePay20261117FixesTest`.
+> - **Pendiente del ciclo (backlog P3 restante):** geo-detector wiring muerto
+>   + `wp_remote_get` síncrono; dead code cart-drawer legacy (~280 líneas);
+>   umbral envío gratis inconsistente (cart vs mini-cart); HPOS legacy en
+>   `find_order_by_txn`; 2 radios de pago checked; payment_meta/carrier_meta
+>   maps muertos; P2 residual: producto oculto MANUALMENTE (vendible) sigue
+>   servible por quick view por ID (el gate cubre el criterio
+>   SYNC-VIS-GATE, no el ocultamiento manual del admin).
 
 ### Fixed — `OPENPAY-WEBHOOK-REG-2026-11-19` (webhook funcional E2E: ping vacío + HTTP Basic + bypass de core)
 

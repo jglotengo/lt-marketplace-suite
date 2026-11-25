@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-11-20
 > **Versión del plugin:** 2.9.435
-> **Total de lecciones:** 215 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215)
+> **Total de lecciones:** 218 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218)
 
 ---
 
@@ -5051,3 +5051,71 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    previo en cero daba falsa confianza. (4) Inputs de tarjeta en JS de
    tokenización: SIN atributo name — el PAN/CVV nunca debe postearse al
    servidor, solo el token.
+
+---
+
+## 34. v2.9.436 - E2E-BUYER-QV-HARDEN: el guard is_admin() de una clase frontend silencia TODOS sus handlers AJAX (3 lecciones nuevas, #216-218)
+
+> Ciclo de hardening del quick view + carrito (backlog P3 del E2E-BUYER-2026-11-20):
+> QV-VISGATE, QV-XSS-EXCERPT, QV-BROKEN-BTN, QV-ACTION-MISMATCH, CART-NONCE,
+> PSE-REMOVAL + QV-AJAX-GUARD (P0 hallado en la validacion E2E post-deploy).
+> Suite 5,470 tests. Commits da5fcf49 + 3bab1c02.
+
+### Leccion #216: is_admin() es TRUE durante admin-ajax.php - un guard "solo frontend" sin exencion AJAX convierte cada handler de la clase en endpoint muerto
+
+1. **Caso real:** la verificacion E2E post-deploy del ciclo (POST real a
+   admin-ajax con wp_create_nonce server-side) devolvio '0' (unknown action)
+   para ltms_pv_quick_view y ltms_pv_product_vendor pese a que el registro
+   existia en el codigo y el nonce era valido. Causa: LTMS_Native_Templates::
+   init() hacia "if ( is_admin() ) return;" - y admin-ajax.php corre en
+   contexto admin - de modo que los add_action de AJAX NUNCA se ejecutaban en
+   produccion desde v2.9.183. El endpoint de vendor-name de las cards
+   Elementor tambien estaba muerto por el mismo guard.
+
+2. **Diagnostico:** es la 3a recurrencia del patron "wiring muerto"
+   (leccion #508: action/filter sin consumidor; PANEL-E2E-005/006: JS sin
+   encolar). La variante de esta leccion: el guard de AMBITO (is_admin) y el
+   registro de HANDLERS AJAX viven en el mismo init() - el guard pensado para
+   "no tocar el admin" mata tambien los endpoints que se sirven DESDE el
+   admin-ajax (que es admin para WP pero frontend para el negocio).
+
+3. **Regla preventiva:** (1) Todo guard de ambito en un init() que tambien
+   registra handlers AJAX debe ser "is_admin() && ! wp_doing_ajax()". (2) La
+   verificacion de un endpoint AJAX es un POST real (curl desde el server con
+   nonce server-side via wp eval) - el grep del add_action en el codigo NO
+   prueba que el registro ocurra en runtime (patron "contra los fixes
+   cosmeticos" de AGENTS.md: el hook registrado condicionalmente puede no
+   ejecutarse nunca). (3) Al encontrar un endpoint que responde '0' con nonce
+   valido, la primera hipotesis es el guard de su clase, no la falta del
+   add_action.
+
+### Leccion #217: el nombre de la accion AJAX es un contrato de 2 capas (JS llama / PHP registra) - se rompe silenciosamente y produce el mismo sintoma que el wiring muerto
+
+1. **Caso real:** PV.quickView llamaba 'ltms_plaza_viva_quick_view' mientras
+   el handler registrado era 'ltms_pv_quick_view' (desde v2.9.183, fe3174f9).
+   Ni lint ni tests lo detectan: ambos lados compilan, el JS recibe '0' del
+   admin-ajax y muestra su toast de error.
+
+2. **Regla preventiva:** (1) Al crear un handler AJAX, grepear AMBAS capas
+   antes de commitear: la cadena exacta del action debe existir una vez en JS
+   y una vez en PHP (y solo una). (2) Un test source-based barato
+   (assertStringContainsString "PV.ajax('ltms_pv_quick_view'" + NotContains
+   de la fantasma) cubre el contrato para siempre. (3) Cuando conviven
+   convenciones de nombres (ltms_pv_* vs ltms_plaza_viva_*), documentar cual
+   es la viva y eliminar el alias muerto.
+
+### Leccion #218: un nonce que no puede fallar (check_ajax_referer(..., false) sin chequear el retorno) es teatro - y su correccion debe examinar a los consumers reales antes de endurecer
+
+1. **Caso real:** ajax_get_cart verificaba el nonce con el flag no-fatal de
+   WP (solo silencia el die) y sin usar el retorno - el nonce era decorativo.
+   ajax_get_pse_banks ademas era un endpoint SIN consumer alguno desde
+   E2EFIX-04 (su unico JS fue borrado): endpoint muerto + nonce teatro.
+
+2. **Regla preventiva:** (1) Si el endpoint es de lectura publica sin
+   superficie CSRF real, eliminar el chequeo con comentario explicito; si se
+   endurece, usar "if ( ! check_ajax_referer(...) )" fatal-if-invalid - el
+   flag false sin examinar el retorno es peor que no chequear (parece
+   seguridad). (2) Antes de endurecer un nonce, listar los consumers con grep
+   y verificar que TODOS envian el nonce que el handler exige (patron
+   leccion #214 regla 3, aqui en direccion inversa). (3) Endpoint muerto =
+   eliminarlo + actualizar el harness/ tests que lo listan (leccion #119).
