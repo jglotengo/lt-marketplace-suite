@@ -146,6 +146,19 @@ class E2eBuyerQuickViewHardeningTest extends LTMS_Unit_Test_Case {
 	}
 
 	// =====================================================================
+	// E2E-BUYER-QV-AJAX-GUARD: init() de native templates registra en admin-ajax
+	// =====================================================================
+
+	public function test_native_templates_init_registra_ajax_en_admin_ajax(): void {
+		$src = (string) file_get_contents( self::NATIVE_TEMPLATES_PATH );
+
+		$this->assertStringContainsString( 'E2E-BUYER-QV-AJAX-GUARD', $src, 'El fix debe estar marcado con su ID de tarea.' );
+		$this->assertStringContainsString( 'is_admin() && ! wp_doing_ajax()', $src, 'init() debe permitir la carga en admin-ajax (is_admin() es true ahí) para registrar ltms_pv_quick_view y ltms_pv_product_vendor.' );
+		// El guard antiguo sin wp_doing_ajax no debe existir como código.
+		$this->assertStringNotContainsString( "if ( is_admin() ) {\n            return;\n        }", $src, 'El guard temprano sin exención AJAX no debe persistir.' );
+	}
+
+	// =====================================================================
 	// E2E-BUYER-CART-NONCE: nonce fatal-if-invalid en ajax_get_cart
 	// =====================================================================
 

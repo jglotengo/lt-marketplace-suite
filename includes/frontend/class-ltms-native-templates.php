@@ -45,7 +45,15 @@ class LTMS_Native_Templates {
         self::$template_dir = $plugin_dir . 'includes/frontend/templates/';
 
         // Solo activar en frontend.
-        if ( is_admin() ) {
+        // E2E-BUYER-QV-AJAX-GUARD (2026-11-24, P0): is_admin() es TRUE durante
+        // admin-ajax.php — el return temprano impedía registrar los handlers AJAX
+        // ltms_pv_quick_view y ltms_pv_product_vendor, y ambos endpoints
+        // respondían '0' (unknown action) en producción desde v2.9.183 aunque el
+        // nonce fuera válido. Verificado en vivo (POST admin-ajax con
+        // wp_create_nonce server-side → '0'). Patrón estándar WP: permitir la
+        // carga cuando la petición es AJAX (wp_doing_ajax) — el resto del wiring
+        // (template overrides, enqueue) es inofensivo en admin-ajax.
+        if ( is_admin() && ! wp_doing_ajax() ) {
             return;
         }
 
