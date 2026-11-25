@@ -495,69 +495,13 @@
     });
 
     // ============================================================
-    // QUICK VIEW MODAL
+    // QUICK VIEW MODAL — ELIMINADO (E2E-BUYER-QV-BROKEN-BTN, 2026-11-24).
+    // El modal legacy jQuery esperaba response.data.html (contrato que el
+    // handler estructurado ltms_quick_view nunca devolvió) y posteba un nonce
+    // por producto que el handler vivo rechaza con 403 en cada click.
+    // El botón .ltms-quick-view-btn ahora emite data-pv-quickview y abre el
+    // modal canonical del design system (ltms-plaza-viva.js → ltms_pv_quick_view).
     // ============================================================
-
-    var LTMS_QuickView = {
-
-        init: function() {
-            // Crear modal container en el body si no existe.
-            if ($('#ltms-quick-view-modal').length === 0) {
-                $('body').append(
-                    '<div id="ltms-quick-view-modal" class="ltms-quick-view-modal">' +
-                        '<div class="ltms-quick-view-modal__inner">' +
-                            '<button class="ltms-quick-view-modal__close" id="ltms-qv-close">&times;</button>' +
-                            '<div id="ltms-qv-content" style="text-align:center;padding:40px;"><p>Cargando...</p></div>' +
-                        '</div>' +
-                    '</div>'
-                );
-            }
-
-            // Click en botón quick view.
-            $(document).on('click', '.ltms-quick-view-btn', this.open.bind(this));
-
-            // Cerrar modal.
-            $('#ltms-qv-close').on('click', this.close.bind(this));
-            $('#ltms-quick-view-modal').on('click', function(e) {
-                if (e.target === this) LTMS_QuickView.close();
-            });
-
-            // ESC para cerrar.
-            $(document).on('keydown', function(e) {
-                if (e.keyCode === 27) LTMS_QuickView.close();
-            });
-        },
-
-        open: function(e) {
-            e.preventDefault();
-            var $btn = $(e.currentTarget);
-            var productId = $btn.data('product-id');
-            var nonce = $btn.data('nonce');
-
-            $('#ltms-qv-content').html('<p style="text-align:center;padding:40px;">Cargando...</p>');
-            $('#ltms-quick-view-modal').addClass('ltms-quick-view-modal--open');
-            $('body').css('overflow', 'hidden');
-
-            $.post(ltmsDrawerData.ajaxUrl, {
-                action: 'ltms_quick_view',
-                product_id: productId,
-                nonce: nonce
-            }, function(response) {
-                if (response.success) {
-                    $('#ltms-qv-content').html(response.data.html);
-                } else {
-                    $('#ltms-qv-content').html('<p style="text-align:center;padding:40px;color:#dc2626;">' + (response.data.message || 'Error') + '</p>');
-                }
-            }).fail(function() {
-                $('#ltms-qv-content').html('<p style="text-align:center;padding:40px;color:#dc2626;">Error de conexión</p>');
-            });
-        },
-
-        close: function() {
-            $('#ltms-quick-view-modal').removeClass('ltms-quick-view-modal--open');
-            $('body').css('overflow', '');
-        }
-    };
 
     // ============================================================
     // WISHLIST TOGGLE
@@ -623,12 +567,6 @@
         });
     });
 
-    // ============================================================
-    // INIT QUICK VIEW
-    // ============================================================
-
-    $(document).ready(function() {
-        LTMS_QuickView.init();
-    });
+    // INIT QUICK VIEW — eliminado con el modal legacy (E2E-BUYER-QV-BROKEN-BTN).
 
 })(jQuery);

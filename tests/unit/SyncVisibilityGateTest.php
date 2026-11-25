@@ -435,9 +435,18 @@ final class SyncVisibilityGateTest extends LTMS_Unit_Test_Case {
 	}
 
 	public function test_quick_view_guard_blocks_unsellable_products(): void {
-		$source = $this->read_source( 'includes/frontend/class-ltms-quick-view.php' );
+		// E2E-BUYER-QV-VISGATE (2026-11-24): los handlers VIVOS de quick view
+		// (ltms_quick_view en el checkout handler y ltms_pv_quick_view en
+		// native-templates) deben aplicar el gate. Antes este test apuntaba a
+		// LTMS_Quick_View::ajax_load_product — handler muerto (acciones sin
+		// registrar desde v2.9.49, eliminado en E2E-BUYER-QV-BROKEN-BTN).
+		$checkout = $this->read_source( 'includes/frontend/class-ltms-frontend-checkout-handler.php' );
+		$native   = $this->read_source( 'includes/frontend/class-ltms-native-templates.php' );
 
-		$this->assertStringContainsString( 'LTMS_Business_Sync_Visibility_Gate::is_unsellable', $source, 'quick-view debe rechazar productos no vendibles.' );
+		$this->assertStringContainsString( 'LTMS_Business_Sync_Visibility_Gate::is_unsellable', $checkout, 'ajax_quick_view (checkout handler) debe rechazar productos no vendibles.' );
+		$this->assertStringContainsString( 'E2E-BUYER-QV-VISGATE', $checkout, 'El gate de quick view debe estar marcado con su ID de tarea.' );
+		$this->assertStringContainsString( 'LTMS_Business_Sync_Visibility_Gate::is_unsellable', $native, 'ajax_quick_view (ltms_pv_quick_view) debe rechazar productos no vendibles.' );
+		$this->assertStringContainsString( 'E2E-BUYER-QV-VISGATE', $native, 'El gate del quick view PV debe estar marcado con su ID de tarea.' );
 	}
 
 	public function test_live_search_filters_visibility(): void {

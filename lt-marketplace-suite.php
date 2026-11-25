@@ -3,7 +3,7 @@
  * Plugin Name:       LT Marketplace Suite (LTMS)
  * Plugin URI:        https://ltmarketplace.co
  * Description:       Plataforma Enterprise Multi-Vendor para WooCommerce. Marketplace, MLM, Fintech, Insurtech, Logística y Cumplimiento Fiscal para Colombia y México.
- * Version:           2.9.435
+ * Version:           2.9.436
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            LT Marketplace Team
@@ -98,7 +98,7 @@ define( 'LTMS_LOADED', true );
 // ausencias aborta la sync sin ocultar nada (Taiwan: "aborta SIN tocar lo
 // publicado"); respuesta vacía con catálogo publicado aborta. VTEX: solo
 // 'ausente' (sin 'desactivado' — IsAvailable es disponibilidad).
-define( 'LTMS_VERSION', '2.9.435' );
+define( 'LTMS_VERSION', '2.9.436' );
 
 
 // ── KYC v3 one-shot patch (auto-removes) ────────────────────────────────────
@@ -514,8 +514,9 @@ function ltms_load_autoloader(): void {
                 'ltms-payment-orchestrator'     => 'business/class-ltms-payment-orchestrator.php',
                 'ltms-media-guard'              => 'business/class-ltms-media-guard.php',
                 'ltms-xcover-checkout-handler'      => 'business/class-ltms-xcover-checkout-handler.php',
-                // M-14: handler de checkout AJAX (endpoints vivos: ltms_get_pse_banks, ltms_get_cart, etc.)
+                // M-14: handler de checkout AJAX (endpoints vivos: ltms_get_cart, etc.)
                 // CHECKOUT-LEGACY-REMOVAL-2026-11-18: ltms_process_checkout eliminado (sin consumidores).
+                // E2E-BUYER-PSE-REMOVAL-2026-11-24: ltms_get_pse_banks eliminado (sin consumers desde E2EFIX-04).
                 'ltms-frontend-checkout-handler'    => 'frontend/class-ltms-frontend-checkout-handler.php',
                 // L-1 to L-8: Cumplimiento legal (Ley 1581/2012, Ley 1480/2011, SAGRILAFT)
                 'ltms-legal-compliance'                 => 'business/class-ltms-legal-compliance.php',

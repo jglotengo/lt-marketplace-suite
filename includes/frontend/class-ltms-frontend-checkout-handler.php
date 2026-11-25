@@ -3,7 +3,10 @@
  * LTMS Frontend Checkout Handler — Controlador AJAX del Checkout
  *
  * Expone los endpoints AJAX que el checkout necesita:
- *  - ltms_get_pse_banks    : devuelve la lista de bancos PSE disponibles
+ *  - ltms_get_cart         : contenido del carrito estructurado (cart drawer)
+ *
+ * E2E-BUYER-PSE-REMOVAL (2026-11-24): ltms_get_pse_banks fue eliminado — su
+ * único consumer era ltms-checkout.js (borrado en E2EFIX-04).
  *
  * Bug histórico corregido (M-14): el JS ltms-checkout.js llamaba acciones AJAX
  * que no tenían handler PHP registrado. Ese JS fue eliminado en E2EFIX-04
@@ -37,44 +40,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class LTMS_Frontend_Checkout_Handler {
 
     use LTMS_Logger_Aware;
-
-    /**
-     * Bancos PSE disponibles en Colombia (códigos Openpay).
-     * Fuente: https://www.openpay.co/recursos/bancos-pse/
-     *
-     * @var array<string,string>
-     */
-    private const PSE_BANKS_CO = [
-        '1006' => 'Banco Agrario',
-        '1283' => 'CFA Cooperativa Financiera',
-        '1052' => 'Banco AV Villas',
-        '1032' => 'Banco Caja Social',
-        '1019' => 'SCOTIABANK COLPATRIA',
-        '1066' => 'Banco Cooperativo Coopcentral',
-        '1051' => 'Banco Davivienda',
-        '1001' => 'Banco de Bogotá',
-        '1023' => 'Banco de Occidente',
-        '1062' => 'Banco Falabella',
-        '1069' => 'Banco Finandina',
-        '1012' => 'Banco GNB Sudameris',
-        '1060' => 'Banco Pichincha',
-        '1002' => 'Banco Popular',
-        '1065' => 'Banco Santander',
-        '1007' => 'Bancolombia',
-        '1013' => 'BBVA Colombia',
-        '1009' => 'Citibank',
-        '1370' => 'Confiar Cooperativa Financiera',
-        '1292' => 'Coofinep Cooperativa Financiera',
-        '1289' => 'Cotrafa',
-        '1097' => 'Dale',
-        '1551' => 'DaviPlata',
-        '1303' => 'Financiera Juriscoop',
-        '1637' => 'IRIS',
-        '1022' => 'Bancolombia (PSE)',
-        '1507' => 'Nequi',
-        '1059' => 'Banco Pichincha',
-        '1049' => 'Itaú',
-    ];
 
     /**
      * Registra los hooks AJAX del handler.
@@ -141,9 +106,11 @@ final class LTMS_Frontend_Checkout_Handler {
         // el carrito inmediatamente). El notice solo se quita en /cart.
         add_action( 'woocommerce_before_cart', [ __CLASS__, 'strip_add_to_cart_success_notice' ], 1 );
 
-        // Lista de bancos PSE — también disponible para no logueados (el checkout puede ser guest)
-        add_action( 'wp_ajax_ltms_get_pse_banks',           [ $instance, 'ajax_get_pse_banks' ] );
-        add_action( 'wp_ajax_nopriv_ltms_get_pse_banks',    [ $instance, 'ajax_get_pse_banks' ] );
+        // E2E-BUYER-PSE-REMOVAL (2026-11-24): el endpoint ltms_get_pse_banks fue
+        // eliminado — su único consumer era ltms-checkout.js (borrado en E2EFIX-04,
+        // AUDIT-E2E-PAY-2026-11-17: el checkout CO usa el gateway nativo WC).
+        // Desde entonces no registraba consumidor alguno (código muerto + nonce
+        // no-fatal decorativo). La lista de bancos vive en la API de Openpay.
 
         // Task 67-A / UX-CART-1: structured cart contents for the UX cart drawer.
         // Replaces the non-existent woocommerce_get_cart_contents AJAX action.
@@ -251,44 +218,6 @@ final class LTMS_Frontend_Checkout_Handler {
     }
 
     // =========================================================================
-    // AJAX: ltms_get_pse_banks
-    // =========================================================================
-
-    /**
-     * Devuelve la lista de bancos PSE para Colombia.
-     *
-     * Respuesta JSON:
-     * {
-     *   success: true,
-     *   data: {
-     *     banks: [ { id: string, name: string }, ... ]
-     *   }
-     * }
-     *
-     * @return void
-     */
-    public function ajax_get_pse_banks(): void {
-        // Verificar nonce (opcional en este endpoint pero buena práctica)
-        check_ajax_referer( 'ltms_checkout_nonce', 'nonce', false );
-
-        $country = LTMS_Core_Config::get_country();
-
-        if ( 'CO' !== $country ) {
-            wp_send_json_error( __( 'PSE solo disponible en Colombia.', 'ltms' ), 400 );
-        }
-
-        $banks = [];
-        foreach ( self::PSE_BANKS_CO as $id => $name ) {
-            $banks[] = [ 'id' => $id, 'name' => $name ];
-        }
-
-        // Ordenar alfabéticamente por nombre
-        usort( $banks, fn( $a, $b ) => strcmp( $a['name'], $b['name'] ) );
-
-        wp_send_json_success( [ 'banks' => $banks ] );
-    }
-
-    // =========================================================================
     // AJAX: ltms_get_cart (Task 67-A / UX-CART-1)
     // =========================================================================
 
@@ -312,9 +241,17 @@ final class LTMS_Frontend_Checkout_Handler {
      * @return void
      */
     public function ajax_get_cart(): void {
-        // Nonce is optional here (drawer opens for guests), but verify when
-        // provided to harden against CSRF on logged-in sessions.
-        check_ajax_referer( 'ltms_ux_nonce', 'nonce', false );
+        // E2E-BUYER-CART-NONCE (2026-11-24): el check no-fatal era nonce-teatro —
+        // un request sin nonce (o con nonce inválido) pasaba igual. Ahora es
+        // fatal-if-invalid, mismo patrón de los hermanos ltms_drawer_update_qty /
+        // ltms_drawer_remove_item (class-ltms-cart-drawer.php). El drawer vive para
+        // guests, pero todos los consumers vivos (ltms-cart-drawer.js via
+        // ltmsCartDrawer.nonce, ltms-ux-storefront.js y ltms-ux-enhancements.js via
+        // ltmsUX.nonce) envían siempre el nonce ltms_ux_nonce; una página cacheada
+        // stale sin ltmsUX degrada graceful a "carrito vacío" (renderCartEmpty).
+        if ( ! check_ajax_referer( 'ltms_ux_nonce', 'nonce', false ) ) {
+            wp_send_json_error( [ 'message' => __( 'Sesión expirada. Recarga la página.', 'ltms' ) ], 403 );
+        }
 
         // CART-UX-NEXT-UPSells (2026-09-11): el drawer nuevo pide full=1 al abrir
         // para recibir también los upsells del mismo vendor. Los refrescos rápidos
@@ -1501,6 +1438,17 @@ final class LTMS_Frontend_Checkout_Handler {
         $product = wc_get_product( $product_id );
         if ( ! $product ) {
             wp_send_json_error( [ 'message' => __( 'Producto no encontrado', 'ltms' ) ], 404 );
+        }
+
+        // E2E-BUYER-QV-VISGATE (SYNC-VIS-GATE, 2026-11-24): los handlers vivos de
+        // quick view no aplicaban el gate de vendibilidad — el gate solo vivía en
+        // el handler muerto LTMS_Quick_View::ajax_load_product (acciones sin
+        // registrar desde v2.9.49). Sin esto, un producto oculto (sin
+        // stock/imagen/precio) es enumerable por ID y el modal lo sirve con
+        // add-to-cart pese a que ninguna card pública lo muestra (paridad con
+        // content-product.php, live-search y vendor-storefront).
+        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) && LTMS_Business_Sync_Visibility_Gate::is_unsellable( $product ) ) {
+            wp_send_json_error( [ 'message' => __( 'Producto no disponible', 'ltms' ) ], 404 );
         }
 
         $rating = $product->get_average_rating();

@@ -136,7 +136,13 @@ class AuditE2ePay20261117FixesTest extends LTMS_Unit_Test_Case {
 		$this->assertStringNotContainsString( 'function ajax_process_checkout', $source, 'El método ajax_process_checkout no debe existir' );
 
 		// Endpoints vivos intactos.
-		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_get_pse_banks'", $source, 'ltms_get_pse_banks debe seguir registrado' );
+		// E2E-BUYER-PSE-REMOVAL (2026-11-24): ltms_get_pse_banks también fue
+		// eliminado — su único consumer era ltms-checkout.js (borrado en E2EFIX-04,
+		// este mismo ciclo); la lista de bancos PSE vive server-side en el gateway
+		// (LTMS_Api_Gateways::get_pse_banks, AUDIT-FUNNEL-PAY-12) y nadie consumía
+		// el endpoint admin-ajax. Assert invertido (lección #119: tests huérfanos
+		// de superficies retiradas se actualizan en el mismo commit).
+		$this->assertStringNotContainsString( "add_action( 'wp_ajax_ltms_get_pse_banks'", $source, 'ltms_get_pse_banks fue eliminado (sin consumers desde E2EFIX-04)' );
 		$this->assertStringContainsString( "add_action( 'wp_ajax_ltms_get_cart'", $source, 'ltms_get_cart (cart drawer) debe seguir registrado' );
 	}
 

@@ -580,6 +580,14 @@ class LTMS_Native_Templates {
             wp_send_json_error( [ 'message' => 'Product not found' ] );
         }
 
+        // E2E-BUYER-QV-VISGATE (SYNC-VIS-GATE, 2026-11-24): paridad con
+        // ajax_quick_view de LTMS_Frontend_Checkout_Handler y content-product.php —
+        // sin el gate, un producto oculto (sin stock/imagen/precio) era servible
+        // por enumeración de ID en el modal PV.
+        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) && LTMS_Business_Sync_Visibility_Gate::is_unsellable( $product ) ) {
+            wp_send_json_error( [ 'message' => 'Product not available' ] );
+        }
+
         ob_start();
         self::render_quick_view( $product );
         $html = ob_get_clean();
@@ -657,7 +665,10 @@ class LTMS_Native_Templates {
                     <span>(<?php echo esc_html( $product->get_review_count() ); ?>)</span>
                 </div>
                 <div class="pv-quick-view__price"><?php echo $price; ?></div>
-                <p class="pv-quick-view__excerpt"><?php echo wp_trim_words( $product->get_short_description(), 30 ); ?></p>
+                <?php /* E2E-BUYER-QV-XSS-EXCERPT (2026-11-24): la short description la
+                       controla el vendor y este HTML va a innerHTML del modal
+                       (ltms-plaza-viva.js). Antes se imprimía cruda — strip + esc. */ ?>
+                <p class="pv-quick-view__excerpt"><?php echo esc_html( wp_trim_words( wp_strip_all_tags( (string) $product->get_short_description() ), 30 ) ); ?></p>
                 <a href="<?php echo esc_url( $product->get_permalink() ); ?>" class="pv-btn pv-btn-primary">
                     <?php esc_html_e( 'Ver producto', 'ltms' ); ?>
                 </a>

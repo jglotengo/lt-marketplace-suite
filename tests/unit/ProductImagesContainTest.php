@@ -53,7 +53,6 @@ final class ProductImagesContainTest extends LTMS_Unit_Test_Case {
 	private string $single_path;
 	private string $wishlist_path;
 	private string $amazon_path;
-	private string $quick_view_path;
 	private string $webhook_path;
 
 	protected function setUp(): void {
@@ -68,7 +67,6 @@ final class ProductImagesContainTest extends LTMS_Unit_Test_Case {
 		$this->single_path  = $base . '/includes/frontend/templates/single-product.php';
 		$this->wishlist_path = $base . '/includes/frontend/class-ltms-wishlist.php';
 		$this->amazon_path  = $base . '/includes/frontend/class-ltms-amazon-enhancements.php';
-		$this->quick_view_path = $base . '/includes/frontend/class-ltms-quick-view.php';
 		$this->webhook_path = $base . '/deploy/ltms-deploy-webhook.php';
 	}
 
@@ -160,9 +158,12 @@ final class ProductImagesContainTest extends LTMS_Unit_Test_Case {
 		$this->assertMatchesRegularExpression( '/\.ltms-compare-bar-item img \{[^}]*object-fit: contain;/s', $ux, 'PROD-IMG-C: comparador (barra) con contain.' );
 		$this->assertMatchesRegularExpression( '/\.ltms-compare-product-img img \{[^}]*object-fit: contain;/s', $ux, 'PROD-IMG-C: comparador (tabla) con contain.' );
 
-		// Thumbs del quick view (inline).
-		$qv = (string) file_get_contents( $this->quick_view_path );
-		$this->assertStringContainsString( "60px;object-fit:contain", $qv, 'PROD-IMG-C: thumbs de galería del quick view con contain.' );
+		// E2E-BUYER-QV-BROKEN-BTN (2026-11-24): el bloque de thumbs del quick view
+		// legacy (LTMS_Quick_View::ajax_load_product, handler muerto sin registro
+		// desde v2.9.49) fue eliminado junto con el handler — la superficie que
+		// este assert cubría ya no existe (lección #119: el test huérfano se
+		// retira en el mismo commit que retira la superficie). El quick view vivo
+		// (ltms_pv_quick_view) no renderiza thumbs de galería.
 
 		// Amazon enhancements: addons + browsing (inline).
 		$amazon = (string) file_get_contents( $this->amazon_path );

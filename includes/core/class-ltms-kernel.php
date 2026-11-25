@@ -1087,10 +1087,11 @@ final class LTMS_Core_Kernel {
             new LTMS_Products_Ajax();
         }
 
-        // M-14 FIX: handler de checkout AJAX (ltms_get_pse_banks y demás endpoints
+        // M-14 FIX: handler de checkout AJAX (ltms_get_cart y demás endpoints
         // del checkout). CHECKOUT-LEGACY-REMOVAL-2026-11-18: el endpoint legacy
         // ltms_process_checkout (y su JS) fue eliminado; el pago vivo usa el
-        // gateway WC ltms_openpay.
+        // gateway WC ltms_openpay. E2E-BUYER-PSE-REMOVAL-2026-11-24:
+        // ltms_get_pse_banks también eliminado (sin consumers desde E2EFIX-04).
         if ( class_exists( 'LTMS_Frontend_Checkout_Handler' ) ) {
             LTMS_Frontend_Checkout_Handler::init();
         }

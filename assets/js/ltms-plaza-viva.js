@@ -262,7 +262,12 @@
     body.classList.add('is-loading');
     body.innerHTML = renderSkeleton('product');
 
-    return PV.ajax('ltms_plaza_viva_quick_view', { product_id: productId })
+    // E2E-BUYER-QV-ACTION-MISMATCH (2026-11-24): la acción real registrada es
+    // ltms_pv_quick_view (LTMS_Native_Templates::ajax_quick_view, nonce global
+    // ltms_plaza_viva). Antes se llamaba 'ltms_plaza_viva_quick_view' — acción
+    // sin handler desde v2.9.183 (fe3174f9) — y el modal quick view de las
+    // cards respondía siempre con error.
+    return PV.ajax('ltms_pv_quick_view', { product_id: productId })
       .then(function (res) {
         if (!res || !res.success) throw new Error((res && res.data && res.data.message) || 'failed');
         var data = res.data || res;
