@@ -975,6 +975,15 @@ Equipo Lo Tengo",
         // Ahora iteramos las meta keys que el handler realmente escribe, en
         // orden de probabilidad. La consulta se hace contra HPOS (wc_orders_meta)
         // primero y luego contra postmeta (legacy CPT storage) como fallback.
+        //
+        // E2E-BUYER-HPOS-DETECT (2026-11-24): la query contra wc_orders_meta se
+        // ejecuta SIEMPRE — en un sitio con HPOS DESACTIVADO (legacy CPT storage)
+        // la tabla no existe y cada intento genera un error MySQL
+        // (Table 'xxx.wc_orders_meta' doesn't exist) en el log por CADA meta key
+        // del loop. Se detecta el modo de almacenamiento activo (OrderUtil de
+        // WC 7.9+) y solo se consulta wc_orders_meta cuando HPOS está habilitado.
+        // El fallback postmeta se mantiene siempre: es el storage activo en
+        // legacy y en HPOS las meta sincronizadas (compat mode) también viven ahí.
         $meta_keys = [
             '_openpay_transaction_id',
             '_ltms_pse_charge_id',
@@ -984,19 +993,24 @@ Equipo Lo Tengo",
             '_ltms_spei_charge_id',
             // AUDIT-FUNNEL-PAY-16 FIX: el gateway PSE nativo WC guarda el charge_id
             // en _ltms_openpay_pse_transaction_id (class-ltms-api-gateways.php
-            // process_payment) — meta que NO estaba en esta lista → si Openpay no
+            // process_payment) — meta que NO estaba en esta lista — si Openpay no
             // devolvía order_id en el webhook, estas órdenes nunca se encontraban.
             '_ltms_openpay_pse_transaction_id',
             '_ltms_openpay_mx_charge_id',
         ];
 
+        $hpos_enabled = class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' )
+            && \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+
         foreach ( $meta_keys as $key ) {
-            // HPOS-aware lookup.
-            $order_id = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT order_id FROM {$wpdb->prefix}wc_orders_meta WHERE meta_key = %s AND meta_value = %s LIMIT 1",
-                $key, $txn_id
-            ) );
-            if ( $order_id ) return $order_id;
+            // HPOS-aware lookup (solo si HPOS está activo; ver HPOS-DETECT arriba).
+            if ( $hpos_enabled ) {
+                $order_id = (int) $wpdb->get_var( $wpdb->prepare(
+                    "SELECT order_id FROM {$wpdb->prefix}wc_orders_meta WHERE meta_key = %s AND meta_value = %s LIMIT 1",
+                    $key, $txn_id
+                ) );
+                if ( $order_id ) return $order_id;
+            }
 
             // Legacy CPT storage.
             $order_id = (int) $wpdb->get_var( $wpdb->prepare(

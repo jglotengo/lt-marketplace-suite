@@ -186,7 +186,7 @@ if ( ! empty( $unknown_vendor['items'] ) ) {
 }
 
 /* ---------------------------------------------------------------------------
- * 2. Envío gratis — umbral (woocommerce_free_shipping_settings o 100000 COP).
+ * 2. Envío gratis — umbral (ltms_shipping_hybrid_threshold o 100000 COP).
  *
  * AUDIT-FE-PV-DS-CICLO1 — P1-9 CERRADO COMO OBSOLETO (decisión de producto
  * 2026-08-25): el hallazgo original ("umbral hardcodeado sin válvula") estaba
@@ -195,13 +195,21 @@ if ( ! empty( $unknown_vendor['items'] ) ) {
  * moneda activa ≠ moneda base, el umbral NO se convierte con el currency
  * switcher (la tienda opera single-currency; reabrir solo si se activa
  * multi-moneda real). Ver CHANGELOG PLAZA-VIVA-DS-AUDIT-CICLO1.
+ *
+ * E2E-BUYER-THRESHOLD-SYNC (2026-11-24, P3): el cart leía el setting global
+ * de envío gratis de WC (min_amount) — un setting que la tienda NO usa (el
+ * envío real lo calcula LTMS_Shipping_Mode con el umbral
+ * ltms_shipping_hybrid_threshold) → la barra del cart mostraba un "te faltan
+ * $X" DIFERENTE al del mini-cart (class-ltms-cart-drawer.php) y al del
+ * single-product (class-ltms-product-tabs.php), que sí leen la fuente real.
+ * Alineado a ltms_shipping_hybrid_threshold (default 100000 COP) — misma
+ * fuente que el comportamiento real de envío y que las otras dos superficies.
  * ------------------------------------------------------------------------- */
-$free_shipping_threshold = 100000; // Fallback razonable en COP.
-$fs_settings = get_option( 'woocommerce_free_shipping_settings', array() );
-if ( is_array( $fs_settings ) && isset( $fs_settings['min_amount'] ) ) {
-    $min = (float) $fs_settings['min_amount'];
-    if ( $min > 0 ) {
-        $free_shipping_threshold = $min;
+$free_shipping_threshold = 100000; // Fallback razonable en COP (igual al default del mini-cart).
+if ( class_exists( 'LTMS_Core_Config' ) ) {
+    $pv_threshold_cfg = (float) LTMS_Core_Config::get( 'ltms_shipping_hybrid_threshold', 100000 );
+    if ( $pv_threshold_cfg > 0 ) {
+        $free_shipping_threshold = $pv_threshold_cfg;
     }
 }
 /**

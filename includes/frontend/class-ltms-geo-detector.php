@@ -1,13 +1,29 @@
 <?php
 /**
- * LTMS Geo Detector
+ * LTMS Geo Detector — sync de ciudad (cookie + sesión WC).
  *
- * Detecta ciudad del visitante vía ip-api.com (gratuito, sin API key).
- * Cache en transient por IP 24 horas. No almacena IPs en DB.
+ * E2E-BUYER-GEO-DEAD (2026-11-24, P3): el detector original consultaba una
+ * API pública de geolocalización SINCRÓNAMENTE en init (HTTP bloqueante,
+ * timeout 2s) para TODO visitante sin cookie — hasta 2s de TTFB extra por
+ * visitante nuevo (y la API gratuita limita 45 req/min, así que la mayoría
+ * de llamadas fallaban e igualmente quemaban el timeout). Además:
+ *  - la sesión/cookie que escribía NO tiene ningún consumer de negocio (ni
+ *    envíos, ni render, ni JS — verificado por grep en el ciclo),
+ *  - las rewrite rules ^productos/{ciudad} y ^vendedores/{ciudad} registraban
+ *    query vars que nadie lee (el feed de Merchant de seo-enhanced usa su
+ *    propia ruta add_feed, no estas rewrites),
+ *  - el localize del selector de ciudad no tenía ningún JS que lo consumiera
+ *    (objeto JS fantasma para una feature que nunca se construyó).
+ * Se eliminaron la llamada HTTP, las rewrites y el localize. Se conservan el
+ * ?ltms_city= (deep link) y el sync cookie→sesión: la cookie ltms_city está
+ * DOCUMENTADA en el catálogo de privacidad (LTMS_Legal_Compliance) y la
+ * limpia LTMS_Privacy_Toolkit — no eliminarla sin actualizar el catálogo.
+ * Si algún día se construye el selector de ciudad, hacer la detección vía
+ * AJAX (no bloqueante) y dar un consumer real a la sesión.
  *
  * @package    LTMS
  * @subpackage LTMS/includes/frontend
- * @version    2.0.0
+ * @version    2.1.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -28,50 +44,6 @@ class LTMS_Geo_Detector {
         if ( ! (bool) LTMS_Core_Config::get( 'ltms_geo_detection_enabled', true ) ) return;
 
         add_action( 'init', [ self::class, 'init_session_location' ], 5 );
-        add_action( 'init', [ self::class, 'register_city_rewrite_rules' ] );
-        add_action( 'wp_enqueue_scripts', [ self::class, 'enqueue_city_selector' ] );
-    }
-
-    /**
-     * Detecta ciudad del visitante.
-     *
-     * @return array ['city' => string, 'region' => string, 'country' => string]
-     */
-    public static function get_visitor_location(): array {
-        $default = [
-            'city'    => LTMS_Core_Config::get( 'ltms_geo_default_city', 'Bogotá' ),
-            'region'  => '',
-            'country' => LTMS_Core_Config::get( 'ltms_geo_default_country', 'CO' ),
-        ];
-        try {
-            $ip = self::get_client_ip();
-            if ( ! $ip || self::is_private_ip( $ip ) ) return $default;
-
-            $cache_key = 'ltms_geo_' . md5( $ip );
-            $cached    = get_transient( $cache_key );
-            if ( $cached !== false ) return is_array( $cached ) ? $cached : $default;
-
-            $response = wp_remote_get(
-                'http://ip-api.com/json/' . rawurlencode( $ip ) . '?fields=city,regionName,countryCode',
-                [ 'timeout' => 2, 'sslverify' => false ]
-            );
-
-            if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) return $default;
-
-            $data = json_decode( wp_remote_retrieve_body( $response ), true );
-            if ( empty( $data['city'] ) ) return $default;
-
-            $location = [
-                'city'    => sanitize_text_field( $data['city'] ),
-                'region'  => sanitize_text_field( $data['regionName'] ?? '' ),
-                'country' => sanitize_text_field( $data['countryCode'] ?? 'CO' ),
-            ];
-            set_transient( $cache_key, $location, DAY_IN_SECONDS );
-            return $location;
-        } catch ( \Throwable $e ) {
-            error_log( 'LTMS Geo: detection failed — ' . $e->getMessage() );
-            return $default;
-        }
     }
 
     public static function init_session_location(): void {
@@ -88,56 +60,11 @@ class LTMS_Geo_Detector {
                 if ( WC()->session ) WC()->session->set( 'ltms_city', sanitize_text_field( $_COOKIE['ltms_city'] ) );
                 return;
             }
-            $location = self::get_visitor_location();
-            if ( WC()->session ) WC()->session->set( 'ltms_city', $location['city'] );
-            setcookie( 'ltms_city', $location['city'], [ 'expires' => time() + MONTH_IN_SECONDS, 'path' => COOKIEPATH, 'domain' => COOKIE_DOMAIN, 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Strict', ] );
+            $city = (string) LTMS_Core_Config::get( 'ltms_geo_default_city', 'Bogotá' );
+            if ( WC()->session ) WC()->session->set( 'ltms_city', $city );
+            setcookie( 'ltms_city', $city, [ 'expires' => time() + MONTH_IN_SECONDS, 'path' => COOKIEPATH, 'domain' => COOKIE_DOMAIN, 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Strict', ] );
         } catch ( \Throwable $e ) {
             error_log( 'LTMS Geo: init_session_location failed — ' . $e->getMessage() );
         }
-    }
-
-    public static function register_city_rewrite_rules(): void {
-        add_rewrite_rule( '^productos/([a-z-]+)/?$',  'index.php?ltms_geo_productos=1&ltms_ciudad=$matches[1]', 'top' );
-        add_rewrite_rule( '^vendedores/([a-z-]+)/?$', 'index.php?ltms_geo_vendedores=1&ltms_ciudad=$matches[1]', 'top' );
-        add_filter( 'query_vars', static function( array $vars ): array {
-            $vars[] = 'ltms_geo_productos';
-            $vars[] = 'ltms_geo_vendedores';
-            $vars[] = 'ltms_ciudad';
-            return $vars;
-        } );
-    }
-
-    public static function enqueue_city_selector(): void {
-        wp_localize_script( 'jquery', 'ltmsGeo', [
-            'currentCity' => self::get_current_city(),
-            'cities'      => self::get_available_cities(),
-            'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
-        ] );
-    }
-
-    public static function get_current_city(): string {
-        if ( ! empty( $_COOKIE['ltms_city'] ) ) return sanitize_text_field( $_COOKIE['ltms_city'] );
-        return LTMS_Core_Config::get( 'ltms_geo_default_city', 'Bogotá' );
-    }
-
-    private static function get_available_cities(): array {
-        return [
-            'CO' => [ 'Bogotá', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena', 'Bucaramanga', 'Pereira', 'Manizales', 'Santa Marta', 'Cúcuta' ],
-            'MX' => [ 'Ciudad de México', 'Guadalajara', 'Monterrey', 'Puebla', 'Tijuana' ],
-        ];
-    }
-
-    private static function get_client_ip(): string {
-        foreach ( [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' ] as $header ) {
-            if ( ! empty( $_SERVER[ $header ] ) ) {
-                $ip = trim( explode( ',', sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ) )[0] );
-                if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) return $ip;
-            }
-        }
-        return '';
-    }
-
-    private static function is_private_ip( string $ip ): bool {
-        return ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
     }
 }

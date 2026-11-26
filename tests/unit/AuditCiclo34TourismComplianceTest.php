@@ -522,11 +522,14 @@ class AuditCiclo34TourismComplianceTest extends LTMS_Unit_Test_Case {
 	}
 
 	public function test_cross_check_c33_geo_detector_exception_preserved(): void {
+		// E2E-BUYER-GEO-DEAD (2026-11-24): la llamada http://ip-api.com (con su
+		// sslverify=>false) fue eliminada — la excepción C33 queda vacía por
+		// diseño; el cross-check ahora asegura que no haya superficie http.
 		$source = self::read_source( self::GEO_DETECTOR_PATH );
-		$this->assertStringContainsString(
-			"'sslverify' => false",
+		$this->assertStringNotContainsString(
+			'wp_remote_get',
 			$source,
-			'Excepcion documentada geo-detector http://ip-api.com sigue con sslverify=>false (C33 regla #5)'
+			'geo-detector.php sin llamadas remotas (E2E-BUYER-GEO-DEAD) — la excepción sslverify C33 quedó vacía por diseño'
 		);
 		$this->assertStringNotContainsString(
 			'CICLO33-P1-SSL-',

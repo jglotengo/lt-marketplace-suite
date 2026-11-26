@@ -241,20 +241,22 @@ class AuditCiclo33SSLVerifyTransversalTest extends LTMS_Unit_Test_Case {
 	// ====================================================================
 
 	public function test_geo_detector_keeps_sslverify_false_for_http_endpoint(): void {
-		// Excepcion documentada: class-ltms-geo-detector.php usa `http://ip-api.com`
-		// (NO HTTPS), por lo que sslverify NO aplica. La migracion C33 NO debe
-		// tocar este archivo. El `sslverify => false` intencional se preserva.
+		// E2E-BUYER-GEO-DEAD (2026-11-24): la llamada http://ip-api.com fue
+		// ELIMINADA (wp_remote_get síncrono en el request path = hasta 2s de TTFB
+		// por visitante sin cookie). La excepción C33 queda vacúa por diseño: el
+		// archivo ya no tiene superficie HTTP — la anti-regresión ahora asegura
+		// que no existan llamadas remotas que re-introduzcan el caso.
 		$this->assertFileExists( self::GEO_DETECTOR_PATH );
 		$source = file_get_contents( self::GEO_DETECTOR_PATH );
-		$this->assertStringContainsString(
-			"'sslverify' => false",
+		$this->assertStringNotContainsString(
+			'wp_remote_get',
 			$source,
-			'geo-detector.php preserva sslverify=>false para endpoint http://ip-api.com (NO HTTPS)'
+			'geo-detector.php no debe hacer llamadas remotas (E2E-BUYER-GEO-DEAD) — la excepción sslverify C33 quedó vacía por diseño'
 		);
 		$this->assertStringNotContainsString(
 			'LTMS_DISABLE_SSL_VERIFY',
 			$source,
-			'geo-detector.php NO se migra a patron canonico (endpoint http, sslverify no aplica)'
+			'geo-detector.php NO se migra a patron canonico (sin superficie http, sslverify no aplica)'
 		);
 		$this->assertStringNotContainsString(
 			'CICLO33-P1-SSL',

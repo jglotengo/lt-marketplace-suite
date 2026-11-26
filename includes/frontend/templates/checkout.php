@@ -58,14 +58,18 @@ if ( WC()->payment_gateways() ) {
 }
 
 // Mapeo de iconos (emoji / svg path) para radio cards de pago.
+// E2E-BUYER-MAPS-REAL-IDS (2026-11-24): las keys anteriores ('pse', 'nequi',
+// 'daviplata', 'card' y las variantes woo_*) no coincidían con ningún
+// gateway_id real — los IDs viven en las clases gateway ($this->id:
+// ltms_openpay, ltms_openpay_mx, ltms_pse, ltms_addi). El lookup
+// $payment_meta[$gateway_id] nunca matcheaba y las cards caían al fallback
+// (icono genérico + título del gateway) — mapa muerto. Re-key a los IDs reales.
 $payment_meta = apply_filters( 'ltms_checkout_payment_meta', array(
-    'pse'             => array( 'label' => __( 'PSE', 'ltms' ), 'sub' => __( 'Bancolombia, Davivienda, Bogotá…', 'ltms' ), 'icon' => '🏦', 'badge' => __( '0% interés', 'ltms' ) ),
-    'nequi'           => array( 'label' => __( 'Nequi', 'ltms' ), 'sub' => __( 'Pago con app Nequi', 'ltms' ), 'icon' => '📲', 'badge' => '' ),
-    'daviplata'       => array( 'label' => __( 'Daviplata', 'ltms' ), 'sub' => __( 'Pago con app Daviplata', 'ltms' ), 'icon' => '💳', 'badge' => '' ),
-    'card'            => array( 'label' => __( 'Tarjeta de crédito/débito', 'ltms' ), 'sub' => __( 'Visa, Mastercard, Amex', 'ltms' ), 'icon' => '💳', 'badge' => '' ),
+    'ltms_openpay'    => array( 'label' => __( 'Tarjeta de crédito/débito', 'ltms' ), 'sub' => __( 'Visa, Mastercard, Amex y PSE', 'ltms' ), 'icon' => '💳', 'badge' => '' ),
+    'ltms_openpay_mx' => array( 'label' => __( 'Tarjeta de crédito/débito', 'ltms' ), 'sub' => __( 'Visa, Mastercard, OXXO y SPEI', 'ltms' ), 'icon' => '💳', 'badge' => '' ),
+    'ltms_pse'        => array( 'label' => __( 'PSE', 'ltms' ), 'sub' => __( 'Bancolombia, Davivienda, Bogotá…', 'ltms' ), 'icon' => '🏦', 'badge' => __( '0% interés', 'ltms' ) ),
+    'ltms_addi'       => array( 'label' => __( 'Addi', 'ltms' ), 'sub' => __( 'Paga en cuotas', 'ltms' ), 'icon' => '💳', 'badge' => '' ),
     'cod'             => array( 'label' => __( 'Contra entrega', 'ltms' ), 'sub' => __( 'Paga en efectivo al recibir', 'ltms' ), 'icon' => '💵', 'badge' => __( 'Verificación', 'ltms' ) ),
-    'woo_nequi'       => array( 'label' => __( 'Nequi', 'ltms' ), 'sub' => __( 'Pago con app Nequi', 'ltms' ), 'icon' => '📲', 'badge' => '' ),
-    'woo_daviplata'   => array( 'label' => __( 'Daviplata', 'ltms' ), 'sub' => __( 'Pago con app Daviplata', 'ltms' ), 'icon' => '💳', 'badge' => '' ),
 ) );
 
 /* ---------------------------------------------------------------------------
@@ -78,13 +82,24 @@ if ( WC()->shipping ) {
 }
 
 // Mapeo visual para carriers colombianos.
+// E2E-BUYER-MAPS-REAL-IDS (2026-11-24): re-key a los method_id reales de las
+// clases de envío ($this->id: ltms_deprisa, ltms_aveonline, ltms_heka,
+// ltms_pickup, ltms_own_delivery, ltms_uber_direct, ltms_free_absorbed) — las
+// keys anteriores ('deprisa', 'aveonline', 'heka') nunca matcheaban
+// $rate->get_method_id() y la metadata visual no se renderizaba. Se conservan
+// las keys estándar de WC (flat_rate, free_shipping, local_pickup) por si las
+// zonas definen métodos nativos.
 $carrier_meta = apply_filters( 'ltms_checkout_carrier_meta', array(
-    'deprisa'    => array( 'label' => __( 'Deprisa', 'ltms' ), 'sub' => __( '2-4 días hábiles', 'ltms' ), 'icon' => '📦', 'badge' => __( 'Recomendado', 'ltms' ) ),
-    'aveonline'  => array( 'label' => __( 'Aveonline', 'ltms' ), 'sub' => __( '1-3 días hábiles', 'ltms' ), 'icon' => '🚚', 'badge' => '' ),
-    'heka'       => array( 'label' => __( 'Heka', 'ltms' ), 'sub' => __( '2-5 días hábiles', 'ltms' ), 'icon' => '🛵', 'badge' => '' ),
-    'local_pickup' => array( 'label' => __( 'Recogida en tienda', 'ltms' ), 'sub' => __( 'Disponible en 24h', 'ltms' ), 'icon' => '🏪', 'badge' => __( 'Gratis', 'ltms' ) ),
-    'flat_rate'  => array( 'label' => __( 'Envío estándar', 'ltms' ), 'sub' => __( '3-5 días hábiles', 'ltms' ), 'icon' => '📦', 'badge' => '' ),
-    'free_shipping' => array( 'label' => __( 'Envío gratis', 'ltms' ), 'sub' => __( 'Aplicado por tu cupón', 'ltms' ), 'icon' => '🎉', 'badge' => __( 'Gratis', 'ltms' ) ),
+    'ltms_deprisa'       => array( 'label' => __( 'Deprisa', 'ltms' ), 'sub' => __( '2-4 días hábiles', 'ltms' ), 'icon' => '📦', 'badge' => __( 'Recomendado', 'ltms' ) ),
+    'ltms_aveonline'     => array( 'label' => __( 'Aveonline', 'ltms' ), 'sub' => __( '1-3 días hábiles', 'ltms' ), 'icon' => '🚚', 'badge' => '' ),
+    'ltms_heka'          => array( 'label' => __( 'Heka', 'ltms' ), 'sub' => __( '2-5 días hábiles', 'ltms' ), 'icon' => '🚛', 'badge' => '' ),
+    'ltms_uber_direct'   => array( 'label' => __( 'Uber Direct', 'ltms' ), 'sub' => __( 'Entrega el mismo día', 'ltms' ), 'icon' => '🚚', 'badge' => '' ),
+    'ltms_pickup'        => array( 'label' => __( 'Recogida en tienda', 'ltms' ), 'sub' => __( 'Disponible en 24h', 'ltms' ), 'icon' => '🏪', 'badge' => __( 'Gratis', 'ltms' ) ),
+    'ltms_own_delivery'  => array( 'label' => __( 'Envío del vendedor', 'ltms' ), 'sub' => __( 'Coordinado por el vendedor', 'ltms' ), 'icon' => '📦', 'badge' => '' ),
+    'ltms_free_absorbed' => array( 'label' => __( 'Envío gratis', 'ltms' ), 'sub' => __( 'Incluido por el vendedor', 'ltms' ), 'icon' => '🎉', 'badge' => __( 'Gratis', 'ltms' ) ),
+    'local_pickup'       => array( 'label' => __( 'Recogida en tienda', 'ltms' ), 'sub' => __( 'Disponible en 24h', 'ltms' ), 'icon' => '🏪', 'badge' => __( 'Gratis', 'ltms' ) ),
+    'flat_rate'          => array( 'label' => __( 'Envío estándar', 'ltms' ), 'sub' => __( '3-5 días hábiles', 'ltms' ), 'icon' => '📦', 'badge' => '' ),
+    'free_shipping'      => array( 'label' => __( 'Envío gratis', 'ltms' ), 'sub' => __( 'Aplicado por tu cupón', 'ltms' ), 'icon' => '🎉', 'badge' => __( 'Gratis', 'ltms' ) ),
 ) );
 
 /**
@@ -451,6 +466,20 @@ get_header( 'shop' );
                                 <?php else : ?>
                                     <ul class="pv-payment-options" role="radiogroup" aria-label="<?php esc_attr_e( 'Métodos de pago', 'ltms' ); ?>">
                                         <?php
+                                        // E2E-BUYER-PAY-RADIO-CHECKED (2026-11-24): con 2+
+                                        // gateways, el OR con "primer elemento" pre-chequeaba
+                                        // SIEMPRE el primero ADEMÁS del gateway elegido en
+                                        // sesión → dos radios checked simultáneos (WC toma el
+                                        // último POSTeado). Ahora: el elegido en sesión gana;
+                                        // solo si NINGUNO está elegido se pre-chequea el
+                                        // primero.
+                                        $pv_any_gateway_chosen = false;
+                                        foreach ( $available_gateways as $pv_gw_check ) {
+                                            if ( ! empty( $pv_gw_check->chosen ) ) {
+                                                $pv_any_gateway_chosen = true;
+                                                break;
+                                            }
+                                        }
                                         $pay_idx = 0;
                                         foreach ( $available_gateways as $gateway_id => $gateway ) :
                                             $meta  = isset( $payment_meta[ $gateway_id ] ) ? $payment_meta[ $gateway_id ] : null;
@@ -459,7 +488,7 @@ get_header( 'shop' );
                                             $badge = $meta ? $meta['badge'] : '';
                                             $label = $meta ? $meta['label'] : $gateway->get_title();
                                             $input_id = 'payment_method_' . $gateway_id;
-                                            $checked  = ( $gateway->chosen ) || ( $pay_idx === 0 );
+                                            $checked  = ! empty( $gateway->chosen ) || ( ! $pv_any_gateway_chosen && $pay_idx === 0 );
                                             $pay_idx++;
                                             ?>
                                             <li class="pv-payment-option <?php echo $checked ? 'is-selected' : ''; ?>" data-pv-payment-option="<?php echo esc_attr( $gateway_id ); ?>">
