@@ -82,6 +82,22 @@ class E2eBuyerQuickViewHardeningTest extends LTMS_Unit_Test_Case {
 		$this->assertStringContainsString( 'Product not available', $qv, 'El gate debe rechazar con error, no servir el producto.' );
 	}
 
+	/**
+	 * E2E-BUYER-QV-MANUAL-HIDE (P2 residual): paridad completa con las cards —
+	 * un producto vendible pero oculto MANUALMENTE (catalog_visibility=hidden /
+	 * draft / private) también debe ser rechazado por quick view.
+	 */
+	public function test_qv_manual_hide_parity_con_cards(): void {
+		$checkout = $this->extract_method( (string) file_get_contents( self::CHECKOUT_HANDLER_PATH ), 'ajax_quick_view' );
+		$native   = $this->extract_method( (string) file_get_contents( self::NATIVE_TEMPLATES_PATH ), 'ajax_quick_view' );
+
+		foreach ( [ 'checkout handler' => $checkout, 'native templates' => $native ] as $label => $qv ) {
+			$this->assertStringContainsString( 'E2E-BUYER-QV-MANUAL-HIDE', $qv, "{$label}: el fix debe estar marcado con su ID de tarea." );
+			$this->assertStringContainsString( '! $product->is_visible()', $qv, "{$label}: debe rechazar productos con is_visible() false (paridad con content-product.php:42)." );
+			$this->assertStringContainsString( '$pv_qv_hidden || $pv_qv_unsellable', $qv, "{$label}: el gate combinado (oculto manual O invendible) debe gobernar el rechazo." );
+		}
+	}
+
 	// =====================================================================
 	// E2E-BUYER-QV-XSS-EXCERPT: escape del excerpt vendor-controlled
 	// =====================================================================

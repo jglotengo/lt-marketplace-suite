@@ -1447,7 +1447,17 @@ final class LTMS_Frontend_Checkout_Handler {
         // stock/imagen/precio) es enumerable por ID y el modal lo sirve con
         // add-to-cart pese a que ninguna card pública lo muestra (paridad con
         // content-product.php, live-search y vendor-storefront).
-        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) && LTMS_Business_Sync_Visibility_Gate::is_unsellable( $product ) ) {
+        //
+        // E2E-BUYER-QV-MANUAL-HIDE (2026-11-24, P2 residual): paridad completa con
+        // las cards (content-product.php:42 usa $product->is_visible()) — un
+        // producto vendible pero oculto MANUALMENTE (catalog_visibility=hidden por
+        // el admin, o draft/private) también era servible por enumeración de ID.
+        // Nota: para variaciones is_visible() retorna false (post_status inherit) —
+        // ningún flujo vivo pide quick view de variación; si algún día hace falta,
+        // el gate debe ser parent-aware.
+        $pv_qv_hidden = ! $product->is_visible();
+        $pv_qv_unsellable = class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) && LTMS_Business_Sync_Visibility_Gate::is_unsellable( $product );
+        if ( $pv_qv_hidden || $pv_qv_unsellable ) {
             wp_send_json_error( [ 'message' => __( 'Producto no disponible', 'ltms' ) ], 404 );
         }
 

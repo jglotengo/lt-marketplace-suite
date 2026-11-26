@@ -592,7 +592,15 @@ class LTMS_Native_Templates {
         // ajax_quick_view de LTMS_Frontend_Checkout_Handler y content-product.php —
         // sin el gate, un producto oculto (sin stock/imagen/precio) era servible
         // por enumeración de ID en el modal PV.
-        if ( class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) && LTMS_Business_Sync_Visibility_Gate::is_unsellable( $product ) ) {
+        //
+        // E2E-BUYER-QV-MANUAL-HIDE (2026-11-24, P2 residual): paridad completa con
+        // las cards (content-product.php:42 usa $product->is_visible()) — vendible
+        // pero oculto MANUALMENTE (catalog_visibility=hidden / draft/private)
+        // también era servible por enumeración de ID. Variaciones: is_visible()
+        // es false para ellas (post_status inherit) — ningún flujo vivo las pide.
+        $pv_qv_hidden = ! $product->is_visible();
+        $pv_qv_unsellable = class_exists( 'LTMS_Business_Sync_Visibility_Gate' ) && LTMS_Business_Sync_Visibility_Gate::is_unsellable( $product );
+        if ( $pv_qv_hidden || $pv_qv_unsellable ) {
             wp_send_json_error( [ 'message' => 'Product not available' ] );
         }
 
