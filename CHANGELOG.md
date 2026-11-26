@@ -6,6 +6,55 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-24
 
+### Fixed — `E2E-BUYER-CHECKOUT-POLISH-2026-11-24` (cierre del backlog P3 restante del ciclo E2E-BUYER-2026-11-20 — 6 fixes)
+
+> Commit `34e52060`. Suite 5,413 tests / 12,353 assertions / 3 skipped — cero
+> regresiones; el delta -57 es exclusivamente la superficie geo eliminada
+> (68 tests de métodos removidos, +11 nuevos; precedente CHECKOUT-LEGACY-
+> REMOVAL "neto -6 tests… sin tests huérfanos"). Deploy CI success;
+> validación E2E en producción por SSH: producción corre HPOS DESACTIVADO →
+> `find_order_by_txn` ya no genera errores MySQL (verificado
+> `int(0)` limpio), /carrito y /checkout HTTP 200.
+>
+> - **E2E-BUYER-HPOS-DETECT (P3):** `find_order_by_txn` (webhook Openpay)
+>   consultaba SIEMPRE `wc_orders_meta` — con HPOS desactivado (el modo de
+>   producción, verificado en vivo) la tabla no existe y cada evento
+>   generaba 8 errores MySQL (uno por meta key). Ahora gatea la query HPOS
+>   con `OrderUtil::custom_orders_table_usage_is_enabled()`; el fallback
+>   postmeta permanece incondicional.
+> - **E2E-BUYER-PAY-RADIO-CHECKED (P3):** con 2+ gateways, el checkout
+>   pre-chequeaba el primero ADEMÁS del gateway elegido en sesión (2 radios
+>   checked simultáneos; WC toma el último POSTeado). El elegido gana; solo
+>   si ninguno está elegido se pre-chequea el primero.
+> - **E2E-BUYER-MAPS-REAL-IDS (P3):** `payment_meta`/`carrier_meta` del
+>   template checkout re-key a los IDs reales (`ltms_openpay`,
+>   `ltms_openpay_mx`, `ltms_pse`, `ltms_addi`; `ltms_deprisa`,
+>   `ltms_aveonline`, `ltms_heka`, `ltms_pickup`, `ltms_own_delivery`,
+>   `ltms_uber_direct`, `ltms_free_absorbed`) — las keys fantasma nunca
+>   matcheaban el lookup y la metadata visual (iconos/subs/badges de las
+>   radio cards) era mapa muerto.
+> - **E2E-BUYER-THRESHOLD-SYNC (P3):** la barra de envío gratis del cart
+>   leía `woocommerce_free_shipping_settings` (setting que la tienda no usa
+>   — el envío real lo calcula `LTMS_Shipping_Mode`) → "te faltan $X"
+>   inconsistente entre cart, mini-cart y single-product. Alineada a
+>   `ltms_shipping_hybrid_threshold` (misma fuente del comportamiento real;
+>   filtro `ltms_cart_free_shipping_threshold` conservado).
+> - **E2E-BUYER-GEO-DEAD (P3):** `LTMS_Geo_Detector` hacía una llamada HTTP
+>   síncrona a una API pública de geolocalización en `init` para todo
+>   visitante sin cookie (hasta 2s de TTFB extra; API gratuita limitada a
+>   45 req/min) y registraba rewrites/query-vars/localize sin consumer
+>   alguno. Eliminados llamada + wiring muerto; conservado el sync de la
+>   cookie `ltms_city` (documentada en el catálogo de privacidad).
+>   Tests: `GeoDetectorTest` reescrito a la superficie viva (lección #119);
+>   re-ancladas las anti-regresiones C33/C34 (la excepción sslverify del
+>   geo quedó vacía por diseño).
+> - **E2E-BUYER-LEGACY-DRAWER-DEAD (P3):** eliminado el objeto JS del drawer
+>   legacy (~337 líneas: render/qty/remove/T&C/countdown sobre markup
+>   `#ltms-drawer-*` que ningún template renderiza desde v2.9.208); sticky
+>   cart y wishlist intactos; min sincronizado.
+> - **Tests:** nueva suite `tests/unit/E2eBuyerCheckoutPolishTest.php`
+>   (+6, 32 assertions).
+
 ### Fixed — `E2E-BUYER-QV-HARDEN-2026-11-24` (hardening del quick view + carrito: cierre parcial del backlog P3 del ciclo E2E-BUYER-2026-11-20 — 5 fixes + 1 P0 de la validación E2E)
 
 > Continúa el backlog documentado del ciclo E2E-BUYER-2026-11-20 (items #2
