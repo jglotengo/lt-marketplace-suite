@@ -55,6 +55,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > - **Tests:** nueva suite `tests/unit/E2eBuyerCheckoutPolishTest.php`
 >   (+6, 32 assertions).
 
+### Fixed — `E2E-BUYER-QV-MANUAL-HIDE-2026-11-24` (P2 residual del backlog E2E-BUYER: paridad total del quick view con las cards)
+
+> Commit `a9c110c1`. El gate QV-VISGATE del ciclo anterior cubría solo el
+> criterio SYNC-VIS-GATE (invendible: sin stock/imagen/precio). Un producto
+> VENDIBLE pero oculto manualmente (`catalog_visibility=hidden` por el admin,
+> o draft/private) seguía servible por enumeración de ID aunque ninguna card
+> lo mostrara. Ambos handlers vivos de quick view ahora rechazan también con
+> `! $product->is_visible()` — el mismo criterio de content-product.php:42.
+> Nota documentada: `is_visible()` es false para variaciones (post_status
+> inherit) — ningún flujo vivo pide quick view de variación; el gate debería
+> volverse parent-aware si eso cambia. Suite 5,414 tests / 12,359 assertions /
+> 3 skipped (cero regresiones). Verificado en producción: happy path visible
+> → `success:true` en ambos handlers (sin falsos positivos); sin productos
+> ocultos/draft en la tienda para probar el rechazo en vivo (cubierto por la
+> suite source-based `test_qv_manual_hide_parity_con_cards`). **Con esto el
+> backlog del ciclo E2E-BUYER-2026-11-20 queda cerrado al 100%.**
+
 ### Fixed — `E2E-BUYER-QV-HARDEN-2026-11-24` (hardening del quick view + carrito: cierre parcial del backlog P3 del ciclo E2E-BUYER-2026-11-20 — 5 fixes + 1 P0 de la validación E2E)
 
 > Continúa el backlog documentado del ciclo E2E-BUYER-2026-11-20 (items #2
