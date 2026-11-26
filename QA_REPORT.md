@@ -1,11 +1,31 @@
 # LT Marketplace Suite — QA Report
 
-**Version:** 2.9.435
-**Report Date:** 2026-11-17
+**Version:** 2.9.436
+**Report Date:** 2026-11-24
 **Environment:** Ubuntu 22.04 · PHP 8.1+ · MySQL 8.0 · WordPress 6.3+ · WooCommerce 8.0+
-**Tester:** Automated CI + Manual Review + 33+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, AUDIT-FUNNEL-2026-10-28, TAIWAN-MIRROR-2026-11-10, AUDIT-E2E-PAY-2026-11-17, AUDIT-E2E-PAY-2026-11-17-QA-CHECKOUT, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX)
-**Commits:** 1,500+ (HEAD@v2.9.435)
+**Tester:** Automated CI + Manual Review + 33+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, AUDIT-FUNNEL-2026-10-28, TAIWAN-MIRROR-2026-11-10, AUDIT-E2E-PAY-2026-11-17, AUDIT-E2E-PAY-2026-11-17-QA-CHECKOUT, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX, E2E-BUYER-QV-HARDEN-2026-11-24, E2E-BUYER-CHECKOUT-POLISH-2026-11-24, E2E-BUYER-QV-MANUAL-HIDE-2026-11-24)
+**Commits:** 1,500+ (HEAD@v2.9.436)
 **Audits completed:** 33+ (all 100% resolved for P0+P1+P2)
+
+---
+
+## 0.20. v2.9.436 — E2E-BUYER-QV-HARDEN + CHECKOUT-POLISH + QV-MANUAL-HIDE (2026-11-24: cierre 100% del backlog del viaje del comprador — 13 fixes: P0 guard is_admin, P1 action-mismatch, P1/P2 quick view, P3 checkout/limpieza)
+
+**Scope:** cierre del backlog P3 documentado del ciclo E2E-BUYER-2026-11-20 (quick view, nonce-teatro, HPOS, radios de pago, umbral de envío, geo-detector, dead code) + 2 hallazgos nuevos de la validación E2E. Producción `lo-tengo.com.co`, LTMS 2.9.436, WC 11.2.1.
+
+**Método:** exploración source-based + suite PHPUnit local (source-based, patrón SyncVisibilityGateTest) + 2ª revisión in-process (subagentes caídos por timeout del proveedor durante toda la sesión) + validación E2E en producción por SSH + `wp eval` + `curl` con nonces reales generados server-side.
+
+**Resultados por commit:**
+
+- `da5fcf49` + `3bab1c02` (QV-HARDEN): E2E-BUYER-QV-VISGATE (gate de vendibilidad en los 2 handlers vivos de quick view — antes solo en el handler muerto), E2E-BUYER-QV-XSS-EXCERPT (excerpt vendor-controlled escapado en el modal PV), E2E-BUYER-QV-BROKEN-BTN (botón "Vista rápida" legacy daba 403 en cada click — nonce-teatro, lección #214; re-pointed al trigger canonical + modal JS muerto eliminado), E2E-BUYER-QV-ACTION-MISMATCH (P1: PV.quickView llamaba acción fantasma sin handler desde v2.9.183), E2E-BUYER-CART-NONCE (nonce fatal-if-invalid en ltms_get_cart), E2E-BUYER-PSE-REMOVAL (endpoint muerto sin consumers desde E2EFIX-04). **P0 E2E-BUYER-QV-AJAX-GUARD:** `LTMS_Native_Templates::init()` retornaba temprano con `is_admin()` — TRUE en admin-ajax — y NUNCA registraba `ltms_pv_quick_view` ni `ltms_pv_product_vendor` (verificado en vivo: POST con nonce server-side válido → '0'; post-fix → success con HTML/vendor_name).
+- `34e52060` (CHECKOUT-POLISH): E2E-BUYER-HPOS-DETECT (producción corre HPOS DESACTIVADO — verificado `custom_orders_table_usage_is_enabled()=false` — y `find_order_by_txn` del webhook Openpay ejecutaba 8 queries/evento contra la tabla inexistente `wc_orders_meta`; gate con OrderUtil, postmeta incondicional; verificado `int(0)` limpio), E2E-BUYER-PAY-RADIO-CHECKED (checkout pre-chequeaba 1er gateway + elegido en sesión → 2 radios), E2E-BUYER-MAPS-REAL-IDS (payment_meta/carrier_meta re-key a IDs reales de gateways/métodos — metadata visual de las radio cards recuperada), E2E-BUYER-THRESHOLD-SYNC (barra de envío gratis del cart alineada a la fuente real `ltms_shipping_hybrid_threshold`), E2E-BUYER-GEO-DEAD (eliminada llamada HTTP síncrona en init — hasta 2s TTFB por visitante nuevo — + rewrites/localize sin consumer; cookie ltms_city conservada por catálogo de privacidad), E2E-BUYER-LEGACY-DRAWER-DEAD (objeto JS del drawer muerto, -337 líneas).
+- `a9c110c1` (QV-MANUAL-HIDE): paridad total quick view ↔ cards — productos vendibles pero ocultos manualmente (`catalog_visibility=hidden`/draft/private) rechazados con `! is_visible()` (antes solo el criterio SYNC-VIS-GATE). Happy path verificado en vivo sin falsos positivos (producto 22167 → success ambos handlers).
+
+**Tests:** +16 nuevos (E2eBuyerQuickViewHardeningTest +11, E2eBuyerCheckoutPolishTest +6 — neto con re-anclajes). GeoDetectorTest reescrito a la superficie viva (lección #119: -68 tests de métodos eliminados); C33/C34 re-anclados. Suite final: **5,414 tests / 12,359 assertions / 3 skipped — cero regresiones**. CI Lint + CI unit + Deploy: success en todos los commits.
+
+**Lecciones:** #216-221 (guard is_admin silencia handlers AJAX; acción AJAX = contrato 2 capas JS/PHP; nonce-teatro y su corrección; Set-Content de PS mojibakea assets UTF-8; Select-String de PS miente sobre UTF-8; comentarios de fixes no citan el anti-patrón que el test vigila).
+
+**Pendiente:** ninguno del backlog E2E-BUYER (cerrado al 100%). Nota de diseño para el futuro: el gate de quick view con `is_visible()` rechaza variaciones (post_status inherit) — si algún día se pide quick view de variación, el gate debe volverse parent-aware.
 
 ---
 

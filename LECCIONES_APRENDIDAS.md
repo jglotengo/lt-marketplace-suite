@@ -3,8 +3,8 @@
 > **Propósito:** Registro de TODOS los errores encontrados durante el desarrollo para que la IA (y los desarrolladores) NO vuelvan a cometer los mismos errores. Cada entrada documenta: el error, la causa raíz, el fix, y la regla preventiva.
 >
 > **Última actualización:** 2026-11-20
-> **Versión del plugin:** 2.9.435
-> **Total de lecciones:** 218 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218)
+> **Versión del plugin:** 2.9.436
+> **Total de lecciones:** 221 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218; + 3 del ciclo E2E-BUYER-CHECKOUT-POLISH 2026-11-24, #219-221)
 
 ---
 
@@ -5119,3 +5119,67 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    y verificar que TODOS envian el nonce que el handler exige (patron
    leccion #214 regla 3, aqui en direccion inversa). (3) Endpoint muerto =
    eliminarlo + actualizar el harness/ tests que lo listan (leccion #119).
+
+---
+
+## 35. v2.9.436 - E2E-BUYER-CHECKOUT-POLISH: la herramienta edita y tambien corrompe - 3 lecciones nuevas (#219-221)
+
+> Ciclo de cierre del backlog P3 (HPOS-DETECT, PAY-RADIO-CHECKED, MAPS-REAL-IDS,
+> THRESHOLD-SYNC, GEO-DEAD, LEGACY-DRAWER-DEAD) + QV-MANUAL-HIDE. Commits
+> 34e52060 + a9c110c1. Suite 5,414 tests.
+
+### Leccion #219: Set-Content de PowerShell 5.1 mojibakea CUALQUIER asset UTF-8 sin BOM (no solo PHP heredado)
+
+1. **Caso real:** la eliminacion del drawer legacy en
+   ltms-product-enhancements.js (337 lineas) se hizo con Get-Content +
+   Set-Content -Encoding UTF8. PS 5.1 leyo el archivo UTF-8 como ANSI (sin
+   BOM) y lo re-escribio: em-dashes/acentos (— á í ó ú ñ →) quedaron
+   doble-encodeados (c3a2e282ace2809d...) + BOM al inicio. El corolario
+   doloroso: el paso de reparacion inicial busco la secuencia equivocada
+   (mojibake antes: 0) y los edits posteriores re-introdujeron variantes.
+
+2. **Regla preventiva:** (1) NUNCA usar Get-Content/Set-Content de PS 5.1
+   para editar archivos UTF-8 con chars no-ASCII (JS/CSS/PHP/MD) - usar la
+   herramienta de edicion del agente o PHP byte-level (str_replace con \xNN).
+   (2) Tras cualquier edicion masiva, auditar bytes:
+   preg_match_all('/[\x80-\xFF]/') + comparar contra HEAD (git show
+   HEAD:file) - el diff content-only no muestra el dano de encoding.
+   (3) Reparar con mapa explicito de doble-encoding (c383c2xx -> c3xx para
+   vocales acentuadas, c3a2e282ace2809d -> e28094 para em-dash,
+   c3a2e280a0 -> e28692 para flecha) y strip del BOM EF BB BF.
+
+### Leccion #220: la inspeccion con Select-String de PS miente sobre UTF-8 - verifica bytes, no renders
+
+1. **Caso real:** Select-String -Pattern 'â€' reporto 3 lineas "con
+   mojibake" que en realidad tenian em-dashes UTF-8 LEGITIMOS (PS lee el
+   archivo como ANSI y RENDERIZA el em-dash como a-siguiente-€). Por poco
+   se "reparan" chars correctos. El mismo render engañoso aplica a los
+   outputs de phpunit/git en consola PS.
+
+2. **Regla preventiva:** (1) Antes de reparar encoding, confirmar con
+   bin2hex() de PHP los bytes REALES de la secuencia sospechosa - el render
+   de consola PS no es evidencia. (2) Los archivos con mojibake HEREDADO del
+   repo (cart-drawer, OpenpayApiTest...) se detectan igual: comparar bytes
+   vs HEAD, no vs el render. (3) Cuando el repo tiene historial de
+   mojibake, la auditoria de encoding es obligatoria tras cualquier edicion
+   binaria/masiva (checkpoint gotchas: editar via PHP byte-level).
+
+### Leccion #221: los comentarios explicativos de un fix no pueden citar el anti-patron que el test vigila
+
+1. **Caso real:** 7 tests fallaron en el primer run de las suites nuevas
+   porque los COMENTARIOS de los fixes citaban literalmente el anti-patron
+   que assertStringNotContainsString vigila: el comentario de checkout.php
+   citaba "woo_nequi" y el OR viejo del radio; el de cart.php citaba el
+   nombre del setting eliminado; el tombstone del JS citaba LTMS_Drawer;
+   el docblock del geo citaba ip-api.com y wp_remote_get. El codigo estaba
+   limpio - los comentarios no.
+
+2. **Regla preventiva:** (1) Los asserts NotContains de suites source-based
+   vigilan el archivo ENTERO, comentarios incluidos: al escribir el
+   comentario del fix, parafrasear el anti-patron (decir "la key fantasma
+   de Nequi", no la key; "el OR con primer elemento", no la expresion).
+   (2) Alternativa valida: acotar el assert al cuerpo del metodo
+   (extract_method por strpos) en vez de archivo completo cuando el
+   comentario necesita ser explicito. (3) Al escribir un test NotContains,
+   grepear inmediatamente el string prohibido en el archivo recien editado
+   ANTES de correr phpunit - el fallo es predecible y barato de evitar.
