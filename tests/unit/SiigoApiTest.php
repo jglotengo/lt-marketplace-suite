@@ -44,6 +44,10 @@ class SiigoApiTest extends TestCase
             'delete_transient'    => static fn(): bool => true,
             // EXCMSG-FIX (AUDIT-EXCMSG-API-001): health_check usa esc_html($e->getMessage())
             'esc_html'            => static fn(string $s): string => $s,
+            // TRIB-004: build_invoice_payload resuelve taxes por tipo de producto
+            // vía post meta. Stub vacío = tipo desconocido = IVA 19% legacy.
+            'get_post_meta'       => static fn(int $pid, string $key = '', bool $single = true): mixed => '',
+            'sanitize_key'        => static fn(string $k): string => preg_replace('/[^a-z0-9_\-]/', '', strtolower($k)),
         ]);
 
         \LTMS_Core_Config::flush_cache();

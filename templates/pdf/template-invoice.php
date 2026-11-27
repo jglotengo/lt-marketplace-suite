@@ -168,7 +168,32 @@ $doc_title = 'CO' === $country ? 'COMPROBANTE DE VENTA' : 'COMPROBANTE FISCAL';
                 <td><?php echo esc_html( $fmt( $data['subtotal'] ?? 0 ) ); ?></td>
             </tr>
             <tr>
-                <td><?php echo 'CO' === $country ? esc_html__( 'IVA (19%)', 'ltms' ) : esc_html__( 'IVA (16%)', 'ltms' ); ?></td>
+                <?php
+                // TRIB-005 FIX (2026-11-26): el label usa la tasa REAL del desglose
+                // (tax_rate del primer item gravado, fallback iva_rate del breakdown).
+                // Antes era fijo "IVA (19%)" CO / "IVA (16%)" MX — un hospedaje
+                // turístico 7% (E.T. art. 468-1) o un 5% reducido salían etiquetados
+                // con la tasa general en el comprobante impreso.
+                $iva_rate_pct = null;
+                foreach ( (array) ( $data['items'] ?? [] ) as $inv_item ) {
+                    $r = (float) ( $inv_item['tax_rate'] ?? 0 );
+                    if ( $r > 0 ) {
+                        $iva_rate_pct = $r;
+                        break;
+                    }
+                }
+                if ( null === $iva_rate_pct && isset( $data['iva_rate'] ) ) {
+                    $iva_rate_pct = (float) $data['iva_rate'] * 100;
+                }
+                if ( null === $iva_rate_pct ) {
+                    $iva_rate_pct = 'CO' === $country ? 19.0 : 16.0;
+                }
+                $iva_rate_pct = round( $iva_rate_pct, 2 );
+                $iva_rate_str = ( floor( $iva_rate_pct ) == $iva_rate_pct )
+                    ? (string) (int) $iva_rate_pct
+                    : rtrim( rtrim( number_format( $iva_rate_pct, 2, '.', '' ), '0' ), '.' );
+                ?>
+                <td><?php echo esc_html( sprintf( /* translators: %s: porcentaje de IVA */ __( 'IVA (%s%%)', 'ltms' ), $iva_rate_str ) ); ?></td>
                 <td><?php echo esc_html( $fmt( $data['tax_total'] ?? 0 ) ); ?></td>
             </tr>
             <?php if ( 'MX' === $country && ! empty( $data['ieps_amount'] ) ) : ?>

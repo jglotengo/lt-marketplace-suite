@@ -308,9 +308,13 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
                 'quantity'     => $item->get_quantity(),
                 'price'        => round( (float) $item->get_total() / $item->get_quantity(), 2 ),
                 'discount'     => 0,
-                'taxes'        => [
-                    [ 'id' => (int) LTMS_Core_Config::get( 'ltms_siigo_tax_id', 29 ) ], // ID impuesto IVA — configurable
-                ],
+                // TRIB-004 FIX (2026-11-26): IVA por item según el tipo LTMS del
+                // producto. Antes TODOS los items llevaban el mismo tax_id (19%
+                // default) — un exento (medicamentos/alimentos básicos) o un
+                // hospedaje turístico 7% salían con IVA 19% en el documento DIAN.
+                'taxes'        => self::resolve_item_tax_ids(
+                    (string) get_post_meta( $item->get_product_id(), '_ltms_product_type', true )
+                ),
             ];
         }
 
@@ -357,6 +361,81 @@ final class LTMS_Api_Siigo extends LTMS_Abstract_API_Client {
             ],
             'observations' => sprintf( 'Pedido WooCommerce #%s - LTMS%s', $order->get_order_number(), $retention_notes ),
         ];
+    }
+
+    /**
+     * TRIB-004 FIX (2026-11-26): resuelve los tax IDs de Siigo para un item
+     * según su tipo LTMS, alineado con LTMS_Tax_Strategy_Colombia.
+     *
+     * Colombia — categorías de IVA (Estatuto Tributario):
+     *   - Exentos (0%): basic_food, medicine, health_service, education,
+     *     agricultural_basic → SIN impuesto en el documento.
+     *   - Reducido (5%): coffee, cacao, eggs_retail, sanitary_supplies,
+     *     agricultural_machinery → ltms_siigo_tax_id_5 (configurable).
+     *   - Turismo (7%, art. 468-1): booking → ltms_siigo_tax_id_7 (configurable).
+     *   - General (19%): physical/digital/service/restaurant/variable y tipos
+     *     desconocidos → ltms_siigo_tax_id (default 29, comportamiento legacy).
+     *
+     * Si la tasa no-19% no tiene tax ID configurado se OMITE el impuesto (y se
+     * advierte en el log) — aplicar el 19% por defecto a un ítem 5%/7% sobre-
+     * facturaría el documento DIAN. Mismo patrón de aviso que
+     * ALEGRA_COMMISSION_NO_IVA en class-ltms-alegra-sync.php.
+     *
+     * @param string $product_type Tipo LTMS crudo del post meta _ltms_product_type.
+     * @return array Lista de taxes Siigo para el line item ([] = sin impuesto).
+     */
+    public static function resolve_item_tax_ids( string $product_type ): array {
+        $type = sanitize_key( $product_type );
+
+        $exempt_types = [ 'basic_food', 'medicine', 'health_service', 'education', 'agricultural_basic' ];
+        if ( in_array( $type, $exempt_types, true ) ) {
+            return [];
+        }
+
+        if ( 'booking' === $type ) {
+            $tax_id = (int) LTMS_Core_Config::get( 'ltms_siigo_tax_id_7', 0 );
+            if ( $tax_id > 0 ) {
+                return [ [ 'id' => $tax_id ] ];
+            }
+            self::log_unconfigured_tax( '7%', 'ltms_siigo_tax_id_7', $type );
+            return [];
+        }
+
+        $reduced_types = [ 'coffee', 'cacao', 'eggs_retail', 'sanitary_supplies', 'agricultural_machinery' ];
+        if ( in_array( $type, $reduced_types, true ) ) {
+            $tax_id = (int) LTMS_Core_Config::get( 'ltms_siigo_tax_id_5', 0 );
+            if ( $tax_id > 0 ) {
+                return [ [ 'id' => $tax_id ] ];
+            }
+            self::log_unconfigured_tax( '5%', 'ltms_siigo_tax_id_5', $type );
+            return [];
+        }
+
+        // physical / digital / service / restaurant / variable / '' / desconocido.
+        return [ [ 'id' => (int) LTMS_Core_Config::get( 'ltms_siigo_tax_id', 29 ) ] ];
+    }
+
+    /**
+     * TRIB-004: aviso de tax ID de Siigo no configurado para una tasa ≠ 19%.
+     *
+     * @param string $rate_label Etiqueta de la tasa (ej. '7%').
+     * @param string $option_key Clave de configuración esperada.
+     * @param string $type       Tipo LTMS del producto.
+     * @return void
+     */
+    private static function log_unconfigured_tax( string $rate_label, string $option_key, string $type ): void {
+        if ( class_exists( 'LTMS_Core_Logger' ) ) {
+            LTMS_Core_Logger::warning(
+                'SIIGO_ITEM_TAX_UNCONFIGURED',
+                sprintf(
+                    'Siigo: item de tipo "%s" (IVA %s) sin tax ID configurado en %s — se emite SIN impuesto en el documento DIAN. Configurar el ID en Siigo para facturar la tasa correcta.',
+                    $type,
+                    $rate_label,
+                    $option_key
+                ),
+                [ 'product_type' => $type, 'rate' => $rate_label, 'option_key' => $option_key ]
+            );
+        }
     }
 
     /**

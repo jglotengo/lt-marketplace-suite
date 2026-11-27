@@ -38,6 +38,10 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         $GLOBALS['wpdb'] = $this->make_base_wpdb();
         // M-210: get_post_field disponible en todos los tests (fallback vendor lookup)
         Functions\when( 'get_post_field' )->justReturn( 0 );
+        // TRIB-001: normalize_ltms_product_type() usa sanitize_key — stub fiel al core.
+        Functions\when( 'sanitize_key' )->alias(
+            fn( $key ) => preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) )
+        );
     }
 
     protected function tearDown(): void {
@@ -787,18 +791,120 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
     }
 
     // -----------------------------------------------------------------------
+    // 9. TRIB-003 — columnas por-impuesto (fuente única de verdad: engine)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Setup TRIB: como prepare_heal_scenario pero con product type configurable
+     * en el post meta del producto y order meta `_ltms_product_type` vacío
+     * (el caso real: nadie escribe ese meta en el pedido).
+     */
+    private function prepare_trib_scenario( object $capture, string $product_type, ?string $commission_id = '5', array $existing_row = [] ): \WC_Order {
+        Functions\when( 'get_post_meta' )->alias(
+            fn( $pid, $key, $single = true ) => match ( $key ) {
+                '_ltms_vendor_id'    => '10',
+                '_ltms_product_type' => $product_type,
+                default              => '',
+            }
+        );
+        Functions\when( 'get_userdata' )->justReturn( (object) [ 'ID' => 10, 'roles' => [] ] );
+        Functions\when( 'get_user_meta' )->justReturn( '' );
+        Functions\when( 'current_time' )->justReturn( '2026-01-01 00:00:00' );
+        Functions\when( '__' )->returnArg();
+        Functions\when( 'wp_json_encode' )->alias( fn( $d, $f = 0 ) => json_encode( $d, $f ) );
+
+        $row = $existing_row ?: [ 'id' => 5 ];
+        $GLOBALS['wpdb'] = $this->make_heal_wpdb( $row, $capture, false, $commission_id );
+
+        // Order meta `_ltms_product_type` VACÍO (producción real) → gana el post meta.
+        return $this->make_order( 10, 10, [ $this->make_item( product_id: 20, total: 100000.0 ) ], '' );
+    }
+
+    /**
+     * TRIB-003/TRIB-001: el insert del split persiste el desglose por-impuesto
+     * del engine. Producto 'booking' (turismo CO): IVA 7%, ReteFuente 0 (gross <
+     * 2.666 UVT servicios), ReteICA 0.414‰, sin ReteIVA (buyer no gran contrib.).
+     */
+    public function test_record_commission_persists_per_tax_columns_from_engine(): void {
+        $capture = $this->make_capture();
+        $order   = $this->prepare_trib_scenario( $capture, 'booking', null );
+
+        LTMS_Business_Order_Split::process( $order );
+
+        $this->assertArrayHasKey( 'wp_lt_commissions', $capture->inserts );
+        $data = $capture->inserts['wp_lt_commissions'][0];
+
+        $this->assertEqualsWithDelta( 7000.0, (float) $data['iva_amount'], 0.01, 'TRIB-001: booking debe tributar IVA turismo 7% (no 19% physical)' );
+        $this->assertEqualsWithDelta( 0.0, (float) $data['retefuente_amount'], 0.01, 'ReteFuente servicios 4% con mínimo 2.666 UVT — gross 100k < min' );
+        $this->assertEqualsWithDelta( 414.0, (float) $data['reteica_amount'], 0.01, 'ReteICA fallback 0.414‰ (CIIU prefijo 4)' );
+        $this->assertEqualsWithDelta( 0.0, (float) $data['reteiva_amount'], 0.01, 'Sin ReteIVA (buyer no es gran contribuyente)' );
+        $this->assertEqualsWithDelta( 0.0, (float) $data['isr_amount'], 0.01, 'CO: ISR siempre 0' );
+        $this->assertEqualsWithDelta( 0.0, (float) $data['ieps_amount'], 0.01 );
+        $this->assertEqualsWithDelta( 0.0, (float) $data['impoconsumo_amount'], 0.01, 'booking NO es food_service → sin INC 8%' );
+    }
+
+    /**
+     * TRIB-003: la fila provisional del writer fiscal (checkout, sin impuestos)
+     * se sana al pagar INCLUDING el desglose por-impuesto — los valores fabricados
+     * por versiones anteriores del writer (reteiva 15% incondicional, ISR MX 1%)
+     * quedan alineados al engine.
+     */
+    public function test_heal_aligns_per_tax_columns_corrupting_writer_values(): void {
+        $capture = $this->make_capture();
+        // Fila "writer fiscal viejo": physical, iva 19% de gross, reteiva 15% del
+        // iva (fabricado sin verificar gran contribuyente), isr 0 (CO).
+        $order = $this->prepare_trib_scenario(
+            $capture,
+            'physical',
+            '5',
+            [
+                'id' => 5, 'order_id' => 10, 'vendor_id' => 10, 'product_id' => null,
+                'gross_amount' => '100000.00', 'commission_amount' => '0.00',
+                'commission_rate' => '0.0000',
+                'vendor_amount' => '100000.00', 'tax_withholding' => '0.00',
+                'iva_amount' => '19000.00',
+                'retefuente_amount' => '0.00', 'retefuente_rate' => '0.000000',
+                'reteiva_amount' => '2850.00', 'reteiva_rate' => '0.150000',
+                'reteica_amount' => '0.00', 'reteica_rate' => '0.000000',
+                'isr_amount' => '0.00', 'isr_rate' => '0.000000',
+                'ieps_amount' => '0.00', 'impoconsumo_amount' => '0.00',
+                'currency' => 'COP', 'status' => 'pending',
+            ]
+        );
+
+        LTMS_Business_Order_Split::process( $order );
+
+        $this->assertArrayHasKey( 'wp_lt_commissions', $capture->updates );
+        $data = $capture->updates['wp_lt_commissions'][0]['data'];
+
+        // El engine para physical CO con buyer no gran contribuyente: reteiva = 0
+        // (el writer viejo fabricaba 2850 = 15% de 19000). El heal lo corrige.
+        $this->assertEqualsWithDelta( 0.0, (float) $data['reteiva_amount'], 0.01, 'TRIB-003: ReteIVA fabricada por el writer debe sanearse a 0 (buyer no gran contribuyente)' );
+        $this->assertEqualsWithDelta( 0.0, (float) $data['reteiva_rate'], 0.0001 );
+        $this->assertEqualsWithDelta( 19000.0, (float) $data['iva_amount'], 0.01, 'IVA 19% physical coincide — se preserva' );
+        $this->assertEqualsWithDelta( 414.0, (float) $data['reteica_amount'], 0.01, 'ReteICA real del engine debe aparecer' );
+        $this->assertEqualsWithDelta( 414.0, (float) $data['tax_withholding'], 0.01, 'withholding agregado = reteica (única retención aplicable)' );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
     /**
      * Crea un WC_Order stub con los datos mínimos necesarios.
+     *
+     * TRIB-001: $product_type_meta permite simular el order meta
+     * `_ltms_product_type` (override manual/legacy). Default 'physical'
+     * preserva el comportamiento de los tests pre-TRIB-001; '' simula el
+     * caso real de producción (nadie escribe ese meta → gana el post meta).
      */
-    private function make_order( int $id, int $vendor_id, array $items ): \WC_Order {
-        return new class( $id, $vendor_id, $items ) extends \WC_Order {
+    private function make_order( int $id, int $vendor_id, array $items, string $product_type_meta = 'physical' ): \WC_Order {
+        return new class( $id, $vendor_id, $items, $product_type_meta ) extends \WC_Order {
             public function __construct(
-                private int   $order_id,
-                private int   $vid,
-                private array $order_items
+                private int    $order_id,
+                private int    $vid,
+                private array  $order_items,
+                private string $product_type_meta = 'physical'
             ) {}
 
             public function get_id(): int            { return $this->order_id; }
@@ -808,7 +914,7 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
 
             public function get_meta( string $key, bool $single = true, string $context = 'view' ): mixed {
                 if ( $key === '_ltms_vendor_id' ) return $this->vid;
-                if ( $key === '_ltms_product_type' ) return 'physical';
+                if ( $key === '_ltms_product_type' ) return $this->product_type_meta;
                 if ( $key === '_ltms_buyer_type' ) return 'person';
                 if ( $key === '_ltms_buyer_regime' ) return 'persona_natural';
                 return '';

@@ -222,12 +222,18 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
      * NT-1 FIX (v2.9.9): IVA turismo 7% para productos bookable/turismo (Estatuto Tributario art. 468-1).
      * ANTES: el IVA turismo solo se aplicaba en Alegra sync, no en el flujo de Order Split →
      * el cliente pagaba 19% en lugar del 7% correcto para hospedaje turístico.
+     *
+     * TRIB-002 FIX (2026-11-26): el vocabulario real de tipos LTMS es
+     * physical/digital/service/booking/restaurant/variable (products-ajax.php) —
+     * 'booking' es el tipo que el Order Split captura para hospedaje turístico.
+     * Sin 'booking' aquí, el IVA 7% seguía siendo dead code incluso con el
+     * product_type real (TRIB-001). No cambia tasas: activa las ya canónicas.
      */
     private function get_iva_rate( string $product_type, array $order_data ): float {
         // NT-1: IVA turismo 7% — Estatuto Tributario art. 468-1 (Ley 1607/2012).
         // Aplica a servicios de hospedaje turístico prestados por hoteles con RNT.
         $is_tourism = ! empty( $order_data['is_booking'] ) || ! empty( $order_data['is_tourism'] )
-            || in_array( $product_type, [ 'accommodation', 'tourism_service', 'hotel', 'hostal' ], true );
+            || in_array( $product_type, [ 'booking', 'accommodation', 'tourism_service', 'hotel', 'hostal' ], true );
         if ( $is_tourism ) {
             return (float) LTMS_Core_Config::get( 'ltms_iva_turismo_co', 0.07 );
         }
@@ -249,7 +255,10 @@ final class LTMS_Tax_Strategy_Colombia implements LTMS_Tax_Strategy_Interface {
      * Tasa de ReteFuente según tipo de actividad y monto.
      */
     private function get_retefuente_rate( string $product_type, float $gross_amount, string $vendor_regime ): float {
-        if ( in_array( $product_type, [ 'software', 'digital_service', 'saas', 'tech_service' ], true ) ) {
+        // TRIB-002 FIX (2026-11-26): 'digital' es el tipo LTMS real para productos
+        // digitales (products-ajax.php:1003) — sin este match caían a "servicios
+        // generales" 4% en vez del 6% tech que esta rama define.
+        if ( in_array( $product_type, [ 'digital', 'software', 'digital_service', 'saas', 'tech_service' ], true ) ) {
             return $gross_amount >= $this->get_retefuente_min_servicios()
                 ? $this->get_retefuente_servicios_tech()
                 : 0.0;

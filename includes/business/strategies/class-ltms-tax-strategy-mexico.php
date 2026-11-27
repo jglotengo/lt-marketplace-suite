@@ -158,10 +158,13 @@ final class LTMS_Tax_Strategy_Mexico implements LTMS_Tax_Strategy_Interface {
         // Aplica a servicios de hospedaje. Tasa varía por estado (2-5%).
         // ANTES: el ISH solo se aplicaba en Alegra sync, no en el flujo de Order Split →
         // el impuesto no se recaudaba ni se reportaba al SAT.
+        // TRIB-002 FIX (2026-11-26): 'booking' es el tipo LTMS real para hospedaje
+        // (products-ajax.php) — sin este match el ISH era dead code incluso con
+        // el product_type real (TRIB-001). No cambia tasas: activa las canónicas.
         $ish_rate   = 0.0;
         $ish_amount = 0.0;
         $is_hospedaje = ! empty( $order_data['is_booking'] ) || ! empty( $order_data['is_tourism'] )
-            || in_array( $product_type, [ 'accommodation', 'tourism_service', 'hotel', 'hostal' ], true );
+            || in_array( $product_type, [ 'booking', 'accommodation', 'tourism_service', 'hotel', 'hostal' ], true );
         if ( $is_hospedaje ) {
             // Tasa configurable por estado (default 3%).
             $ish_state = $order_data['shipping_state'] ?? $vendor_data['state'] ?? '';

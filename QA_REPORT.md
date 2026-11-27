@@ -3,9 +3,33 @@
 **Version:** 2.9.436
 **Report Date:** 2026-11-24
 **Environment:** Ubuntu 22.04 · PHP 8.1+ · MySQL 8.0 · WordPress 6.3+ · WooCommerce 8.0+
-**Tester:** Automated CI + Manual Review + 33+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, AUDIT-FUNNEL-2026-10-28, TAIWAN-MIRROR-2026-11-10, AUDIT-E2E-PAY-2026-11-17, AUDIT-E2E-PAY-2026-11-17-QA-CHECKOUT, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX, E2E-BUYER-QV-HARDEN-2026-11-24, E2E-BUYER-CHECKOUT-POLISH-2026-11-24, E2E-BUYER-QV-MANUAL-HIDE-2026-11-24)
+**Tester:** Automated CI + Manual Review + 34+ Audits (REG-AUDIT-001, DEEP-AUDIT-002, UIUX-AUDIT-001, AUDIT-FUNNEL-2026-10-28, TAIWAN-MIRROR-2026-11-10, AUDIT-E2E-PAY-2026-11-17, AUDIT-E2E-PAY-2026-11-17-QA-CHECKOUT, integrations, core security, financial business-logic, regression, Plaza Viva, shop/cart cards UX, E2E-BUYER-QV-HARDEN-2026-11-24, E2E-BUYER-CHECKOUT-POLISH-2026-11-24, E2E-BUYER-QV-MANUAL-HIDE-2026-11-24, TRIB-2026-11-26)
 **Commits:** 1,500+ (HEAD@v2.9.436)
-**Audits completed:** 33+ (all 100% resolved for P0+P1+P2)
+**Audits completed:** 34+ (all 100% resolved for P0+P1+P2)
+
+---
+
+## 0.21. v2.9.437-dev — TRIB-2026-11-26 (auditoría tributaria MX/CO + E2E fiscal del viaje de compra — 7 fixes: P0 meta fantasma en el Order Split, P1 fuente única de verdad fiscal, P1 vocabulario, P1 Siigo por-item, P2 label PDF)
+
+**Scope:** ciclo completo del loop AGENTS.md (inventario → auditoría → priorización → fix → re-auditoría → stop check) sobre la superficie tributaria MX/CO: LTMS_Tax_Engine + estrategias CO/MX, Order Split (+ ReDi), commission-writer, Siigo (e-invoice DIAN), reportes SAT Art. 30-B / DIAN, template PDF de factura y display de impuestos al comprador (cart/checkout).
+
+**Método:** exploración source-based (greps de escritores/lectores de metas y columnas) + suite PHPUnit local + 2ª revisión in-process (sin subagentes, patrón del checkpoint E2E-BUYER) + tests funcionales y source-based por fix.
+
+**Hallazgos y fixes (evidencia en CHANGELOG 2026-11-26):**
+- TRIB-001 (P0): order meta `_ltms_product_type` jamás escrito → todo pedido tributaba `physical`; ReteFuente siempre 2.5% compras, IVA turismo 7%/INC 8%/ISH dead code. Fix: resolución por vendor desde post meta + override legacy.
+- TRIB-002 (P1): vocabulario LTMS ≠ strategies → `booking`/`digital` añadidos a gates turismo/tech.
+- TRIB-003 (P1): commission-writer fabricaba impuestos y pisaba columnas de los reportes SAT/DIAN → writer solo reporte Frac. I/II; split persiste desglose por-impuesto en insert Y heal.
+- TRIB-001R (P1, re-auditoría): ReDi split hardcodeaba `physical` para el origen revendido → resuelve origin_product_id.
+- TRIB-004 (P1): Siigo IVA 19% fijo a todos los items → resolve_item_tax_ids() por tipo (exentos sin tax; 5%/7% configurables con warning, nunca 19% por defecto).
+- TRIB-005 (P2): label IVA fijo del PDF → tasa real del item/breakdown.
+- TRIB-006 (P2): `is_booking` expuesto al engine.
+
+**Verificación:** suite completa 5,445 tests / 12,450 assertions / 3 skipped (baseline 5,414, +31 tests: TributaryAudit20261126FixesTest 29 + 2 funcionales en OrderSplitTest). `php -l` en los 7 archivos tocados.
+
+**Pendiente de negocio (no asumido):**
+1. Backfill histórico de `lt_commissions`: filas pre-fix con `reteiva_amount`/`isr_amount` fabricados por el writer (reportes SAT/DIAN retroactivos requieren decisión).
+2. Configurar en Siigo los tax IDs por tasa (`ltms_siigo_tax_id_5`, `ltms_siigo_tax_id_7`) si se venden productos reducidos/turísticos.
+3. P3 backlog: label "ReteIVA (15%)" fijo en el box de retenciones del PDF y TAX_MAP_CO de Alegra sin entrada 7% (líneas de comisión).
 
 ---
 

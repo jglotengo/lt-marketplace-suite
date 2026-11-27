@@ -120,7 +120,15 @@ final class LTMS_Business_Order_Split {
                 $platform_rate = 0.15;
             }
 
-            $tax_breakdown = self::calculate_tax_breakdown( $gross_amount, $order, $vendor_id, $country );
+            // TRIB-001 FIX: pasa el product_type real del grupo del vendor
+            // (resuelto desde el post meta del producto en group_items_by_vendor).
+            $tax_breakdown = self::calculate_tax_breakdown(
+                $gross_amount,
+                $order,
+                $vendor_id,
+                $country,
+                (string) ( $data['product_type'] ?? '' )
+            );
 
             $platform_fee = round( $gross_amount * $platform_rate, 2 );
             $vendor_gross = $gross_amount - $platform_fee;
@@ -554,12 +562,24 @@ final class LTMS_Business_Order_Split {
                 );
                 continue;
             }
-
             if ( ! isset( $vendor_totals[ $vendor_id ] ) ) {
-                $vendor_totals[ $vendor_id ] = [ 'gross' => 0.0, 'items' => [] ];
+                $vendor_totals[ $vendor_id ] = [ 'gross' => 0.0, 'items' => [], 'product_type' => '' ];
             }
+
             $vendor_totals[ $vendor_id ]['gross'] += $line_total;
             $vendor_totals[ $vendor_id ]['items'][] = $item;
+
+            // TRIB-001 FIX (2026-11-26): capturar el product_type LTMS del PRIMER
+            // item del grupo (el split es agregado por pedido/vendor; el desglose
+            // fiscal usa el tipo dominante del grupo). El meta vive en el PRODUCT
+            // (products-ajax.php:1006, admin-product-meta.php:199) — el order meta
+            // `_ltms_product_type` NUNCA se escribe, así que el fallback del
+            // calculate_tax_breakdown anterior siempre era 'physical'.
+            if ( '' === $vendor_totals[ $vendor_id ]['product_type'] ) {
+                $vendor_totals[ $vendor_id ]['product_type'] = self::normalize_ltms_product_type(
+                    (string) get_post_meta( $product_id, '_ltms_product_type', true )
+                );
+            }
         }
 
         // Round each vendor's gross to 2 decimals (sum of floats may have FP drift).
@@ -571,23 +591,62 @@ final class LTMS_Business_Order_Split {
     }
 
     /**
+     * TRIB-001 FIX (2026-11-26): normaliza el tipo LTMS crudo del post meta.
+     *
+     * El vocabulario válido es physical/digital/service/booking/restaurant/variable
+     * (products-ajax.php:1003). Legacy: '' o 'product' → 'physical' (mismo mapeo
+     * que LTMS_Commission_Strategy::get_product_type_rate() y products-ajax.php:249).
+     *
+     * Público estático para reuso — LTMS_Business_Redi_Order_Split lo usa para
+     * resolver el tipo fiscal del producto ORIGEN revendido (TRIB-001R).
+     *
+     * @param string $raw Valor crudo del post meta _ltms_product_type.
+     * @return string Tipo normalizado ('physical' como fallback).
+     */
+    public static function normalize_ltms_product_type( string $raw ): string {
+        $raw = sanitize_key( $raw );
+        if ( '' === $raw || 'product' === $raw ) {
+            return 'physical';
+        }
+        $valid = [ 'physical', 'digital', 'service', 'booking', 'restaurant', 'variable' ];
+        return in_array( $raw, $valid, true ) ? $raw : 'physical';
+    }
+
+    /**
      * Calcula el desglose de impuestos usando la estrategia del país.
+     *
+     * TRIB-001 FIX (2026-11-26): el product_type llega resuelto por vendor desde
+     * group_items_by_vendor() (post meta del producto). Antes leía el order meta
+     * `_ltms_product_type`, que NADIE escribe → todos los pedidos tributaban como
+     * 'physical' (ReteFuente compras 2.5%, sin turismo 7%/INC 8%/ISH/IEPS/tech 6%).
+     * El order meta se mantiene como override de compatibilidad (prioridad 1).
+     *
+     * TRIB-006 FIX (2026-11-26): se expone `is_booking` en order_data para los
+     * gates NT-1 (IVA turismo CO) y NT-2 (ISH MX) de las estrategias.
      *
      * @param float     $gross_amount Monto bruto.
      * @param \WC_Order $order        Pedido.
      * @param int       $vendor_id    ID del vendedor.
      * @param string    $country      Código de país.
+     * @param string    $product_type Tipo LTMS normalizado del grupo del vendor ('' → legacy 'physical').
      * @return array
      */
-    private static function calculate_tax_breakdown( float $gross_amount, \WC_Order $order, int $vendor_id, string $country ): array {
+    private static function calculate_tax_breakdown( float $gross_amount, \WC_Order $order, int $vendor_id, string $country, string $product_type = '' ): array {
         if ( ! class_exists( 'LTMS_Tax_Engine' ) ) {
             return [ 'withholding_total' => 0.0 ];
         }
 
+        // Prioridad: order meta (override manual/legacy) > post meta del grupo > 'physical'.
+        $resolved_type = self::normalize_ltms_product_type(
+            (string) $order->get_meta( '_ltms_product_type' ) ?: $product_type
+        );
+
         $vendor_data = self::get_vendor_data( $vendor_id );
         $order_data  = [
             'order_id'     => $order->get_id(),
-            'product_type' => $order->get_meta( '_ltms_product_type' ) ?: 'physical',
+            'product_type' => $resolved_type,
+            // TRIB-006: gate turismo de las estrategias (NT-1 CO / NT-2 MX).
+            'is_booking'   => ( 'booking' === $resolved_type ),
             'buyer_type'   => $order->get_meta( '_ltms_buyer_type' ) ?: 'person',
             'buyer_regime'              => $order->get_meta( '_ltms_buyer_regime' ) ?: 'persona_natural',
             'buyer_is_gran_contribuyente' => (bool) $order->get_meta( '_ltms_buyer_is_gran_contribuyente' ),
@@ -677,13 +736,33 @@ final class LTMS_Business_Order_Split {
                 'vendor_amount'     => $vendor_net,                 // monto neto para el vendedor
                 'tax_withholding'   => $tax_breakdown['withholding_total'] ?? $tax_breakdown['total_withholding'] ?? 0.0, // M-QA-02: normalised
                 'iva_amount'        => $tax_breakdown['iva'] ?? $tax_breakdown['iva_amount'] ?? 0.0, // NOT NULL DEFAULT 0
+                // TRIB-003 FIX (2026-11-26): persistir el desglose por-impuesto del
+                // engine (fuente única de verdad). Antes estas columnas solo las
+                // escribía el writer fiscal con fórmulas propias (CO IVA 19% fijo,
+                // ReteIVA incondicional, ISR MX 1% fijo) → los reportes SAT Art.
+                // 30-B / DIAN leían cifras inconsistentes con el split. El fallback
+                // (TAX_BREAKDOWN_FAILED) solo trae withholding_total → ?? 0 cubre.
+                'retefuente_amount' => (float) ( $tax_breakdown['retefuente'] ?? 0.0 ),
+                'retefuente_rate'   => (float) ( $tax_breakdown['retefuente_rate'] ?? 0.0 ),
+                'reteiva_amount'    => (float) ( $tax_breakdown['reteiva'] ?? 0.0 ),
+                'reteiva_rate'      => (float) ( $tax_breakdown['reteiva_rate'] ?? 0.0 ),
+                'reteica_amount'    => (float) ( $tax_breakdown['reteica'] ?? 0.0 ),
+                'reteica_rate'      => (float) ( $tax_breakdown['reteica_rate'] ?? 0.0 ),
+                'isr_amount'        => (float) ( $tax_breakdown['isr'] ?? 0.0 ),
+                'isr_rate'          => (float) ( $tax_breakdown['isr_rate'] ?? 0.0 ),
+                'ieps_amount'       => (float) ( $tax_breakdown['ieps'] ?? 0.0 ),
+                'impoconsumo_amount'=> (float) ( $tax_breakdown['impoconsumo'] ?? 0.0 ),
                 'currency'          => $order->get_currency(),
                 'country_code'      => LTMS_Core_Config::get_country(),
                 'status'            => 'paid',
                 'metadata'          => wp_json_encode( $tax_breakdown ),
                 'created_at'        => LTMS_Utils::now_utc(),
             ],
-            [ '%d', '%d', '%d', '%f', '%f', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s' ]
+            [
+                '%d', '%d', '%d', '%f', '%f', '%f', '%f', '%f', '%f',
+                '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f',
+                '%s', '%s', '%s', '%s', '%s',
+            ]
         );
 
         // OS-BUG-C FIX: el insert puede fallar por deadlock, constraint violation,
@@ -743,7 +822,10 @@ final class LTMS_Business_Order_Split {
         $row = $wpdb->get_row(
             $wpdb->prepare(
                 // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                "SELECT gross_amount, commission_amount, commission_rate, vendor_amount, tax_withholding, iva_amount FROM `{$table}` WHERE id = %d",
+                "SELECT gross_amount, commission_amount, commission_rate, vendor_amount, tax_withholding, iva_amount,
+                        retefuente_amount, retefuente_rate, reteiva_amount, reteiva_rate, reteica_amount, reteica_rate,
+                        isr_amount, isr_rate, ieps_amount, impoconsumo_amount
+                 FROM `{$table}` WHERE id = %d",
                 $commission_id
             )
         );
@@ -759,15 +841,41 @@ final class LTMS_Business_Order_Split {
         $withholding = (float) ( $r['tax_breakdown']['withholding_total'] ?? $r['tax_breakdown']['total_withholding'] ?? 0.0 );
         $iva         = (float) ( $r['tax_breakdown']['iva'] ?? $r['tax_breakdown']['iva_amount'] ?? 0.0 );
 
+        // TRIB-003 FIX (2026-11-26): el desglose por-impuesto también se sana.
+        // Antes solo se alineaban gross/fee/rate/net/withholding/iva — el writer
+        // fiscal dejaba reteiva_amount (ReteIVA CO incondicional) e isr_amount
+        // (ISR MX 1% fijo) fabricados, y los reportes SAT/DIAN los consumían.
+        $per_tax = [
+            'retefuente_amount'  => (float) ( $r['tax_breakdown']['retefuente'] ?? 0.0 ),
+            'retefuente_rate'    => (float) ( $r['tax_breakdown']['retefuente_rate'] ?? 0.0 ),
+            'reteiva_amount'     => (float) ( $r['tax_breakdown']['reteiva'] ?? 0.0 ),
+            'reteiva_rate'       => (float) ( $r['tax_breakdown']['reteiva_rate'] ?? 0.0 ),
+            'reteica_amount'     => (float) ( $r['tax_breakdown']['reteica'] ?? 0.0 ),
+            'reteica_rate'       => (float) ( $r['tax_breakdown']['reteica_rate'] ?? 0.0 ),
+            'isr_amount'         => (float) ( $r['tax_breakdown']['isr'] ?? 0.0 ),
+            'isr_rate'           => (float) ( $r['tax_breakdown']['isr_rate'] ?? 0.0 ),
+            'ieps_amount'        => (float) ( $r['tax_breakdown']['ieps'] ?? 0.0 ),
+            'impoconsumo_amount' => (float) ( $r['tax_breakdown']['impoconsumo'] ?? 0.0 ),
+        ];
+
         // Idempotencia real: si los valores ya coinciden con el split, skip.
         // COMMISSION-RATE-FIX: la tasa entra en la comparación para que una fila
         // saneada antes del fix (rate=0.0000 con montos correctos) se corrija.
+        // TRIB-003: el desglose por-impuesto también entra (tolerancia 0.001
+        // para montos, 0.0001 para tasas — floats desde DB string).
         $already_healed = abs( (float) $row->gross_amount - $gross ) < 0.001
             && abs( (float) $row->commission_amount - $fee ) < 0.001
             && abs( (float) ( $row->commission_rate ?? 0.0 ) - $rate ) < 0.0001
             && abs( (float) $row->vendor_amount - $vendor_net ) < 0.001
             && abs( (float) $row->tax_withholding - $withholding ) < 0.001
             && abs( (float) $row->iva_amount - $iva ) < 0.001;
+        foreach ( $per_tax as $col => $val ) {
+            $tol = str_ends_with( $col, '_rate' ) ? 0.0001 : 0.001;
+            if ( abs( (float) ( $row->$col ?? 0.0 ) - $val ) >= $tol ) {
+                $already_healed = false;
+                break;
+            }
+        }
 
         if ( $already_healed ) {
             return;
@@ -783,20 +891,29 @@ final class LTMS_Business_Order_Split {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $result = $wpdb->update(
             $table,
-            [
-                'gross_amount'      => $gross,
-                'commission_amount' => $fee,
-                // COMMISSION-RATE-FIX: persistir la tasa aplicada (ver record_commission).
-                'commission_rate'   => $rate,
-                'vendor_amount'     => $vendor_net,
-                'tax_withholding'   => $withholding,
-                'iva_amount'        => $iva,
-                'product_id'        => $first_product_id,
-                'currency'          => $order->get_currency(),
-                'status'            => 'paid',
-            ],
+            array_merge(
+                [
+                    'gross_amount'      => $gross,
+                    'commission_amount' => $fee,
+                    // COMMISSION-RATE-FIX: persistir la tasa aplicada (ver record_commission).
+                    'commission_rate'   => $rate,
+                    'vendor_amount'     => $vendor_net,
+                    'tax_withholding'   => $withholding,
+                    'iva_amount'        => $iva,
+                ],
+                $per_tax,
+                [
+                    'product_id'        => $first_product_id,
+                    'currency'          => $order->get_currency(),
+                    'status'            => 'paid',
+                ]
+            ),
             [ 'id' => $commission_id ],
-            [ '%f', '%f', '%f', '%f', '%f', '%f', '%d', '%s', '%s' ],
+            [
+                '%f', '%f', '%f', '%f', '%f', '%f',
+                '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f',
+                '%d', '%s', '%s',
+            ],
             [ '%d' ]
         );
 
@@ -893,10 +1010,16 @@ final class LTMS_Business_Order_Split {
     /**
      * Obtiene los datos del vendedor para el cálculo fiscal.
      *
+     * TRIB-BACKFILL FIX (2026-11-26): pública para que el backfill histórico
+     * de lt_commissions (deploy/ltms-backfill-fiscal-tax-columns-2026-11-26.php)
+     * recalcule el desglose con EXACTAMENTE los mismos datos del vendor que
+     * usa el split (régimen, CIIU, municipio DANE, ingreso mensual) — una
+     * réplica privada divergiría del engine en el lookup municipal de ReteICA.
+     *
      * @param int $vendor_id ID del vendedor.
      * @return array
      */
-    private static function get_vendor_data( int $vendor_id ): array {
+    public static function get_vendor_data( int $vendor_id ): array {
         $user = get_userdata( $vendor_id );
         if ( ! $user ) {
             return [];

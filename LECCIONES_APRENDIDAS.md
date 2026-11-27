@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-11-20
 > **Versión del plugin:** 2.9.436
-> **Total de lecciones:** 221 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218; + 3 del ciclo E2E-BUYER-CHECKOUT-POLISH 2026-11-24, #219-221)
+> **Total de lecciones:** 224 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218; + 3 del ciclo E2E-BUYER-CHECKOUT-POLISH 2026-11-24, #219-221; + 3 del ciclo TRIB-2026-11-26, #222-224)
 
 ---
 
@@ -5183,3 +5183,70 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    comentario necesita ser explicito. (3) Al escribir un test NotContains,
    grepear inmediatamente el string prohibido en el archivo recien editado
    ANTES de correr phpunit - el fallo es predecible y barato de evitar.
+
+---
+
+## 36. v2.9.437-dev - TRIB-2026-11-26: auditoria tributaria MX/CO - 3 lecciones nuevas (#222-224)
+
+> Ciclo fiscal: 1 P0 + 3 P1 + 2 P2 + 1 P1 de re-auditoria (ReDi). Suite
+> 5,445 tests. Modulos: order-split, tax-strategies CO/MX, commission-writer,
+> siigo API, template-invoice.
+
+### Leccion #222: un order meta que nadie escribe es una fuente de datos fantasma - el codigo "funciona" y siempre calcula el default
+
+1. **Caso real:** el Order Split leia `_ltms_product_type` del ORDER meta
+   para calcular todo el desglose fiscal (ReteFuente/IVA/INC/ISH/IEPS), pero
+   ese meta solo se ESCRIBE en el post del producto (products-ajax,
+   admin-product-meta). `$order->get_meta()` retornaba siempre '' → cada
+   pedido tributaba como 'physical': IVA turismo 7% (fix NT-1 documentado),
+   Impoconsumo 8% restaurantes, ISH MX y ReteFuente tech 6% eran dead code
+   en produccion DESPUES de sus fixes oficiales. Ningun test lo detecto
+   porque los tests mockean el order meta con el valor esperado (replican
+   la misma ilusion).
+
+2. **Regla preventiva:** (1) Antes de leer un order meta en un calculo de
+   dinero, grepear los ESCRITORES: si nadie hace update_meta_data con esa
+   key en un WC_Order (vs post del producto), el read es fantasma. (2) Los
+   tests que mockean get_meta deben tener al menos UN test que cubra el
+   caso "meta vacio" (el caso real de produccion), no solo el happy path.
+   (3) Patron correcto ya existente en el mismo repo: Commission_Strategy
+   lee el tipo desde el post meta del producto - alinear nuevos readers a
+   esa fuente, no inventar otra.
+
+### Leccion #223: dos escritores de las mismas columnas de dinero = reportes fiscales corruptos - designar fuente unica de verdad y hacer heal del resto
+
+1. **Caso real:** el commission-writer (checkout_order_processed) fabricaba
+   IVA 19% fijo CO, ReteIVA incondicional e ISR MX 1% fijo sobre
+   lt_commissions, mientras el Order Split (payment_complete) calculaba el
+   desglose canonicamente con el Tax Engine. Los reportes SAT Art. 30-B /
+   DIAN leen esas columnas: cifras inconsistentes con el split real, y el
+   heal (E2EFIX-02) solo curaba 6 columnas - reteiva_amount/isr_amount
+   quedaban con los valores fabricados para siempre.
+
+2. **Regla preventiva:** (1) Columnas de dinero en una tabla fiscal = una
+   sola clase escritora (el motor); los hooks auxiliares solo rellenan
+   campos de reporte (metodos de pago, folios, service_type). (2) El heal
+   idempotente debe cubrir TODAS las columnas que escribe el escritor
+   canonico - comparar la lista columna-por-columna al anadir una nueva.
+   (3) Al heredar un writer con formulas propias, tratarlas como bug hasta
+   demostrar lo contrario: grep de quien consume las columnas (reportes)
+   antes de decidir si el writer "tambien sirve".
+
+### Leccion #224: el vocabulario de tipos de producto debe ser un contrato compartido entre quien lo ESCRIBE y quien lo CONSUME
+
+1. **Caso real:** los productos guardan physical/digital/service/booking/
+   restaurant/variable (products-ajax), pero las estrategias fiscales
+   reconocian accommodation/tourism_service/software/digital_service/
+   food_service/consulting - vocabularios disjuntos. Aunque el P0 del meta
+   fantasma se hubiera arreglado, booking seguia pagando 19% (no 7%),
+   digital caia en servicios generales (no tech 6%). Dos sistemas
+   co-evolucionando por separado.
+
+2. **Regla preventiva:** (1) Antes de anadir un product type nuevo,
+   grepear quien lo CONSUME por nombre literal (strategies, writer,
+   syncs, templates) y agregar el mapeo en el mismo commit. (2) Un test
+   por tipo REAL del vocabulario contra la strategy (como
+   TributaryAudit20261126FixesTest) detecta la disjuncion sin DB. (3)
+   Normalizar el tipo crudo en UN helper compartido (Order_Split::
+   normalize_ltms_product_type, publico para ReDi) - no repetir la
+   normalizacion inline en cada consumidor.

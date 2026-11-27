@@ -33,6 +33,10 @@ class LTMS_Commission_Writer {
     const PLATFORM_NAME    = 'Lo-Tengo.com.co';
     const PLATFORM_METHOD  = 'wallet_marketplace'; // método de pago de la plataforma (Frac. II f-iv-c)
 
+    // TRIB-003 FIX (2026-11-26): las constantes IVA_CO / ISR_MX_RATE /
+    // RETEIVA_CO_RATE se ELIMINARON — eran tasas fiscales hardcodeadas que este
+    // writer ya no fabrica (fuente única de verdad: LTMS_Tax_Engine vía Order Split).
+
     /**
      * Returns the fully-qualified commissions table name, honouring the
      * site's configured $wpdb->prefix. C-2 FIX: previously this was a
@@ -46,13 +50,6 @@ class LTMS_Commission_Writer {
         global $wpdb;
         return $wpdb->prefix . 'lt_commissions';
     }
-
-    // Tasa IVA Colombia
-    const IVA_CO = 0.19;
-    // Tasa ISR retención MX (Art. 113-A LISR) — 1% sobre ingreso bruto
-    const ISR_MX_RATE = 0.01;
-    // Tasa RETEIVA Colombia (Art. 437-2 E.T.) — 15% del IVA facturado
-    const RETEIVA_CO_RATE = 0.15;
 
     public function __construct() {
         // Hook principal: se dispara cuando WooCommerce crea la comisión de YITH
@@ -151,12 +148,23 @@ class LTMS_Commission_Writer {
                 $payment_method_vendor = $this->get_vendor_payout_method( $vendor_id );
 
                 // Cálculos fiscales por ítem
-                $gross         = (float) $item->get_subtotal();
-                $iva           = $country_code === 'MX'
-                                 ? (float) $item->get_subtotal_tax()
-                                 : round( $gross * self::IVA_CO, 2 );
-                $isr_retenido  = $country_code === 'MX' ? round( $gross * self::ISR_MX_RATE, 2 ) : 0.00;
-                $reteiva       = $country_code === 'CO' ? round( $iva * self::RETEIVA_CO_RATE, 2 )  : 0.00;
+                //
+                // TRIB-003 FIX (2026-11-26): este writer YA NO fabrica impuestos.
+                // Antes calculaba aquí: CO IVA = gross×19% fijo (ignorando IVA
+                // turismo 7% / reducido 5% / exento y el IVA real del ítem),
+                // ReteIVA CO = IVA×15% INCONDICIONAL (contradecía el T3 FIX de
+                // LTMS_Tax_Strategy_Colombia: solo gran contribuyente + vendor
+                // responsable de IVA) e ISR MX = gross×1% fijo (vs tramos RESICO
+                // 1.25%-3%). Esas cifras pisaban (UPDATE) las columnas
+                // reteiva_amount/isr_amount que los reportes SAT Art. 30-B CFF
+                // y DIAN consumen de lt_commissions.
+                //
+                // Ahora la ÚNICA fuente de verdad fiscal es LTMS_Tax_Engine vía
+                // LTMS_Business_Order_Split (record_commission + heal, que
+                // persisten el desglose por-impuesto). Este writer se limita a
+                // su propósito original: campos de reporte Frac. I a) y Frac.
+                // II f-iv (service_type + métodos de pago + RFC/folio CFDI).
+                $gross = (float) $item->get_subtotal();
 
                 // service_type específico por ítem si hay override en product meta
                 $item_service_type = get_post_meta( $item->get_product_id(), '_ltms_service_type', true )
@@ -184,8 +192,8 @@ class LTMS_Commission_Writer {
                     'payment_method_platform' => $payment_method_platform,
                     'rfc_cliente'             => $rfc_cliente,
                     'cfdi_folio'              => $cfdi_folio,
-                    'isr_amount'              => $isr_retenido,
-                    'reteiva_amount'          => $reteiva,
+                    // TRIB-003 FIX: sin isr_amount/reteiva_amount — el engine es la
+                    // única fuente de verdad para columnas de dinero en este UPDATE.
                     'country_code'            => $country_code,
                     'updated_at'              => current_time( 'mysql' ),
                 ];
@@ -218,15 +226,24 @@ class LTMS_Commission_Writer {
                     }
                 } else {
                     // Insertar nueva comisión si no existe (fallback)
+                    //
+                    // TRIB-003 FIX: la fila provisional se crea SIN cifras fiscales
+                    // fabricadas (antes: IVA 19% fijo, ISR MX 1%, ReteIVA CO
+                    // incondicional). Queda en 0 hasta que el split del pago escriba
+                    // el desglose real del engine (record_commission / heal_commission_row).
+                    // vendor_amount provisional = gross (sin retenciones calculadas a
+                    // ciegas — el neto real queda al pagar, status='paid').
                     $data = array_merge( [
                         'order_id'          => $order_id,
                         'vendor_id'         => $vendor_id,
                         'gross_amount'      => $gross,
-                        'iva_amount'        => $iva,
+                        'iva_amount'        => 0.00,
                         'commission_rate'   => 0.0,
                         'commission_amount' => 0.0,
-                        'vendor_amount'     => $gross - $isr_retenido - $reteiva,
-                        'tax_withholding'   => $isr_retenido + $reteiva,
+                        'vendor_amount'     => $gross,
+                        'tax_withholding'   => 0.00,
+                        'isr_amount'        => 0.00,
+                        'reteiva_amount'    => 0.00,
                         'currency'          => $country_code === 'MX' ? 'MXN' : 'COP',
                         'status'            => 'pending',
                         'type'              => 'commission',

@@ -127,10 +127,21 @@ class LTMS_Business_Redi_Order_Split {
         $origin_vendor_gross     = max( 0.0, $origin_vendor_gross );
 
         // Tax withholding on origin vendor gross
+        //
+        // TRIB-001R FIX (2026-11-26): el tipo fiscal es el del producto ORIGEN
+        // revendido (reserva de restaurante → INC 8% CO, hospedaje → IVA 7%/ISH).
+        // Antes: 'physical' hardcodeado — las reservas ReDi tributaban siempre
+        // como producto físico. El origin_product_id viene en item_data desde
+        // LTMS_Business_Redi_Manager::detect_redi_items().
+        $origin_product_type = LTMS_Business_Order_Split::normalize_ltms_product_type(
+            (string) get_post_meta( (int) ( $item_data['origin_product_id'] ?? 0 ), '_ltms_product_type', true )
+        );
         $origin_vendor_data = self::get_vendor_data( $origin_vendor_id );
         $order_data         = [
             'order_id'     => $order->get_id(),
-            'product_type' => 'physical',
+            'product_type' => $origin_product_type,
+            // TRIB-006: gate turismo de las estrategias (NT-1 CO / NT-2 MX).
+            'is_booking'   => ( 'booking' === $origin_product_type ),
             'buyer_type'   => $order->get_meta( '_ltms_buyer_type' ) ?: 'person',
             'municipality' => $order->get_billing_city(),
         ];

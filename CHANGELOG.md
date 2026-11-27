@@ -4,6 +4,56 @@ All notable changes to this project are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0.html).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 2026-11-26
+
+### Fixed - `TRIB-2026-11-26` (auditoría tributaria MX/CO + E2E fiscal del viaje de compra - 7 fixes)
+
+> Suite 5,445 tests / 12,450 assertions / 3 skipped - cero regresiones (+31
+> tests nuevos vs baseline 5,414). Hallazgos: 1 P0, 3 P1, 2 P2 + 1 P1
+> derivado de la re-auditoría (ReDi). Pendiente de negocio: backfill
+> histórico de `lt_commissions` (reteiva/isr fabricados por el writer
+> pre-fix) y configuración de tax IDs Siigo por tasa.
+>
+> - **TRIB-001 (P0):** el Order Split leía el order meta `_ltms_product_type`,
+>   que NADIE escribe (el meta vive en el post del producto) → todo pedido
+>   tributaba como `physical`. Ahora el agrupador por vendor resuelve el tipo
+>   desde el post meta del producto (mismo patrón que Commission_Strategy),
+>   con el order meta como override legacy. Impacto real: ReteFuente CO
+>   siempre tasa compras 2.5%; IVA turismo 7% (NT-1), Impoconsumo 8%
+>   restaurantes e ISH MX (NT-2) eran dead code en el flujo real.
+> - **TRIB-002 (P1):** vocabulario LTMS (`booking`/`digital`/`restaurant`)
+>   no matcheaba el de las estrategias (`accommodation`/`digital_service`/
+>   `food_service`) → `booking` añadido a los gates turismo CO (IVA 7%) y MX
+>   (ISH), `digital` a la rama ReteFuente tech 6% CO. No cambia tasas: activa
+>   las canónicas ya configuradas y documentadas en legal pages.
+> - **TRIB-003 (P1):** fuente única de verdad fiscal. El commission writer
+>   fabricaba CO IVA 19% fijo + ReteIVA incondicional + ISR MX 1% fijo y
+>   pisaba (UPDATE) `reteiva_amount`/`isr_amount` que consumen los reportes
+>   SAT Art. 30-B CFF / DIAN. Ahora el writer solo escribe campos de reporte
+>   Frac. I/II (service_type, métodos de pago, RFC/folio) y el split persiste
+>   el desglose por-impuesto del engine (retefuente/reteiva/reteica/isr/ieps/
+>   impoconsumo + rates) en record_commission Y heal_commission_row.
+>   Constantes muertas IVA_CO/ISR_MX_RATE/RETEIVA_CO_RATE eliminadas.
+> - **TRIB-001R (P1, re-auditoría):** el split ReDi hardcodeaba `physical`
+>   para el producto ORIGEN revendido → reservas ReDi tributaban como
+>   producto físico. Resuelve el tipo del origin_product_id + flag is_booking.
+> - **TRIB-004 (P1):** Siigo (e-invoice DIAN) aplicaba el tax_id 19% default a
+>   TODOS los items — un exento o un hospedaje 7% salían con IVA 19% en el
+>   documento. Ahora `resolve_item_tax_ids()` por tipo: exentos sin tax,
+>   5%/7% vía `ltms_siigo_tax_id_5`/`ltms_siigo_tax_id_7` (si no están
+>   configurados se omite el impuesto y se advierte en log, no se sobre-
+>   factura con 19%).
+> - **TRIB-005 (P2):** el PDF de factura etiquetaba "IVA (19%)/(16%)" fijo
+>   aunque el desglose dijera otra tasa (turismo 7% sale como 19%). El label
+>   usa la tasa real del item o del breakdown.
+> - **TRIB-006 (P2):** `is_booking` nunca se pasaba al engine (gates NT-1/NT-2
+>   de las estrategias). Expuesto desde el split y ReDi split.
+>
+> Tests: `tests/unit/TributaryAudit20261126FixesTest.php` (29: engine CO/MX,
+> source-based split/writer/Siigo, render del PDF) + 2 funcionales en
+> OrderSplitTest (insert por-impuesto con booking; heal de fila corrupta del
+> writer). Pendiente negocio: backfill histórico + tax IDs Siigo.
+
 ## [Unreleased] — 2026-11-24
 
 ### Fixed — `E2E-BUYER-CHECKOUT-POLISH-2026-11-24` (cierre del backlog P3 restante del ciclo E2E-BUYER-2026-11-20 — 6 fixes)
