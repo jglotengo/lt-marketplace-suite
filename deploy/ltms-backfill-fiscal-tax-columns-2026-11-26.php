@@ -198,6 +198,17 @@ if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'LTMS_Tax_Engine' ) ) {
                 $order_data,
                 $country
             );
+
+            // TRIB-007: drift-safe — solo columnas por-impuesto existentes
+            // (iva_amount es columna base, siempre incluida). En un sitio con
+            // esquema parcial el UPDATE no explota por columna inexistente.
+            $per_tax_avail = class_exists( 'LTMS_Business_Order_Split' )
+                ? LTMS_Business_Order_Split::available_per_tax_columns()
+                : [];
+            $computed = array_merge(
+                [ 'iva_amount' => $computed['iva_amount'] ?? 0.0 ],
+                array_intersect_key( $computed, $per_tax_avail )
+            );
         } catch ( \Throwable $e ) {
             $errors++;
             echo "  [{$row_num}/{$total}] comision #{$row->id}: engine fallo ({$e->getMessage()}) — SKIP (error)\n";

@@ -24,7 +24,11 @@
 - TRIB-005 (P2): label IVA fijo del PDF → tasa real del item/breakdown.
 - TRIB-006 (P2): `is_booking` expuesto al engine.
 
-**Verificación:** suite completa 5,445 tests / 12,450 assertions / 3 skipped (baseline 5,414, +31 tests: TributaryAudit20261126FixesTest 29 + 2 funcionales en OrderSplitTest). `php -l` en los 7 archivos tocados.
+**Verificación:** suite completa 5,453 tests / 12,479 assertions / 3 skipped (baseline 5,414, +39 tests). `php -l` en los 8 archivos tocados. Validación SSH: deploy `46b6d94d` confirmado, plugin recargado, cache flush, clases verificadas, `SHOW COLUMNS` de lt_commissions.
+
+**Incidente de producción detectado por la validación SSH (TRIB-007, P1):** `migrate_2_1_0_fiscal_dian` parcialmente aplicada (gate `ltms_db_version` la saltea) — faltaban 4 columnas que el nuevo INSERT del split escribe; habría roto la wallet del vendor en el primer pedido. Fix: ALTERs idempotentes aplicados + guard `available_per_tax_columns()` en record_commission/heal/backfill (la wallet no depende de columnas de reporting).
+
+**Backfill ejecutado en producción:** 2 filas pagadas corregidas (ReteIVA fabricada 4.25 → 0.00; ReteICA real 0.62 + rate 0.414‰ poblados; invariante gross − comisión − withholding = vendor_amount verificado).
 
 **Pendiente de negocio (no asumido):**
 1. Backfill histórico de `lt_commissions`: filas pre-fix con `reteiva_amount`/`isr_amount` fabricados por el writer (reportes SAT/DIAN retroactivos requieren decisión).

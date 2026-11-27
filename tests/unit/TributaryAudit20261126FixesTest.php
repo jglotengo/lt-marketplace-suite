@@ -43,6 +43,13 @@ class TributaryAudit20261126FixesTest extends TestCase {
 			'sanitize_key'  => static fn( $v ) => preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $v ) ),
 			'sanitize_text_field' => static fn( $v ) => is_scalar( $v ) ? (string) $v : '',
 			'absint'        => static fn( $v ) => abs( (int) $v ),
+			// TRIB-007: cache por transient del guard de columnas.
+			'get_transient' => static fn() => false,
+			'set_transient' => static fn() => true,
+			'wp_list_pluck' => static fn( $list, $field ) => array_map(
+				static fn( $item ) => is_array( $item ) ? ( $item[ $field ] ?? null ) : ( is_object( $item ) ? ( $item->$field ?? null ) : null ),
+				(array) $list
+			),
 		] );
 		\LTMS_Tax_Engine::flush_strategies();
 		\LTMS_Core_Config::flush_cache();
@@ -499,5 +506,64 @@ class TributaryAudit20261126FixesTest extends TestCase {
 		$this->assertStringContainsString( 'wp db export', $src, 'TRIB-BACKFILL: pre-requisito obligatorio de backup de BD documentado.' );
 		$this->assertStringContainsString( 'LTMS_BACKFILL_DRY_RUN', $src, 'TRIB-BACKFILL: soporte dry-run obligatorio para preview.' );
 		$this->assertStringContainsString( 'TRIB-BACKFILL-2026-11-26', $src, 'TRIB-BACKFILL: tag de trazabilidad requerido.' );
+	}
+
+	// ------------------------------------------------------------------ //
+	//  TRIB-007 — guard de drift de esquema en lt_commissions
+	// ------------------------------------------------------------------ */
+
+	/**
+	 * Stub wpdb cuyo get_results responde SOLO a SHOW COLUMNS con la lista dada.
+	 */
+	private function stub_wpdb_columns( array $column_names ): void {
+		$GLOBALS['wpdb'] = new class( $column_names ) {
+			public string $prefix     = 'wp_';
+			public string $last_error = '';
+			private array $cols;
+			public function __construct( array $cols ) { $this->cols = $cols; }
+			public function get_results( $q = null, $output = 'OBJECT' ) {
+				if ( is_string( $q ) && stripos( $q, 'SHOW COLUMNS' ) !== false ) {
+					return array_map( static fn( $n ) => [ 'Field' => $n ], $this->cols );
+				}
+				return [];
+			}
+			public function prepare( $q, ...$args ) { return $q; }
+		};
+	}
+
+	public function test_per_tax_columns_guard_filters_missing_schema_columns(): void {
+		// Drift simulado: faltan reteica_rate e impoconsumo_amount (el caso real
+		// de producción pre-ALTER — migrate_2_1_0 salteada por el gate de versión).
+		$this->stub_wpdb_columns( [
+			'id', 'order_id', 'vendor_id', 'gross_amount', 'iva_amount',
+			'retefuente_amount', 'retefuente_rate', 'reteiva_amount', 'reteiva_rate',
+			'reteica_amount', 'isr_amount', 'isr_rate', 'ieps_amount',
+		] );
+		$avail = \LTMS_Business_Order_Split::available_per_tax_columns( true );
+
+		$this->assertArrayNotHasKey( 'reteica_rate', $avail, 'TRIB-007: columna inexistente debe filtrarse del guard.' );
+		$this->assertArrayNotHasKey( 'impoconsumo_amount', $avail, 'TRIB-007: columna inexistente debe filtrarse del guard.' );
+		$this->assertArrayHasKey( 'reteica_amount', $avail, 'Columna existente debe conservarse.' );
+		$this->assertArrayHasKey( 'isr_rate', $avail, 'Columna existente debe conservarse.' );
+	}
+
+	public function test_per_tax_columns_guard_fails_open_without_schema_access(): void {
+		// wpdb mockeado sin SHOW COLUMNS (tests legacy / permisos): asume TODAS
+		// las columnas — el incidente, si existe, debe ser un SQL error visible,
+		// no datos descartados en silencio.
+		$GLOBALS['wpdb'] = new class {
+			public string $prefix     = 'wp_';
+			public string $last_error = '';
+			public function get_results( $q = null, $output = 'OBJECT' ) { return []; }
+		};
+		$avail = \LTMS_Business_Order_Split::available_per_tax_columns( true );
+		$this->assertCount( 10, $avail, 'TRIB-007: sin acceso al esquema, fail-open con las 10 columnas.' );
+	}
+
+	public function test_split_source_uses_schema_guard_in_insert_and_heal(): void {
+		$src = $this->split_source();
+		$this->assertStringContainsString( 'available_per_tax_columns', $src, 'TRIB-007: el guard debe usarse en el split.' );
+		$this->assertStringContainsString( 'TRIB-007 FIX', $src, 'TRIB-007: tag de trazabilidad requerido.' );
+		$this->assertStringContainsString( 'array_intersect_key( $per_tax_all, $available_cols )', $src, 'TRIB-007: el heal debe filtrar su desglose por columnas existentes.' );
 	}
 }

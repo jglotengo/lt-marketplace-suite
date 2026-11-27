@@ -42,6 +42,16 @@ class OrderSplitTest extends \LTMS\Tests\Unit\LTMS_Unit_Test_Case {
         Functions\when( 'sanitize_key' )->alias(
             fn( $key ) => preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) )
         );
+        // TRIB-007: available_per_tax_columns() cachea por transient — sin cache
+        // (cada test re-evalúa SHOW COLUMNS contra el stub wpdb, fail-open).
+        Functions\when( 'get_transient' )->justReturn( false );
+        Functions\when( 'set_transient' )->justReturn( true );
+        Functions\when( 'wp_list_pluck' )->alias(
+            fn( $list, $field ) => array_map(
+                fn( $item ) => is_array( $item ) ? ( $item[ $field ] ?? null ) : ( is_object( $item ) ? ( $item->$field ?? null ) : null ),
+                (array) $list
+            )
+        );
     }
 
     protected function tearDown(): void {

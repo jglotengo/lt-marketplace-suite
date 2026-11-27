@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-11-20
 > **Versión del plugin:** 2.9.436
-> **Total de lecciones:** 224 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218; + 3 del ciclo E2E-BUYER-CHECKOUT-POLISH 2026-11-24, #219-221; + 3 del ciclo TRIB-2026-11-26, #222-224)
+> **Total de lecciones:** 225 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218; + 3 del ciclo E2E-BUYER-CHECKOUT-POLISH 2026-11-24, #219-221; + 4 del ciclo TRIB-2026-11-26, #222-225)
 
 ---
 
@@ -5250,3 +5250,27 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    Normalizar el tipo crudo en UN helper compartido (Order_Split::
    normalize_ltms_product_type, publico para ReDi) - no repetir la
    normalizacion inline en cada consumidor.
+
+### Leccion #225: codigo que ESCRIBE columnas de reporting no puede compartir la suerte de las columnas de dinero - guard de esquema + validacion SSH de SHOW COLUMNS antes de deploy fiscal
+
+1. **Caso real:** la validacion SSH del backfill detecto que produccion
+   tenia la migracion migrate_2_1_0_fiscal_dian PARCIALMENTE aplicada: el
+   gate `ltms_db_version >= 2.9.20` la saltea para siempre y faltaban 4
+   columnas (3 rates + impoconsumo_amount). Con el nuevo INSERT del split
+   (TRIB-003) ya deployado, el primer pedido pagado habria hecho ROLLBACK
+   de la tx externa (SQL error columna inexistente) → vendor SIN credito
+   de wallet. Cero errores en local: el esquema de dev tiene todas las
+   columnas. El CO SAT report ademas llevaba semanas haciendo SELECT de
+   columnas inexistentes (resultado vacio silencioso).
+
+2. **Regla preventiva:** (1) Las wallet/credits jamas dependen de columnas
+   de reporting: guard `available_per_tax_columns()` (SHOW COLUMNS cacheado,
+   fail-open) filtra INSERT/UPDATE/heal contra el esquema real - un drift
+   degrada reporting, no dinero. (2) Antes de deployar codigo que toca
+   esquema, verificar en produccion con `SHOW COLUMNS` por SSH (2 min),
+   no asumir que las migraciones corrieron. (3) Las migraciones con gate de
+   version son one-shot: al EXPANDIR la lista de columnas de una migracion
+   ya marcada, las nuevas ALTERs nunca corren - anyadir o re-lanzar con
+   helper idempotente por columna. (4) El primer smoke post-deploy fiscal
+   debe ser un INSERT transaccional de prueba con ROLLBACK, no esperar un
+   pedido real.

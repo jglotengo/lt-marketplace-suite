@@ -613,6 +613,65 @@ final class LTMS_Business_Order_Split {
     }
 
     /**
+     * TRIB-007 FIX (2026-11-26): set de columnas de desglose por-impuesto que
+     * REALMENTE existen en lt_commissions (lookup por SHOW COLUMNS, cacheado
+     * en transient 1h — patrón CICLO20 AD-067).
+     *
+     * Devuelve un map column => true para filtrar el INSERT/UPDATE de
+     * record_commission y heal_commission_row. La wallet NO puede romperse por
+     * drift de esquema: un INSERT con columna inexistente provoca SQL error →
+     * excepción → ROLLBACK de la tx externa → vendor sin crédito.
+     *
+     * FAIL-OPEN deliberado: si SHOW COLUMNS no es posible (wpdb mockeado en
+     * tests, permisos limitados), se asumen TODAS las columnas (comportamiento
+     * legacy) — el incidente se manifiesta como SQL error visible, no como
+     * datos silenciosamente descartados.
+     *
+     * @param bool $force_refresh Omitir el transient (útil en tests).
+     * @return array<string,bool>
+     */
+    public static function available_per_tax_columns( bool $force_refresh = false ): array {
+        $all = [
+            'retefuente_amount'  => true,
+            'retefuente_rate'    => true,
+            'reteiva_amount'     => true,
+            'reteiva_rate'       => true,
+            'reteica_amount'     => true,
+            'reteica_rate'       => true,
+            'isr_amount'         => true,
+            'isr_rate'           => true,
+            'ieps_amount'        => true,
+            'impoconsumo_amount' => true,
+        ];
+
+        if ( ! $force_refresh ) {
+            $cached = get_transient( 'ltms_schema_lt_commissions_per_tax' );
+            if ( is_array( $cached ) ) {
+                return $cached;
+            }
+        }
+
+        $available = $all; // fail-open
+
+        try {
+            global $wpdb;
+            if ( isset( $wpdb ) && is_object( $wpdb ) && method_exists( $wpdb, 'get_results' ) ) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $cols = $wpdb->get_results( "SHOW COLUMNS FROM `{$wpdb->prefix}lt_commissions`", 'ARRAY_A' );
+                if ( is_array( $cols ) && ! empty( $cols ) ) {
+                    $names     = wp_list_pluck( $cols, 'Field' );
+                    $available = array_intersect_key( $all, array_flip( $names ) );
+                }
+            }
+        } catch ( \Throwable $e ) {
+            $available = $all; // fail-open
+        }
+
+        set_transient( 'ltms_schema_lt_commissions_per_tax', $available, HOUR_IN_SECONDS );
+        return $available;
+    }
+
+    /**
      * Calcula el desglose de impuestos usando la estrategia del país.
      *
      * TRIB-001 FIX (2026-11-26): el product_type llega resuelto por vendor desde
@@ -720,50 +779,69 @@ final class LTMS_Business_Order_Split {
             break;
         }
 
+        // TRIB-007 FIX (2026-11-26): el INSERT se arma con pares [valor, formato]
+        // y se FILTRA contra las columnas realmente existentes. Un drift de
+        // esquema (migración parcial, restore de backup viejo) con un INSERT
+        // de columna inexistente provoca SQL error → excepción → ROLLBACK de
+        // la tx externa → vendor SIN crédito de wallet. La wallet nunca puede
+        // depender de columnas de reporting. Incidente real en producción
+        // (4 columnas faltantes por migrate_2_1_0 salteada por el gate de
+        // ltms_db_version): detectado en la validación SSH del ciclo TRIB.
+        // Columnas base: SIEMPRE presentes (el guard TRIB-007 solo aplica al
+        // desglose por-impuesto — un drift de las base sería un esquema roto
+        // de raíz que el fail-open del guard no puede disimular).
+        $data = [
+            'order_id'          => $order->get_id(),
+            'vendor_id'         => $vendor_id,
+            'product_id'        => $first_product_id,
+            'gross_amount'      => $gross_amount,
+            'commission_amount' => $platform_fee,
+            // COMMISSION-RATE-FIX: la tasa aplicada debe quedar persistida
+            // (antes quedaba en el default 0.0000 y el export de privacidad
+            // mostraba "Tasa 0" aunque el monto de comisión fuera correcto).
+            'commission_rate'   => max( 0.0, min( 1.0, $commission_rate ) ),
+            'vendor_amount'     => $vendor_net,
+            'tax_withholding'   => $tax_breakdown['withholding_total'] ?? $tax_breakdown['total_withholding'] ?? 0.0,
+            'iva_amount'        => $tax_breakdown['iva'] ?? $tax_breakdown['iva_amount'] ?? 0.0,
+            'currency'          => $order->get_currency(),
+            'country_code'      => LTMS_Core_Config::get_country(),
+            'status'            => 'paid',
+            'metadata'          => wp_json_encode( $tax_breakdown ),
+            'created_at'        => LTMS_Utils::now_utc(),
+        ];
+        $formats = [ '%d', '%d', '%d', '%f', '%f', '%f', '%f', '%f', '%f', '%s', '%s', '%s', '%s', '%s' ];
+
+        // TRIB-003 FIX (2026-11-26): persistir el desglose por-impuesto del
+        // engine (fuente única de verdad). Antes estas columnas solo las
+        // escribía el writer fiscal con fórmulas propias (CO IVA 19% fijo,
+        // ReteIVA incondicional, ISR MX 1% fijo) → los reportes SAT Art.
+        // 30-B / DIAN leían cifras inconsistentes con el split. El fallback
+        // (TAX_BREAKDOWN_FAILED) solo trae withholding_total → ?? 0 cubre.
+        //
+        // TRIB-007 FIX: solo columnas existentes — un INSERT con columna
+        // inexistente (drift de esquema, migración parcial) provoca SQL error
+        // → excepción → ROLLBACK de la tx externa → vendor SIN crédito de
+        // wallet. Incidente real en producción (4 columnas faltantes por
+        // migrate_2_1_0 salteada por el gate de ltms_db_version).
+        $per_tax_all = [
+            'retefuente_amount'  => [ (float) ( $tax_breakdown['retefuente'] ?? 0.0 ), '%f' ],
+            'retefuente_rate'    => [ (float) ( $tax_breakdown['retefuente_rate'] ?? 0.0 ), '%f' ],
+            'reteiva_amount'     => [ (float) ( $tax_breakdown['reteiva'] ?? 0.0 ), '%f' ],
+            'reteiva_rate'       => [ (float) ( $tax_breakdown['reteiva_rate'] ?? 0.0 ), '%f' ],
+            'reteica_amount'     => [ (float) ( $tax_breakdown['reteica'] ?? 0.0 ), '%f' ],
+            'reteica_rate'       => [ (float) ( $tax_breakdown['reteica_rate'] ?? 0.0 ), '%f' ],
+            'isr_amount'         => [ (float) ( $tax_breakdown['isr'] ?? 0.0 ), '%f' ],
+            'isr_rate'           => [ (float) ( $tax_breakdown['isr_rate'] ?? 0.0 ), '%f' ],
+            'ieps_amount'        => [ (float) ( $tax_breakdown['ieps'] ?? 0.0 ), '%f' ],
+            'impoconsumo_amount' => [ (float) ( $tax_breakdown['impoconsumo'] ?? 0.0 ), '%f' ],
+        ];
+        foreach ( array_intersect_key( $per_tax_all, self::available_per_tax_columns() ) as $col => [ $value, $format ] ) {
+            $data[ $col ]    = $value;
+            $formats[]       = $format;
+        }
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $result = $wpdb->insert(
-            $table,
-            [
-                'order_id'          => $order->get_id(),
-                'vendor_id'         => $vendor_id,
-                'product_id'        => $first_product_id,          // NOT NULL — primer producto del pedido
-                'gross_amount'      => $gross_amount,
-                'commission_amount' => $platform_fee,               // comisión de la plataforma
-                // COMMISSION-RATE-FIX: la tasa aplicada debe quedar persistida
-                // (antes quedaba en el default 0.0000 y el export de privacidad
-                // mostraba "Tasa 0" aunque el monto de comisión fuera correcto).
-                'commission_rate'   => max( 0.0, min( 1.0, $commission_rate ) ),
-                'vendor_amount'     => $vendor_net,                 // monto neto para el vendedor
-                'tax_withholding'   => $tax_breakdown['withholding_total'] ?? $tax_breakdown['total_withholding'] ?? 0.0, // M-QA-02: normalised
-                'iva_amount'        => $tax_breakdown['iva'] ?? $tax_breakdown['iva_amount'] ?? 0.0, // NOT NULL DEFAULT 0
-                // TRIB-003 FIX (2026-11-26): persistir el desglose por-impuesto del
-                // engine (fuente única de verdad). Antes estas columnas solo las
-                // escribía el writer fiscal con fórmulas propias (CO IVA 19% fijo,
-                // ReteIVA incondicional, ISR MX 1% fijo) → los reportes SAT Art.
-                // 30-B / DIAN leían cifras inconsistentes con el split. El fallback
-                // (TAX_BREAKDOWN_FAILED) solo trae withholding_total → ?? 0 cubre.
-                'retefuente_amount' => (float) ( $tax_breakdown['retefuente'] ?? 0.0 ),
-                'retefuente_rate'   => (float) ( $tax_breakdown['retefuente_rate'] ?? 0.0 ),
-                'reteiva_amount'    => (float) ( $tax_breakdown['reteiva'] ?? 0.0 ),
-                'reteiva_rate'      => (float) ( $tax_breakdown['reteiva_rate'] ?? 0.0 ),
-                'reteica_amount'    => (float) ( $tax_breakdown['reteica'] ?? 0.0 ),
-                'reteica_rate'      => (float) ( $tax_breakdown['reteica_rate'] ?? 0.0 ),
-                'isr_amount'        => (float) ( $tax_breakdown['isr'] ?? 0.0 ),
-                'isr_rate'          => (float) ( $tax_breakdown['isr_rate'] ?? 0.0 ),
-                'ieps_amount'       => (float) ( $tax_breakdown['ieps'] ?? 0.0 ),
-                'impoconsumo_amount'=> (float) ( $tax_breakdown['impoconsumo'] ?? 0.0 ),
-                'currency'          => $order->get_currency(),
-                'country_code'      => LTMS_Core_Config::get_country(),
-                'status'            => 'paid',
-                'metadata'          => wp_json_encode( $tax_breakdown ),
-                'created_at'        => LTMS_Utils::now_utc(),
-            ],
-            [
-                '%d', '%d', '%d', '%f', '%f', '%f', '%f', '%f', '%f',
-                '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f', '%f',
-                '%s', '%s', '%s', '%s', '%s',
-            ]
-        );
+        $result = $wpdb->insert( $table, $data, $formats );
 
         // OS-BUG-C FIX: el insert puede fallar por deadlock, constraint violation,
         // tabla corrupta, etc. Antes este caso era silencioso — la comisión NO se
@@ -818,13 +896,18 @@ final class LTMS_Business_Order_Split {
 
         $table = $wpdb->prefix . 'lt_commissions';
 
+        // TRIB-007 FIX: el SELECT solo pide las columnas por-impuesto que
+        // existen — con drift de esquema, una columna inexistente en el SELECT
+        // produce SQL error → get_row null → heal silenciosamente omitido.
+        $available_cols = self::available_per_tax_columns();
+        $per_tax_select = implode( ', ', array_keys( $available_cols ) );
+
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $row = $wpdb->get_row(
             $wpdb->prepare(
                 // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-                "SELECT gross_amount, commission_amount, commission_rate, vendor_amount, tax_withholding, iva_amount,
-                        retefuente_amount, retefuente_rate, reteiva_amount, reteiva_rate, reteica_amount, reteica_rate,
-                        isr_amount, isr_rate, ieps_amount, impoconsumo_amount
+                "SELECT gross_amount, commission_amount, commission_rate, vendor_amount, tax_withholding, iva_amount
+                        {$per_tax_select}
                  FROM `{$table}` WHERE id = %d",
                 $commission_id
             )
@@ -845,7 +928,8 @@ final class LTMS_Business_Order_Split {
         // Antes solo se alineaban gross/fee/rate/net/withholding/iva — el writer
         // fiscal dejaba reteiva_amount (ReteIVA CO incondicional) e isr_amount
         // (ISR MX 1% fijo) fabricados, y los reportes SAT/DIAN los consumían.
-        $per_tax = [
+        // TRIB-007: solo columnas existentes (drift-safe).
+        $per_tax_all = [
             'retefuente_amount'  => (float) ( $r['tax_breakdown']['retefuente'] ?? 0.0 ),
             'retefuente_rate'    => (float) ( $r['tax_breakdown']['retefuente_rate'] ?? 0.0 ),
             'reteiva_amount'     => (float) ( $r['tax_breakdown']['reteiva'] ?? 0.0 ),
@@ -857,6 +941,7 @@ final class LTMS_Business_Order_Split {
             'ieps_amount'        => (float) ( $r['tax_breakdown']['ieps'] ?? 0.0 ),
             'impoconsumo_amount' => (float) ( $r['tax_breakdown']['impoconsumo'] ?? 0.0 ),
         ];
+        $per_tax = array_intersect_key( $per_tax_all, $available_cols );
 
         // Idempotencia real: si los valores ya coinciden con el split, skip.
         // COMMISSION-RATE-FIX: la tasa entra en la comparación para que una fila

@@ -49,10 +49,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > - **TRIB-006 (P2):** `is_booking` nunca se pasaba al engine (gates NT-1/NT-2
 >   de las estrategias). Expuesto desde el split y ReDi split.
 >
-> Tests: `tests/unit/TributaryAudit20261126FixesTest.php` (29: engine CO/MX,
-> source-based split/writer/Siigo, render del PDF) + 2 funcionales en
-> OrderSplitTest (insert por-impuesto con booking; heal de fila corrupta del
-> writer). Pendiente negocio: backfill histórico + tax IDs Siigo.
+> Tests: `tests/unit/TributaryAudit20261126FixesTest.php` (37: engine CO/MX,
+> source-based split/writer/Siigo, render del PDF, backfill, guard de esquema)
+> + 2 funcionales en OrderSplitTest (insert por-impuesto con booking; heal de
+> fila corrupta del writer). Backfill EJECUTADO en producción (2 filas
+> corregidas). Pendiente negocio: tax IDs Siigo.
+>
+> - **TRIB-007 (P1, incidente en producción, validación SSH):** la migración
+>   `migrate_2_1_0_fiscal_dian` quedó PARCIALMENTE aplicada en producción — el
+>   gate `ltms_db_version >= 2.9.20` la saltea para siempre y faltaban 4
+>   columnas (`retefuente_rate`, `reteiva_rate`, `reteica_rate`,
+>   `impoconsumo_amount`). Con TRIB-003 deployado, el INSERT de
+>   `record_commission` habría fallado con SQL error → ROLLBACK de la tx
+>   externa → **vendor sin crédito de wallet** (detectado ANTES de un pedido
+>   real, en la verificación de esquema del backfill). Fix doble: (1) ALTERs
+>   aplicados manualmente en producción (idempotentes, verificados); (2) guard
+>   `available_per_tax_columns()` (SHOW COLUMNS cacheado 1h, fail-open) que
+>   filtra el INSERT/UPDATE/heal del split contra las columnas reales — la
+>   wallet NUNCA vuelve a depender de columnas de reporting. Los reportes
+>   SAT/DIAN que hacen SELECT de columnas inexistentes quedaban vacíos en
+>   silencio (otro síntoma del mismo drift).
+>
+> - **TRIB-BACKFILL (ejecutado):** `deploy/ltms-backfill-fiscal-tax-columns-
+>   2026-11-26.php` (dry-run + idempotente; solo columnas fiscales, NO toca
+>   money de wallet). Producción: 2 filas pagadas corregidas — ReteIVA
+>   fabricada 4.25 → 0.00 (compradores no gran contribuyente), ReteICA real
+>   0.62 poblada (rate 0.414‰), invariante `gross − comisión − withholding =
+>   vendor_amount` verificado post-fix. Productos publicados solo
+>   physical/product → IVA 19% se mantiene correcto.
 
 ## [Unreleased] — 2026-11-24
 
