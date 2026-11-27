@@ -422,6 +422,71 @@ class TributaryAudit20261126FixesTest extends TestCase {
 	}
 
 	// ------------------------------------------------------------------ //
+	//  TRIB-008 — label ReteIVA del PDF usa la tasa real del desglose
+	// ------------------------------------------------------------------ //
+
+	public function test_invoice_reteiva_label_uses_breakdown_rate(): void {
+		$html = $this->render_invoice_template( [
+			'country'       => 'CO',
+			'currency'      => 'COP',
+			'items'         => [ [ 'name' => 'Servicio', 'quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 19, 'tax_amount' => 19000, 'subtotal' => 100000 ] ],
+			'subtotal'      => 100000,
+			'tax_total'     => 19000,
+			'rete_iva'      => 2850,
+			'rete_iva_rate' => 15,
+		] );
+		$this->assertStringContainsString( 'ReteIVA (15.0%)', $html, 'TRIB-008: el label ReteIVA usa la tasa del desglose.' );
+	}
+
+	public function test_invoice_reteiva_label_shows_custom_rate_not_fixed_15(): void {
+		// Hallazgo P3: admin con tasa de retención distinta de la legal — el
+		// label fijo "15%" mentía sobre la retención aplicada al comprobante.
+		$html = $this->render_invoice_template( [
+			'country'       => 'CO',
+			'currency'      => 'COP',
+			'items'         => [ [ 'name' => 'Servicio', 'quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 19, 'tax_amount' => 19000, 'subtotal' => 100000 ] ],
+			'subtotal'      => 100000,
+			'tax_total'     => 19000,
+			'rete_iva'      => 1140,
+			'rete_iva_rate' => 6,
+		] );
+		$this->assertStringContainsString( 'ReteIVA (6.0%)', $html, 'TRIB-008: tasa custom debe mostrarse, no el 15% fijo.' );
+		$this->assertStringNotContainsString( 'ReteIVA (15%)', $html );
+	}
+
+	public function test_invoice_reteiva_label_falls_back_to_statutory_15(): void {
+		// Sin rete_iva_rate en $data → fallback legal 15% (E.T. art. 437-2).
+		$html = $this->render_invoice_template( [
+			'country'   => 'CO',
+			'currency'  => 'COP',
+			'items'     => [ [ 'name' => 'Servicio', 'quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 19, 'tax_amount' => 19000, 'subtotal' => 100000 ] ],
+			'subtotal'  => 100000,
+			'tax_total' => 19000,
+			'rete_iva'  => 2850,
+		] );
+		$this->assertStringContainsString( 'ReteIVA (15.0%)', $html, 'TRIB-008: fallback legal 15% cuando el desglose no trae tasa.' );
+	}
+
+	public function test_invoice_template_carries_trib008_tag(): void {
+		$src = (string) file_get_contents( dirname( __DIR__, 2 ) . '/templates/pdf/template-invoice.php' );
+		$this->assertStringContainsString( 'TRIB-008 FIX', $src, 'TRIB-008: tag de trazabilidad requerido.' );
+	}
+
+	// ------------------------------------------------------------------ //
+	//  TRIB-009 — warning de Alegra sin referencia a config inexistente
+	// ------------------------------------------------------------------ //
+
+	public function test_alegra_warning_does_not_reference_phantom_config(): void {
+		$src = (string) file_get_contents( dirname( __DIR__, 2 ) . '/includes/business/class-ltms-alegra-sync.php' );
+		$this->assertStringContainsString( 'TRIB-009 FIX', $src, 'TRIB-009: tag de trazabilidad requerido.' );
+		$this->assertStringNotContainsString(
+			'ltms_alegra_tax_map',
+			$src,
+			'TRIB-009: el warning no debe remitir a una config de opciones que no existe en el código — el remedio real es el const TAX_MAP_CO/MX.'
+		);
+	}
+
+	// ------------------------------------------------------------------ //
 	//  TRIB-BACKFILL-2026-11-26 — backfill de columnas fiscales históricas
 	// ------------------------------------------------------------------ */
 

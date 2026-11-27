@@ -18,6 +18,11 @@
  *     site_name, site_logo_url, site_url,
  * }
  * @version    1.5.0
+ *
+ * NOTA (TRIB-008, 2026-11-27): este template NO tiene builder en producción —
+ * nadie incluye este archivo ni construye $data (la facturación real opera vía
+ * Alegra/Siigo). Se conserva como especificación de comprobante y soporte de
+ * tests; si se planea emitir PDFs locales, crear primero el builder de $data.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -210,14 +215,20 @@ $doc_title = 'CO' === $country ? 'COMPROBANTE DE VENTA' : 'COMPROBANTE FISCAL';
     </div>
 
     <!-- Colombia: Retenciones -->
-    <?php if ( 'CO' === $country && ( ! empty( $data['rete_fuente'] ) || ! empty( $data['rete_ica'] ) ) ) : ?>
+    <?php if ( 'CO' === $country && ( ! empty( $data['rete_fuente'] ) || ! empty( $data['rete_ica'] ) || ! empty( $data['rete_iva'] ) ) ) : ?>
     <div class="tax-box">
         <div class="tax-box-title">📋 Retenciones Aplicadas (Colombia)</div>
         <?php if ( ! empty( $data['rete_fuente'] ) && (float) $data['rete_fuente'] > 0 ) : ?>
         <div class="tax-row"><span>ReteFuente (<?php echo esc_html( number_format( (float) ( $data['rete_fuente_rate'] ?? 3.5 ), 1 ) ); ?>%)</span><span>- <?php echo esc_html( $fmt( $data['rete_fuente'] ) ); ?></span></div>
         <?php endif; ?>
         <?php if ( ! empty( $data['rete_iva'] ) && (float) $data['rete_iva'] > 0 ) : ?>
-        <div class="tax-row"><span>ReteIVA (15%)</span><span>- <?php echo esc_html( $fmt( $data['rete_iva'] ) ); ?></span></div>
+        <!-- TRIB-008 FIX (2026-11-27): label con la tasa real del desglose
+             (rete_iva_rate, fallback legal 15% E.T. art. 437-2) — paridad con
+             ReteFuente e IVA (TRIB-005). El gate de la caja también admite
+             pedidos con SOLO ReteIVA (buyer gran contribuyente, base < 27 UVT
+             → sin ReteFuente ni ReteICA): antes la retención desaparecía del
+             comprobante. -->
+        <div class="tax-row"><span>ReteIVA (<?php echo esc_html( number_format( (float) ( $data['rete_iva_rate'] ?? 15 ), 1 ) ); ?>%)</span><span>- <?php echo esc_html( $fmt( $data['rete_iva'] ) ); ?></span></div>
         <?php endif; ?>
         <?php if ( ! empty( $data['rete_ica'] ) && (float) $data['rete_ica'] > 0 ) : ?>
         <div class="tax-row"><span>ReteICA</span><span>- <?php echo esc_html( $fmt( $data['rete_ica'] ) ); ?></span></div>

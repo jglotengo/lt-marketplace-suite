@@ -23,6 +23,8 @@
 - TRIB-004 (P1): Siigo IVA 19% fijo a todos los items → resolve_item_tax_ids() por tipo (exentos sin tax; 5%/7% configurables con warning, nunca 19% por defecto).
 - TRIB-005 (P2): label IVA fijo del PDF → tasa real del item/breakdown.
 - TRIB-006 (P2): `is_booking` expuesto al engine.
+- TRIB-008 (P3, backlog): label ReteIVA fijo del PDF → tasa real del desglose (rete_iva_rate, fallback legal 15%) + gate de la caja admite pedidos con solo ReteIVA. Template documentado como sin builder en producción.
+- TRIB-009 (P3, backlog): warning de Alegra remitía a una config de opciones inexistente → remite al remedio real (const TAX_MAP_CO/MX).
 
 **Verificación:** suite completa 5,453 tests / 12,479 assertions / 3 skipped (baseline 5,414, +39 tests). `php -l` en los 8 archivos tocados. Validación SSH: deploy `46b6d94d` confirmado, plugin recargado, cache flush, clases verificadas, `SHOW COLUMNS` de lt_commissions.
 
@@ -30,10 +32,11 @@
 
 **Backfill ejecutado en producción:** 2 filas pagadas corregidas (ReteIVA fabricada 4.25 → 0.00; ReteICA real 0.62 + rate 0.414‰ poblados; invariante gross − comisión − withholding = vendor_amount verificado).
 
+**Cierre del P3 backlog (TRIB-008/009, 2026-11-27):** suite 5,458 tests / 12,486 assertions / 3 skipped (5,453 + 5 nuevos), `php -l` OK. El template PDF se documenta como sin builder en producción (la facturación real va por Alegra/Siigo); añadir la entrada 7% a TAX_MAP_CO queda aplazado a decisión de negocio (requiere el tax ID real de la cuenta Alegra del comercio).
+
 **Pendiente de negocio (no asumido):**
-1. Backfill histórico de `lt_commissions`: filas pre-fix con `reteiva_amount`/`isr_amount` fabricados por el writer (reportes SAT/DIAN retroactivos requieren decisión).
-2. Configurar en Siigo los tax IDs por tasa (`ltms_siigo_tax_id_5`, `ltms_siigo_tax_id_7`) si se venden productos reducidos/turísticos.
-3. P3 backlog: label "ReteIVA (15%)" fijo en el box de retenciones del PDF y TAX_MAP_CO de Alegra sin entrada 7% (líneas de comisión).
+1. Configurar en Siigo los tax IDs por tasa (`ltms_siigo_tax_id_5`, `ltms_siigo_tax_id_7`) si se venden productos reducidos/turísticos.
+2. TAX_MAP_CO de Alegra: entrada 7% (turismo) requiere el tax ID real de la cuenta Alegra del comercio; su único consumidor (prepare_invoice_items) es dead-code deprecated M-201.
 
 ---
 

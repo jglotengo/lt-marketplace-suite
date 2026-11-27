@@ -6,13 +6,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased] — 2026-11-26
 
-### Fixed - `TRIB-2026-11-26` (auditoría tributaria MX/CO + E2E fiscal del viaje de compra - 7 fixes)
+### Fixed - `TRIB-2026-11-26` (auditoría tributaria MX/CO + E2E fiscal del viaje de compra - 10 fixes)
 
-> Suite 5,445 tests / 12,450 assertions / 3 skipped - cero regresiones (+31
+> Suite 5,458 tests / 12,486 assertions / 3 skipped - cero regresiones (+44
 > tests nuevos vs baseline 5,414). Hallazgos: 1 P0, 3 P1, 2 P2 + 1 P1
-> derivado de la re-auditoría (ReDi). Pendiente de negocio: backfill
-> histórico de `lt_commissions` (reteiva/isr fabricados por el writer
-> pre-fix) y configuración de tax IDs Siigo por tasa.
+> derivado de la re-auditoría (ReDi) + 1 P1 de incidente en producción
+> (TRIB-007) + 2 P3 de backlog (TRIB-008/009). Backfill histórico
+> EJECUTADO en producción (2 filas corregidas). Pendiente de negocio:
+> configuración de tax IDs Siigo por tasa.
 >
 > - **TRIB-001 (P0):** el Order Split leía el order meta `_ltms_product_type`,
 >   que NADIE escribe (el meta vive en el post del producto) → todo pedido
@@ -49,8 +50,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 > - **TRIB-006 (P2):** `is_booking` nunca se pasaba al engine (gates NT-1/NT-2
 >   de las estrategias). Expuesto desde el split y ReDi split.
 >
-> Tests: `tests/unit/TributaryAudit20261126FixesTest.php` (37: engine CO/MX,
-> source-based split/writer/Siigo, render del PDF, backfill, guard de esquema)
+> Tests: `tests/unit/TributaryAudit20261126FixesTest.php` (42: engine CO/MX,
+> source-based split/writer/Siigo, render del PDF, backfill, guard de esquema,
+> label ReteIVA, warning Alegra)
 > + 2 funcionales en OrderSplitTest (insert por-impuesto con booking; heal de
 > fila corrupta del writer). Backfill EJECUTADO en producción (2 filas
 > corregidas). Pendiente negocio: tax IDs Siigo.
@@ -77,6 +79,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 >   0.62 poblada (rate 0.414‰), invariante `gross − comisión − withholding =
 >   vendor_amount` verificado post-fix. Productos publicados solo
 >   physical/product → IVA 19% se mantiene correcto.
+
+>
+> - **TRIB-008 (P3, backlog):** el label ReteIVA del PDF era fijo "15%" — usa
+>   la tasa real del desglose (rete_iva_rate, fallback legal 15% E.T. art.
+>   437-2) y el gate de la caja de retenciones admite pedidos con solo
+>   ReteIVA. El template se documenta como sin builder en producción (la
+>   facturación real va por Alegra/Siigo) — pulido por paridad con TRIB-005.
+> - **TRIB-009 (P3, backlog):** el warning ALEGRA_COMMISSION_NO_IVA remitía a
+>   una config de opciones que nunca existió en el código — ahora remite al
+>   remedio real (agregar la entrada al const TAX_MAP_CO/MX). Añadir la
+>   entrada 7% (turismo) al TAX_MAP_CO queda aplazado a decisión de negocio:
+>   requiere el tax ID real de la cuenta Alegra del comercio y su único
+>   consumidor es dead-code (M-201).
 
 ## [Unreleased] — 2026-11-24
 

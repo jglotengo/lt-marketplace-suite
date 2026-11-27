@@ -1119,11 +1119,15 @@ final class LTMS_Alegra_Sync {
             if ( $iva_tax_id && (int) $iva_tax_id > 0 ) {
                 $line['tax'] = [ [ 'id' => (int) $iva_tax_id ] ];
             } else {
+                // TRIB-009 FIX (2026-11-27): el mensaje anterior refería una
+                // config de opciones que nunca existió en el código — el remedio
+                // real es agregar la entrada rate => tax_id al const TAX_MAP
+                // correspondiente (los IDs viven en la cuenta Alegra del comercio).
                 if ( class_exists( 'LTMS_Core_Logger' ) ) {
                     LTMS_Core_Logger::warning(
                         'ALEGRA_COMMISSION_NO_IVA',
                         sprintf(
-                            'Factura para pedido #%d: IVA %.0f%% no aplicado a comisión — tax_id no configurado en tax_map (país=%s, key=%s). Configurar ltms_alegra_tax_map_co/mx.',
+                            'Factura para pedido #%d: IVA %.0f%% no aplicado a comisión — la tasa no está mapeada en LTMS_Alegra_Sync::TAX_MAP_%s (key=%s). Agregar la entrada rate => tax_id de Alegra al const.',
                             $order->get_id(),
                             $iva_rate * 100,
                             $country,

@@ -4,7 +4,7 @@
 >
 > **Última actualización:** 2026-11-20
 > **Versión del plugin:** 2.9.436
-> **Total de lecciones:** 225 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218; + 3 del ciclo E2E-BUYER-CHECKOUT-POLISH 2026-11-24, #219-221; + 4 del ciclo TRIB-2026-11-26, #222-225)
+> **Total de lecciones:** 226 (… + 8 del ciclo OPENPAY-WEBHOOK/E2E-BUYER 2026-11-19/20, #208-215; + 3 del ciclo E2E-BUYER-QV-HARDEN 2026-11-24, #216-218; + 3 del ciclo E2E-BUYER-CHECKOUT-POLISH 2026-11-24, #219-221; + 5 del ciclo TRIB-2026-11-26, #222-226)
 
 ---
 
@@ -5274,3 +5274,21 @@ deben ocultarse (con aviso), no mostrarse inertes. Validación client-side que e
    helper idempotente por columna. (4) El primer smoke post-deploy fiscal
    debe ser un INSERT transaccional de prueba con ROLLBACK, no esperar un
    pedido real.
+
+### Leccion #226: audita la superficie real (callers) de un hallazgo de backlog antes de fixear - 2 de 3 P3 apuntaban a codigo muerto o config fantasma
+
+1. **Caso real:** el backlog P3 del ciclo TRIB documentaba "label ReteIVA fijo
+   en PDF" y "TAX_MAP_CO de Alegra sin 7%". Al trazar callers antes de codear:
+   el template de factura NO tiene builder (nadie lo incluye; la facturacion
+   real va por Alegra/Siigo) y prepare_invoice_items (unico consumidor que
+   necesitaba el 7%) es dead-code deprecated M-201. Ademas, el warning de
+   Alegra remitia a una config de opciones que nunca existio en el codigo -
+   un remedio fantasma que convierte el log en bucle de soporte.
+
+2. **Regla preventiva:** (1) Antes de fixear un hallazgo de backlog, grep de
+   callers/lectores: si la superficie esta muerta, el fix honesto es
+   documentar el estado real en el propio archivo (o eliminar), no maquillar
+   como si estuviera vivo. (2) Los mensajes de warning/error deben remitir
+   SOLO a remedios que existen: const, option key verificada o accion
+   documentada. (3) Un test que incluye un template directamente prueba el
+   render, NO que produccion lo ejecute - cobertura no es alcance.
